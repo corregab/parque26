@@ -278,6 +278,11 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .avsumt td{text-align:center;padding:2px 1px;color:var(--bone)}
 .avsumt td.nm{text-align:left;white-space:nowrap}
 @media(max-width:520px){.avsumwrap{grid-template-columns:1fr}}
+.qacourt{background:#0d0a08;border:1px solid #2a2119;border-top:none;border-radius:0 0 10px 10px;padding:8px;display:flex;flex-direction:column;align-items:center}
+#qaCanvas{width:100%;max-width:320px;height:auto;border-radius:6px;touch-action:none}
+.qaleg{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:6px;font-size:11px;color:#9a8a76}
+.qaleg .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle;margin-right:4px}
+.qaleg .dot.meu.on{background:#e8a33d}.qaleg .dot.adv.on{background:#7f95ab}.qaleg .dot.bola{background:#ff8c2b}
 </style>
 </head>
 <body>
@@ -1102,6 +1107,8 @@ function avPasso(){
 
   const O=AV.posse, D=O===AV.A?AV.B:AV.A;
   const ptsAntesO=O.pts;
+  AV._ultLadoAtaque = O===AV.A?'A':'B';
+  AV.lanceVis=null;
 
   // ---- momentum: bônus temporário no ataque de quem está embalado / saiu de timeout
   aplicarMomentum(O);
@@ -1238,6 +1245,7 @@ function avOnShot(shot){
   AV.shots.push({tipo:shot.tipo, acertou:shot.acertou, lado:shot.lado, nome:shot.nome,
                  x:clamp(x,3,97), y:clamp(y,6,92), q:AV.quarto});
   if(AV.shots.length>120) AV.shots.shift();
+  AV.lanceVis={tipo:'arremesso', lado:shot.lado, arremessador:shot.nome, acertou:shot.acertou, shotTipo:shot.tipo};
 }
 
 function avEncerrar(){
@@ -3689,8 +3697,13 @@ const AV_VEL={ lento:1100, normal:620, rapido:240 };
 
 function avSetVel(v){
   AVUI.velocidade=v; AVUI.pausado=false;
-  clearInterval(AVUI.timer);
-  AVUI.timer=setInterval(avTick, AV_VEL[v]);
+  clearInterval(AVUI.timer); AVUI.timer=null;
+  if(AVUI.aba==='quadra'){
+    if(QA){ QA.dur=QA_DUR[v]; if(!QA.raf) avQuadraLoop(performance.now()); }
+    else avQuadraIniciar();
+  } else {
+    AVUI.timer=setInterval(avTick, AV_VEL[v]);
+  }
   avAtualizaControles();
 }
 function avPausar(){
@@ -3757,10 +3770,18 @@ function avRenderTela(){
 }
 
 function avSetAba(aba){
+  const antiga=AVUI.aba;
   AVUI.aba=aba;
   [...document.querySelectorAll('.avtab')].forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes("'"+aba+"'")));
   avRenderCentral();
-  if(aba==='narracao'){ const box=el('avPbp'); if(box)box.scrollTop=box.scrollHeight; }
+  if(aba==='quadra'){
+    clearInterval(AVUI.timer); AVUI.timer=null;
+    avQuadraIniciar();               // cria canvas e inicia o loop de animação
+  } else {
+    avQuadraParar();                 // sai da quadra: para a animação
+    if(aba==='narracao'){ const box=el('avPbp'); if(box)box.scrollTop=box.scrollHeight; }
+    if(!AVUI.pausado){ clearInterval(AVUI.timer); AVUI.timer=setInterval(avTick, AV_VEL[AVUI.velocidade]); }
+  }
 }
 
 function avRenderCentral(){
@@ -3771,7 +3792,7 @@ function avRenderCentral(){
     AV.log.forEach(l=>box.appendChild(avLinhaEl(l)));
     box.scrollTop=box.scrollHeight;
   } else if(AVUI.aba==='quadra'){
-    c.innerHTML=avQuadraSVG();
+    c.innerHTML=avQuadraCanvasHTML();
   } else {
     c.innerHTML=avSumulaHTML();
   }
@@ -3815,7 +3836,7 @@ function avAtualizaPlacar(){
 }
 
 function avPintarNovos(eventos){
-  if(AVUI.aba==='quadra'){ avAtualizaShots(); return; }
+  if(AVUI.aba==='quadra'){ return; }   // a quadra anima sozinha via requestAnimationFrame
   if(AVUI.aba==='sumula'){ const c=el('avCentral'); if(c)c.innerHTML=avSumulaHTML(); return; }
   const box=el('avPbp'); if(!box||!eventos) return;
   eventos.forEach(l=>box.appendChild(avLinhaEl(l)));
@@ -4043,6 +4064,199 @@ function toast(txt){
   if(!t){ t=document.createElement('div'); t.id='avToast'; t.className='avtoast'; document.body.appendChild(t); }
   t.textContent=txt; t.classList.add('on');
   clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),1600);
+}
+/* ============================================================
+   QUADRA ANIMADA — visualização 2D da partida ao vivo
+   Encena cada posse: jogadores se movem, a bola passa e vai à cesta.
+   ============================================================ */
+let QA = null;
+
+// slots de formação (normalizado 0..1) para quem ataca a cesta de CIMA (y pequeno)
+const QA_ATAQUE = [
+  {x:0.50,y:0.44}, {x:0.80,y:0.34}, {x:0.20,y:0.34}, {x:0.63,y:0.18}, {x:0.37,y:0.18}
+];
+const QA_DEFESA = [
+  {x:0.50,y:0.32}, {x:0.73,y:0.26}, {x:0.27,y:0.26}, {x:0.59,y:0.13}, {x:0.41,y:0.13}
+];
+const QA_DUR = { lento:1.9, normal:1.15, rapido:0.55 }; // duração da posse (s)
+
+function avQuadraCanvasHTML(){
+  const meuA=AV.meuLado==='A';
+  return `<div class="qacourt">
+    <canvas id="qaCanvas" width="340" height="440"></canvas>
+    <div class="qaleg">
+      <span><i class="dot meu on"></i> ${esc((meuA?AV.A:AV.B).t.ab)}</span>
+      <span><i class="dot adv on"></i> ${esc((meuA?AV.B:AV.A).t.ab)}</span>
+      <span><i class="dot bola"></i> bola</span>
+    </div>
+  </div>`;
+}
+
+function avQuadraIniciar(){
+  const cv=el('qaCanvas'); if(!cv) return;
+  const ctx=cv.getContext('2d'); if(!ctx) return;
+  // monta os 10 jogadores a partir do quinteto em quadra
+  const mk=(g,lado)=>g.quinteto.slice(0,5).map((p,i)=>({
+    lado, nome:p.nome.split(' ').slice(-1)[0], ref:p,
+    x:0.5,y:lado==='A'?0.7:0.3, tx:0.5,ty:0.5
+  }));
+  QA={
+    cv, ctx, W:cv.width, H:cv.height,
+    jog:[...mk(AV.A,'A'), ...mk(AV.B,'B')],
+    bola:{x:0.5,y:0.5, tx:0.5,ty:0.5, dono:null, voando:false, entrou:false},
+    fase:'nova', t:0, dur:QA_DUR[AVUI.velocidade]||1.15, last:0,
+    atk:null, beats:[], raf:null, placarFlash:0
+  };
+  avQuadraLoop(performance.now());
+}
+function avQuadraParar(){ if(QA&&QA.raf){cancelAnimationFrame(QA.raf);} QA=null; }
+
+function avQuadraLoop(ts){
+  if(!QA||AVUI.aba!=='quadra'){ return; }
+  const dt=Math.min(0.05,(ts-(QA.last||ts))/1000); QA.last=ts;
+  if(!AVUI.pausado){
+    if(QA.fase==='nova') avQuadraNovaPosse();
+    else if(QA.fase==='animando'){
+      QA.t += dt/QA.dur;   // 0..1 ao longo da posse
+      if(QA.t>=1){ avQuadraFimPosse(); }
+    }
+  }
+  if(!QA||AVUI.aba!=='quadra') return;   // pode ter encerrado o jogo nesta iteração
+  avQuadraTick(dt);
+  avQuadraDesenhar();
+  QA.raf=requestAnimationFrame(avQuadraLoop);
+}
+
+function avQuadraNovaPosse(){
+  const r=avPasso();
+  // repercute nos outros painéis também (placar, energia)
+  avAtualizaPlacar(); avAtualizaQuadra();
+  QA.evtPend=r;
+  // resumo visual da posse
+  const lado = AV._ultLadoAtaque || (AV.posse===AV.A?'A':'B');
+  QA.lanceVis = AV.lanceVis || null;
+  QA.atk = QA.lanceVis? QA.lanceVis.lado : lado;
+  const alvoCima = QA.atk==='A'; // A ataca a cesta de cima
+  posicionarFormacao(QA.atk, alvoCima);
+  // define a sequência da bola
+  const atk=QA.jog.filter(j=>j.lado===QA.atk);
+  const handler = atk[0]; // PG traz
+  let arremessador = handler;
+  if(QA.lanceVis && QA.lanceVis.arremessador){
+    const found = atk.find(j=>j.nome===QA.lanceVis.arremessador);
+    if(found) arremessador=found;
+  } else {
+    arremessador = atk[RI(0,atk.length-1)];
+  }
+  QA.handler=handler; QA.arremessador=arremessador; QA.alvoCima=alvoCima;
+  QA.bola.dono=handler; QA.bola.voando=false; QA.bola.entrou=false;
+  QA.acertou = QA.lanceVis? QA.lanceVis.acertou : false;
+  QA.ehArremesso = QA.lanceVis? (QA.lanceVis.tipo==='arremesso') : false;
+  QA.t=0; QA.dur=QA_DUR[AVUI.velocidade]||1.15; QA.fase='animando';
+}
+
+function posicionarFormacao(atk, alvoCima){
+  const espelha = p=> alvoCima? p : {x:p.x, y:1-p.y};
+  const atkJ=QA.jog.filter(j=>j.lado===atk);
+  const defJ=QA.jog.filter(j=>j.lado!==atk);
+  atkJ.forEach((j,i)=>{ const s=espelha(QA_ATAQUE[i%5]); j.tx=s.x+R(-0.03,0.03); j.ty=s.y+R(-0.03,0.03); });
+  defJ.forEach((j,i)=>{ const s=espelha(QA_DEFESA[i%5]); j.tx=s.x+R(-0.03,0.03); j.ty=s.y+R(-0.03,0.03); });
+}
+
+function avQuadraFimPosse(){
+  // aplica flash de placar se acertou
+  if(QA.ehArremesso && QA.acertou) QA.placarFlash=1;
+  const r=QA.evtPend||{};
+  QA.fase='fimcheck';
+  // trata pausas (fim de quarto, clutch, timeout, fim de jogo)
+  if(r.fim){ avQuadraParar(); avFimDeJogo(r.resultado); return; }
+  if(r.fimQuarto){ avPausar(); avPainelIntervalo(r.quarto); QA.fase='nova'; return; }
+  if(r.clutch && r.minhaPosse){ avPausar(); avPainelClutch(); QA.fase='nova'; return; }
+  if(r.sugereTimeout && !AV._jaAvisou){ AV._jaAvisou=true; avPausar(); avSugereTimeout(); QA.fase='nova'; return; }
+  QA.fase='nova';
+}
+
+// interpola posições (lerp) e move a bola conforme a sub-fase da posse
+function avQuadraTick(dt){
+  const lerp=(a,b,k)=>a+(b-a)*k;
+  QA.jog.forEach(j=>{ j.x=lerp(j.x,j.tx,0.12); j.y=lerp(j.y,j.ty,0.12); });
+  if(QA.placarFlash>0) QA.placarFlash=Math.max(0,QA.placarFlash-dt*2);
+  if(QA.fase!=='animando'){ if(QA.bola.dono){const d=QA.bola.dono;QA.bola.x=d.x;QA.bola.y=d.y;} return; }
+  const t=QA.t;
+  const cesta={x:0.5, y:QA.alvoCima?0.06:0.94};
+  if(t<0.42){
+    // trazer a bola: handler avança, bola com ele
+    const d=QA.handler; QA.bola.x=lerp(QA.bola.x,d.x,0.18); QA.bola.y=lerp(QA.bola.y,d.y,0.18); QA.bola.voando=false;
+  } else if(t<0.62){
+    // passe pro arremessador
+    const p=QA.arremessador; QA.bola.x=lerp(QA.bola.x,p.x,0.22); QA.bola.y=lerp(QA.bola.y,p.y,0.22); QA.bola.voando=true;
+  } else if(t<0.86){
+    if(QA.ehArremesso){
+      // arremesso: bola voa pra cesta
+      const k=(t-0.62)/0.24; QA.bola.x=lerp(QA.arremessador.x,cesta.x,k); QA.bola.y=lerp(QA.arremessador.y,cesta.y,k); QA.bola.voando=true;
+    } else {
+      // turnover/falta: bola fica com o jogador
+      const p=QA.arremessador; QA.bola.x=p.x; QA.bola.y=p.y;
+    }
+  } else {
+    if(QA.ehArremesso){
+      if(QA.acertou){ QA.bola.x=cesta.x; QA.bola.y=cesta.y; QA.bola.entrou=true; }
+      else {
+        // rebote: bola cai perto da cesta e vai pra um jogador aleatório
+        if(!QA._reb){ QA._reb=QA.jog[RI(0,9)]; }
+        QA.bola.x=lerp(QA.bola.x,QA._reb.x,0.18); QA.bola.y=lerp(QA.bola.y,QA._reb.y,0.18);
+      }
+    }
+  }
+  if(t<0.6) QA._reb=null;
+}
+
+function avQuadraDesenhar(){
+  const {ctx,W,H}=QA;
+  ctx.clearRect(0,0,W,H);
+  // fundo quadra
+  ctx.fillStyle='#12100d'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#3a2e22'; ctx.lineWidth=1.5;
+  ctx.strokeRect(6,6,W-12,H-12);
+  // linha central
+  ctx.beginPath(); ctx.moveTo(6,H/2); ctx.lineTo(W-12+6,H/2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(W/2,H/2,26,0,7); ctx.stroke();
+  // garrafões + cestas (topo e base)
+  const paint=(cy,dir)=>{
+    ctx.strokeStyle='#3a2e22';
+    ctx.strokeRect(W/2-34, cy, 68, 60*dir);
+    ctx.beginPath(); ctx.arc(W/2, cy+60*dir, 22,0,7); ctx.stroke();
+    // cesta
+    ctx.strokeStyle='#c8792e'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(W/2, cy+8*dir, 5,0,7); ctx.stroke();
+    ctx.lineWidth=1.5;
+  };
+  paint(6,1); paint(H-6,-1);
+  // jogadores
+  QA.jog.forEach(j=>{
+    const x=j.x*W, y=j.y*H, meu=(j.lado===AV.meuLado);
+    ctx.beginPath(); ctx.arc(x,y,10,0,7);
+    ctx.fillStyle= meu? '#e8a33d' : '#7f95ab';
+    ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=1; ctx.stroke();
+    // inicial do nome
+    ctx.fillStyle= meu? '#3a2408' : '#101820';
+    ctx.font='bold 9px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(j.nome.slice(0,3), x, y);
+  });
+  // bola
+  const bx=QA.bola.x*W, by=QA.bola.y*H;
+  if(!QA.bola.entrou){
+    ctx.beginPath(); ctx.arc(bx,by, QA.bola.voando?5.5:5, 0,7);
+    ctx.fillStyle='#ff8c2b'; ctx.fill();
+    ctx.strokeStyle='#7a3d10'; ctx.lineWidth=1; ctx.stroke();
+  }
+  // flash de cesta
+  if(QA.placarFlash>0){
+    ctx.fillStyle=`rgba(232,163,61,${QA.placarFlash*0.5})`;
+    const cy=QA.alvoCima?14:H-14;
+    ctx.beginPath(); ctx.arc(W/2,cy,18*(1.5-QA.placarFlash),0,7); ctx.fill();
+  }
 }
 /* ============================================================
    BOOT · SETUP · SAVE
