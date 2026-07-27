@@ -283,6 +283,17 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .qaleg{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:6px;font-size:11px;color:#9a8a76}
 .qaleg .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle;margin-right:4px}
 .qaleg .dot.meu.on{background:#e8a33d}.qaleg .dot.adv.on{background:#7f95ab}.qaleg .dot.bola{background:#ff8c2b}
+.jogadalist{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.jogadaopt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:9px;padding:9px 11px;cursor:pointer;text-align:left}
+.jogadaopt.on{border-color:var(--amber);background:rgba(232,163,61,.14)}
+.jogadaopt b{font-size:14px}.jogadaopt .hint{font-size:11px}
+.funclist{display:flex;flex-direction:column;gap:5px;margin-top:8px;max-height:52vh;overflow-y:auto}
+.funcopt{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:13px}
+.funcbadge{font-size:11px;color:var(--amber);white-space:nowrap}
+.funcgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.funcopt2{background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:8px;padding:10px 8px;cursor:pointer;font-size:12px;text-align:center}
+.funcopt2.on{border-color:var(--amber);background:rgba(232,163,61,.16);color:var(--amber)}
+.avjgd{font-size:10px;color:var(--wood);text-align:center;margin-top:2px}
 </style>
 </head>
 <body>
@@ -426,6 +437,45 @@ function forcaTime(t){
 }
 function folha(t){return t.elenco.reduce((s,p)=>s+p.salario,0);}
 const TETO = 145000000;
+
+/* ===== FUNÇÕES (papéis) e JOGADAS (padrões ofensivos) ===== */
+const FUNCOES = {
+  estrela:    {nome:'Primeira opção',    emoji:'⭐', usage:1.75, w3:0.10, wRim:0.10, ast:0,   clutch:1},
+  scorer:     {nome:'Pontuador',         emoji:'🎯', usage:1.40, w3:0.14, wRim:0.06, ast:0},
+  armador:    {nome:'Armador',           emoji:'🎪', usage:1.02, w3:0.05, wRim:-0.05, ast:1.0},
+  ala3:       {nome:'Ala de 3 (spot-up)',emoji:'🏹', usage:0.95, w3:0.55, wRim:-0.30, ast:0},
+  defensor:   {nome:'Defensor (3&D)',    emoji:'🛡️', usage:0.72, w3:0.26, wRim:-0.14, ast:0, def:1},
+  poste:      {nome:'Pivô / Poste',      emoji:'💪', usage:1.08, w3:-0.45, wRim:0.55, ast:0, reb:1},
+  coadjuvante:{nome:'Coadjuvante',       emoji:'🔧', usage:0.60, w3:0,    wRim:0,    ast:0.2}
+};
+const ORDEM_FUNCOES=['estrela','scorer','armador','ala3','defensor','poste','coadjuvante'];
+
+function funcaoDe(p){
+  const src = (p && p.ref) ? p.ref : p;   // no motor p é o preparado (tem .ref); fora é o real
+  if(src.funcao && FUNCOES[src.funcao]) return src.funcao;
+  const a=src.arq||'', pos=src.pos||p.pos||'SF', ovr=src.ovr||p.ovr||70;
+  if(['SCOR','SLSH'].includes(a) && ovr>=86) return 'estrela';
+  if(['SCOR','SLSH'].includes(a)) return 'scorer';
+  if(a==='PLAY') return pos==='PG'?'armador':(ovr>=86?'estrela':'scorer');
+  if(a==='3D') return 'defensor';
+  if(['SHOT','STRE'].includes(a)) return 'ala3';
+  if(['PROT','POST'].includes(a)) return 'poste';
+  if(['DEF','GLUE'].includes(a)) return 'defensor';
+  if(a==='ATHL') return ['C','PF'].includes(pos)?'poste':'scorer';
+  if(ovr>=88) return 'estrela';
+  if(['C','PF'].includes(pos)) return 'poste';
+  if(pos==='PG') return 'armador';
+  return 'coadjuvante';
+}
+
+const JOGADAS = {
+  balanceado:{nome:'Equilibrado', emoji:'⚖️', desc:'Ataque distribuído, sem prioridade.',            w3:0,    wRim:0,    wMid:0,   ast:0,    usaTop:0, usaBig:0, usaArm:0, falta:0},
+  poste:     {nome:'Bola dentro', emoji:'🏀', desc:'Prioriza os pivôs no garrafão. Mais faltas.',     w3:-0.25,wRim:0.55, wMid:0,    ast:0.1,  usaTop:0, usaBig:1.7,usaArm:0, falta:0.4},
+  pnr:       {nome:'Pick & Roll', emoji:'🔄', desc:'Armador + pivô. Mais finalizações e assistências.',w3:0.05, wRim:0.30, wMid:0.12,ast:0.7,  usaTop:0, usaBig:1.3,usaArm:1.4,falta:0.1},
+  perimetro: {nome:'Chover de 3', emoji:'🎯', desc:'Espaça a quadra e busca o de três.',              w3:0.60, wRim:-0.25,wMid:-0.1,ast:0.25, usaTop:0, usaBig:0, usaArm:0, falta:0},
+  iso:       {nome:'Isolação',    emoji:'🎪', desc:'Dá a bola pro seu craque decidir.',               w3:0.05, wRim:0.08, wMid:0,    ast:-0.5, usaTop:2.0,usaBig:0, usaArm:0, falta:0.1}
+};
+const ORDEM_JOGADAS=['balanceado','poste','pnr','perimetro','iso'];
 /* ============================================================
    DADOS REAIS — NBA, temporada 2025-26
    Formato: [nome, posição, idade, overall, arquétipo]
@@ -651,7 +701,7 @@ function criarLiga(){
       ingresso:Math.round(78+mkt*13+(prest-70)*0.6),
       capacidade:cap, patroc:Math.round((13+mkt*5.5+(prest-70)*0.32)*1e6),
       tv:Math.round((30+mkt*3.5)*1e6),
-      tatica:{ritmo:1,foco:1,pressao:1},minutos:{},titulares:[],hist:[],camp:0};
+      tatica:{ritmo:1,foco:1,pressao:1,jogada:'balanceado'},minutos:{},titulares:[],hist:[],camp:0};
     (ROSTERS[ab]||[]).forEach(d=>tm.elenco.push(jogadorReal(d,i)));
     tm.elenco.sort((a,b)=>b.ovr-a.ovr);
     let f=folha(tm),lim=TETO*R(.74,.97);
@@ -927,8 +977,20 @@ function jogada(O,D,ctx){
   const defP=media(df,p=>p.at.defP)*(1+(tatD.pressao-1)*0.05);
   const defI=media(df,p=>p.at.defI);
   const casaBonus=(O.casa?0.015:0)+(O.sorte||0);
+  // ---- jogada ofensiva ativa e usage por função
+  const jgd = JOGADAS[tatO.jogada] || JOGADAS.balanceado;
+  // identifica o cara de maior "peso natural" (pro iso concentrar nele)
+  let topId=null,topPeso=-1;
+  of.forEach(p=>{const w=Math.pow(Math.max(1,p.ovr-44),1.3)*FUNCOES[funcaoDe(p)].usage; if(w>topPeso){topPeso=w;topId=p.id;}});
   // ---- posse do jogador
-  const h=sorteioPeso(of,p=>Math.pow(Math.max(1,p.ovr-44),1.34)*(1+(p.at.drible-60)/300))||of[0];
+  const h=sorteioPeso(of,p=>{
+    let peso=Math.pow(Math.max(1,p.ovr-44),1.34)*(1+(p.at.drible-60)/300);
+    peso *= FUNCOES[funcaoDe(p)].usage;
+    if(jgd.usaBig && ['C','PF'].includes(p.pos)) peso*=jgd.usaBig;
+    if(jgd.usaArm && p.pos==='PG') peso*=jgd.usaArm;
+    if(jgd.usaTop && p.id===topId) peso*=jgd.usaTop;
+    return peso;
+  })||of[0];
   if(!h) return 'troca';
   // ---- turnover
   let pTO = 0.124 + (tatD.pressao-1)*0.022 - (h.at.qi-65)*0.0009 - (h.at.drible-65)*0.0008 + (100-h.fadiga)*0.0004;
@@ -952,9 +1014,10 @@ function jogada(O,D,ctx){
   }
   // ---- escolha do arremesso
   const foco=tatO.foco; // 0 dentro, 1 equilíbrio, 2 perímetro
-  const w3  = Math.max(.05, 1.02+(h.at.arr3-56)*0.058 + (foco-1)*0.50);
-  const wRim= Math.max(.10, 1.45+(h.at.fin-62)*0.045+(h.at.atl-66)*0.020 - (foco-1)*0.32);
-  const wMid= Math.max(.15, 0.85-(h.at.arr3-56)*0.012);
+  const fnH=FUNCOES[funcaoDe(h)];
+  const w3  = Math.max(.05, 1.02+(h.at.arr3-56)*0.058 + (foco-1)*0.50 + (jgd.w3||0) + (fnH.w3||0));
+  const wRim= Math.max(.10, 1.45+(h.at.fin-62)*0.045+(h.at.atl-66)*0.020 - (foco-1)*0.32 + (jgd.wRim||0) + (fnH.wRim||0));
+  const wMid= Math.max(.15, 0.85-(h.at.arr3-56)*0.012 + (jgd.wMid||0));
   const r=Math.random()*(w3+wRim+wMid);
   const tipo = r<w3?3 : r<w3+wMid?2 : 1; // 3=triple 2=media 1=garrafão
   const fad=(h.fadiga-82)*0.0009, form=(h.ref.forma-95)*0.0009+(h.ref.moral-70)*0.0004;
@@ -979,9 +1042,10 @@ function jogada(O,D,ctx){
     const v=tipo===3?3:2; h.b.fgm++; if(tipo===3)h.b.tpm++; h.b.pts+=v; O.pts+=v;
     // assistência
     const cand=of.filter(p=>p!==h);
-    const pAst=(tipo===3?.78:tipo===2?.44:.47)*clamp(media(of,p=>p.at.passe)/66,.7,1.3);
+    let pAst=(tipo===3?.78:tipo===2?.44:.47)*clamp(media(of,p=>p.at.passe)/66,.7,1.3);
+    pAst=clamp(pAst+(jgd.ast||0)*0.28, .05, .96);
     let ast=null;
-    if(cand.length&&Math.random()<pAst){ast=sorteioPeso(cand,p=>p.at.passe+p.at.qi*0.35);ast.b.ast++;}
+    if(cand.length&&Math.random()<pAst){ast=sorteioPeso(cand,p=>p.at.passe+p.at.qi*0.35+FUNCOES[funcaoDe(p)].ast*30);ast.b.ast++;}
     const desc = tipo===3?'BOLA DE 3 de '+nome(h):tipo===2?'jumper de '+nome(h):'cesta de '+nome(h)+' no garrafão';
     put(desc+(ast?' (assist. '+nome(ast)+')':'')+' — '+O.t.ab+' '+O.pts,tipo===3?'ev-3':'');
     if(falta){
@@ -2471,7 +2535,16 @@ function vTaticas(){
       <div class="kv"><span>Ritmo</span>${sel('ritmo',t.tatica.ritmo,['Lento (controle)','Equilibrado','Acelerado (transição)'])}</div>
       <div class="kv"><span>Foco ofensivo</span>${sel('foco',t.tatica.foco,['Garrafão','Equilibrado','Perímetro (3pts)'])}</div>
       <div class="kv"><span>Pressão defensiva</span>${sel('pressao',t.tatica.pressao,['Baixa (sem faltas)','Média','Alta (roubos)'])}</div>
-      <p class="hint" style="margin-top:12px">Ritmo acelerado = mais posses e mais pontos, útil com elenco profundo. Pressão alta rouba mais bolas, mas gera faltas e cansaço.</p>
+      <div class="kv"><span>Jogada padrão</span><select onchange="setJogadaPad(this.value)">${ORDEM_JOGADAS.map(k=>`<option value="${k}" ${(t.tatica.jogada||'balanceado')===k?'selected':''}>${JOGADAS[k].emoji} ${JOGADAS[k].nome}</option>`).join('')}</select></div>
+      <p class="hint" style="margin-top:12px">Ritmo acelerado = mais posses e mais pontos, útil com elenco profundo. Pressão alta rouba mais bolas, mas gera faltas e cansaço. A jogada padrão é o ataque inicial — dá pra trocar ao vivo durante a partida.</p>
+    </div>
+    <div class="card" style="margin-top:14px"><h3 class="sub">Funções no ataque</h3>
+      <p class="hint" style="margin-bottom:8px">O papel de cada jogador muda quanto ele ataca e que tipo de arremesso busca.</p>
+      ${[...t.elenco].filter(p=>!p.lesao).sort((a,b)=>b.ovr-a.ovr).slice(0,10).map(p=>{
+        const fa=funcaoDe(p);
+        return `<div class="kv"><span>${bd(p.pos)} ${esc(p.nome.split(' ').slice(-1)[0])}</span>
+        <select onchange="setFuncaoJog(${p.id},this.value)">${ORDEM_FUNCOES.map(k=>`<option value="${k}" ${fa===k?'selected':''}>${FUNCOES[k].emoji} ${FUNCOES[k].nome}</option>`).join('')}</select></div>`;
+      }).join('')}
     </div>
     <div class="card" style="margin-top:14px"><h3 class="sub">Quinteto provável</h3>
       ${[...t.elenco].filter(p=>!p.lesao).sort((a,b)=>(t.minutos[b.id]||0)-(t.minutos[a.id]||0)).slice(0,5)
@@ -2480,6 +2553,8 @@ function vTaticas(){
 }
 function setMin(id,v){S.times[S.meuTime].minutos[id]=clamp(parseInt(v)||0,0,42);render();}
 function setTat(k,v){S.times[S.meuTime].tatica[k]=parseInt(v);render();}
+function setJogadaPad(v){S.times[S.meuTime].tatica.jogada=v;render();}
+function setFuncaoJog(pid,v){const p=S.times[S.meuTime].elenco.find(x=>x.id===pid);if(p){p.funcao=v;render();}}
 function autoRot(){S.times[S.meuTime].minutos=autoMinutos(S.times[S.meuTime]);render();}
 
 /* ---------- CALENDÁRIO ---------- */
@@ -3746,6 +3821,7 @@ function avRenderTela(){
     </div>
 
     <div class="avctrl" id="avCtrl"></div>
+    <div class="avjgd" id="avJgd"></div>
 
     <div class="avtabs">
       <button class="avtab ${AVUI.aba==='narracao'?'on':''}" onclick="avSetAba('narracao')">📝 Narração</button>
@@ -3755,15 +3831,18 @@ function avRenderTela(){
     <div class="avcentral" id="avCentral"></div>
 
     <div class="avactions">
-      <button class="btn mini" onclick="avUITimeout()" id="btnTempo">⏱️ Pedir tempo</button>
-      <button class="btn mini ghost" onclick="avPainelSub()">🔄 Substituir</button>
+      <button class="btn mini" onclick="avUITimeout()" id="btnTempo">⏱️ Tempo</button>
+      <button class="btn mini ghost" onclick="avPainelJogada()">🏀 Jogada</button>
+      <button class="btn mini ghost" onclick="avPainelFuncoes()">👥 Funções</button>
+      <button class="btn mini ghost" onclick="avPainelSub()">🔄 Trocar</button>
       <button class="btn mini ghost" onclick="avPainelPostura()">🎯 Postura</button>
-      <button class="btn mini ghost" onclick="avSimularResto()">⏩ Simular resto</button>
+      <button class="btn mini ghost" onclick="avSimularResto()">⏩ Simular</button>
     </div>
 
     <div class="avquadra" id="avQuadra"></div>
   </div>`;
   avAtualizaControles();
+  avAtualizaPlacar();
   avAtualizaQuadra();
   avRenderCentral();
   avPintarNovos(AV.log); // pinta a jogada de abertura
@@ -3833,6 +3912,7 @@ function avAtualizaPlacar(){
   if(el('avToA'))el('avToA').textContent='●'.repeat(AV.temposA)+'○'.repeat(7-AV.temposA);
   if(el('avToB'))el('avToB').textContent='●'.repeat(AV.temposB)+'○'.repeat(7-AV.temposB);
   if(el('avRun'))el('avRun').textContent=avRunTxt();
+  const jg=el('avJgd'); if(jg){const g=AV.meuLado==='A'?AV.A:AV.B;const j=JOGADAS[g.t.tatica.jogada||'balanceado'];jg.textContent='Jogada: '+j.emoji+' '+j.nome;}
 }
 
 function avPintarNovos(eventos){
@@ -4005,6 +4085,60 @@ function avConfirmaSub(){
   if(!r){ toast('Troca inválida'); return; }
   avPintarNovos(r.eventos); avAtualizaQuadra();
   avFecharModal(); toast('Substituição feita');
+}
+
+/* ---------- JOGADA OFENSIVA ---------- */
+function avPainelJogada(){
+  const g=AV.meuLado==='A'?AV.A:AV.B;
+  const atual=g.t.tatica.jogada||'balanceado';
+  avModal(`<h3 class="sub">🏀 Jogada ofensiva — ${g.t.ab}</h3>
+    <p class="hint">O padrão de ataque vale até você trocar.</p>
+    <div class="jogadalist">
+      ${ORDEM_JOGADAS.map(k=>{const j=JOGADAS[k];return `
+        <button class="jogadaopt ${atual===k?'on':''}" onclick="avSetJogada('${k}')">
+          <b>${j.emoji} ${j.nome}</b><span class="hint">${esc(j.desc)}</span></button>`;}).join('')}
+    </div>
+    <div class="row" style="margin-top:12px"><button class="btn" onclick="avFecharModal()">Pronto</button></div>`);
+}
+function avSetJogada(k){
+  const g=AV.meuLado==='A'?AV.A:AV.B;
+  g.t.tatica.jogada=k;
+  [...document.querySelectorAll('.jogadaopt')].forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes("'"+k+"'")));
+  toast(JOGADAS[k].emoji+' '+JOGADAS[k].nome);
+}
+
+/* ---------- FUNÇÕES DOS JOGADORES ---------- */
+function avPainelFuncoes(){
+  const g=AV.meuLado==='A'?AV.A:AV.B;
+  const jogadores=g.ps.filter(p=>!p.fora).sort((a,b)=>b.ovr-a.ovr);
+  avModal(`<h3 class="sub">👥 Funções — ${g.t.ab}</h3>
+    <p class="hint">Toque num jogador para mudar o papel dele no ataque.</p>
+    <div class="funclist">
+      ${jogadores.map(p=>{const fn=FUNCOES[funcaoDe(p)];return `
+        <button class="funcopt" onclick="avEscolherFuncao(${p.id})">
+          <span>${bd(p.pos)} <b>${esc(p.nome.split(' ').slice(-1)[0])}</b> <span class="hint">${p.ovr}</span></span>
+          <span class="funcbadge">${fn.emoji} ${fn.nome}</span></button>`;}).join('')}
+    </div>
+    <div class="row" style="margin-top:12px"><button class="btn" onclick="avFecharModal()">Pronto</button></div>`);
+}
+function avEscolherFuncao(pid){
+  const g=AV.meuLado==='A'?AV.A:AV.B;
+  const p=g.ps.find(x=>x.id===pid); if(!p)return;
+  const atual=funcaoDe(p);
+  avModal(`<h3 class="sub">Função de ${esc(p.nome.split(' ').slice(-1)[0])}</h3>
+    <div class="funcgrid">
+      ${ORDEM_FUNCOES.map(k=>{const fn=FUNCOES[k];return `
+        <button class="funcopt2 ${atual===k?'on':''}" onclick="avSetFuncao(${pid},'${k}')">
+          <b>${fn.emoji} ${fn.nome}</b></button>`;}).join('')}
+    </div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" onclick="avPainelFuncoes()">◀ Voltar</button></div>`);
+}
+function avSetFuncao(pid,k){
+  const g=AV.meuLado==='A'?AV.A:AV.B;
+  const p=g.ps.find(x=>x.id===pid); if(!p)return;
+  p.funcao=k; if(p.ref)p.ref.funcao=k;   // aplica no jogo atual e persiste no jogador real
+  toast(FUNCOES[k].emoji+' '+p.nome.split(' ').slice(-1)[0]+': '+FUNCOES[k].nome);
+  avPainelFuncoes();
 }
 
 function avPainelPostura(){
