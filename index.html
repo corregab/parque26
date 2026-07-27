@@ -210,6 +210,54 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .teamsel .nk{font-size:16px;font-weight:700}
 .teamsel .fr{font-family:var(--mono);font-size:11px;color:var(--wood);margin-top:3px}
 .hidden{display:none!important}
+/* ===== MODO AO VIVO ===== */
+.avwrap{display:flex;flex-direction:column;gap:10px}
+.avscore{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;background:linear-gradient(180deg,#171310,#0f0c0a);border:1px solid var(--wood);border-radius:12px;padding:12px 14px}
+.avteam .avab{font:700 14px/1 'Barlow Condensed',sans-serif;letter-spacing:1px;color:var(--bone);text-transform:uppercase}
+.avteam.meu .avab{color:var(--amber)}
+.avteam .vc{font-size:10px;background:var(--wood);color:#120d08;padding:1px 5px;border-radius:4px;vertical-align:middle}
+.avpts{font:800 42px/1 'Anton',sans-serif;color:var(--bone)}
+.avteam.meu .avpts{color:var(--amber)}
+.avto{font-size:9px;color:var(--wood);letter-spacing:1px;margin-top:2px}
+.avmid{text-align:center;min-width:90px}
+.avq{font:700 11px/1 'Barlow Condensed',sans-serif;letter-spacing:1px;color:var(--wood)}
+.avclock{font:800 22px/1 'IBM Plex Mono',monospace;color:var(--bone);margin:3px 0}
+.avrun{font-size:10px;color:#e8a33d;height:12px}
+.avctrl{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.avvel{background:#1a1512;border:1px solid #3a2e22;color:var(--bone);border-radius:7px;padding:6px 12px;font-size:13px;cursor:pointer}
+.avvel.on{background:var(--wood);color:#120d08;border-color:var(--wood);font-weight:700}
+.avvel.play{background:var(--amber);color:#120d08;font-weight:700;border-color:var(--amber)}
+.avpbp{height:210px;overflow-y:auto;background:#0d0a08;border:1px solid #2a2119;border-radius:10px;padding:8px 10px;font-size:13px;display:flex;flex-direction:column;gap:3px}
+.avline{padding:3px 4px;border-radius:5px;line-height:1.35}
+.avline .avsc{color:var(--wood);font:600 10px/1 'IBM Plex Mono',monospace;margin-right:5px}
+.avline .avmini{color:#6b5c4a;font-size:10px;float:right}
+.avline.q{background:rgba(200,121,46,.13);color:var(--amber);font-weight:600}
+.avline.ev-3{color:#8ad0ff}
+.avline.hi{color:var(--amber);font-weight:600}
+.avline.ev-to{color:#d98a6a}
+.avactions{display:flex;gap:6px;flex-wrap:wrap}
+.avactions .btn{flex:1;min-width:120px}
+.avquadra{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.avqt{background:#12100d;border:1px solid #2a2119;border-radius:9px;padding:8px}
+.avqt.meu{border-color:var(--wood)}
+.avqtab{font:700 11px/1 'Barlow Condensed',sans-serif;letter-spacing:1px;color:var(--wood);margin-bottom:5px}
+.avpl{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--bone);padding:2px 0;flex-wrap:wrap}
+.avpl b{color:var(--bone)}
+.fadbar{display:inline-block;width:40px;height:5px;background:#2a2119;border-radius:3px;overflow:hidden;margin-left:auto}
+.fadbar>span{display:block;height:100%}
+.fl3{color:#e8a33d;font-weight:700}.fl5{color:#d9534f;font-weight:700}
+.avmodal{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:10000;padding:18px}
+.avmodal.on{display:flex}
+.avmodalbox{background:#17120e;border:1px solid var(--wood);border-radius:14px;padding:18px;max-width:440px;width:100%;max-height:86vh;overflow-y:auto}
+.clutchopts{display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.subgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:5px}
+.subpl{background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:7px;padding:7px 8px;font-size:12px;cursor:pointer;text-align:left}
+.subpl.on{border-color:var(--amber);background:rgba(232,163,61,.14)}
+.postrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.postopt{background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer}
+.postopt.on{border-color:var(--amber);background:rgba(232,163,61,.16);color:var(--amber);font-weight:600}
+.avtoast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(20,16,12,.96);border:1px solid var(--wood);color:var(--bone);padding:9px 16px;border-radius:9px;font-size:13px;z-index:10001;opacity:0;transition:.25s;pointer-events:none}
+.avtoast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -885,10 +933,11 @@ function jogada(O,D,ctx){
   const r=Math.random()*(w3+wRim+wMid);
   const tipo = r<w3?3 : r<w3+wMid?2 : 1; // 3=triple 2=media 1=garrafão
   const fad=(h.fadiga-82)*0.0009, form=(h.ref.forma-95)*0.0009+(h.ref.moral-70)*0.0004;
+  const mom=(O.momBonus||0);
   let prob, pFalta;
-  if(tipo===3){ prob=.354+(h.at.arr3-70)*.0029-(defP-68)*.0020+casaBonus+fad+form; prob=clamp(prob,.16,.53); pFalta=.028; }
-  else if(tipo===2){ prob=.428+(h.at.arr2-70)*.0029-(defP-68)*.0019+casaBonus+fad+form; prob=clamp(prob,.26,.58); pFalta=.05; }
-  else { prob=.604+(h.at.fin-70)*.0032-(defI-68)*.0024+casaBonus+fad+form; prob=clamp(prob,.38,.78); pFalta=.195; }
+  if(tipo===3){ prob=.354+(h.at.arr3-70)*.0029-(defP-68)*.0020+casaBonus+fad+form+mom; prob=clamp(prob,.16,.53); pFalta=.028; }
+  else if(tipo===2){ prob=.428+(h.at.arr2-70)*.0029-(defP-68)*.0019+casaBonus+fad+form+mom; prob=clamp(prob,.26,.58); pFalta=.05; }
+  else { prob=.604+(h.at.fin-70)*.0032-(defI-68)*.0024+casaBonus+fad+form+mom; prob=clamp(prob,.38,.78); pFalta=.195; }
   pFalta*=(1+(tatD.pressao-1)*0.14);
   // ---- toco
   if(tipo!==3 && Math.random()< (tipo===1?.055:.022)+(defI-68)*.0016){
@@ -973,6 +1022,199 @@ function gravarJogo(res){
 }
 function boxOrdenado(g){return g.ps.filter(p=>p.seg>0).sort((a,b)=>b.seg-a.seg);}
 function totaisBox(g){const t=zeroBox();g.ps.forEach(p=>{for(const k in t)t[k]+=p.b[k]||0;});return t;}
+/* ============================================================
+   MOTOR AO VIVO — partida pausável, posse a posse
+   Reaproveita jogada/rebote/lances/escolherQuinteto/prepTime do motor base.
+   Adiciona: momentum (runs), tempo técnico (timeout), substituição ao vivo,
+   ajuste de postura, e momentos decisivos (clutch) no fim.
+   ============================================================ */
+let AV=null;
+
+function avLog(txt,cls){
+  const q=AV.quarto, t=avRel(Math.max(0,AV.tempo));
+  const e={q,t,txt,cls:cls||'',pa:AV.A.pts,pb:AV.B.pts};
+  AV.log.push(e); AV.novos.push(e);
+  return e;
+}
+function avRel(t){const m=Math.floor(t/60),s=Math.floor(t%60);return m+':'+(s<10?'0':'')+s;}
+
+function avIniciar(tCasa,tFora,meuTimeId){
+  const A=prepTime(tCasa,true), B=prepTime(tFora,false);
+  escolherQuinteto(A); escolherQuinteto(B);
+  const ritmoSeg=[15.8,14.2,12.6];
+  const paceBase=(ritmoSeg[A.t.tatica.ritmo]+ritmoSeg[B.t.tatica.ritmo])/2;
+  AV={
+    A,B, quarto:0, tempo:720, posse:Math.random()<.5?A:B,
+    ultSub:720, prot:0, paceBase, log:[], novos:[],
+    temposA:7, temposB:7,
+    run:{lado:null,pts:0}, ultPontuador:null,
+    meuLado: A.t.id===meuTimeId?'A':'B', meuTimeId,
+    fase:'jogando', clutch:false, lesoes:[], ot:0,
+    proxMod:null   // modificador da próxima posse (decisão clutch)
+  };
+  avLog('🏀 Bola ao alto! '+A.t.cidade+' '+A.t.nick+' x '+B.t.cidade+' '+B.t.nick,'q');
+  return AV;
+}
+
+// avança UMA posse; devolve {eventos, fimQuarto, fim, pediuPausa}
+function avPasso(){
+  if(!AV || AV.fase==='fim') return {fim:true, eventos:[]};
+  AV.novos=[];
+
+  // ---- virada de quarto
+  if(AV.tempo<=0){
+    const A=AV.A,B=AV.B,q=AV.quarto;
+    if(q<4){A.q[q]=A.pts-A.q.slice(0,q).reduce((a,b)=>a+b,0);
+            B.q[q]=B.pts-B.q.slice(0,q).reduce((a,b)=>a+b,0);}
+    else{A.q.push(A.pts-A.q.reduce((a,b)=>a+b,0));B.q.push(B.pts-B.q.reduce((a,b)=>a+b,0));}
+    AV.quarto++;
+    if(AV.quarto>=4 && A.pts!==B.pts){ return avEncerrar(); }
+    AV.tempo = AV.quarto<4?720:300; A.faltasQ=0;B.faltasQ=0;AV.ultSub=AV.tempo;
+    if(AV.quarto>=5)AV.ot=AV.quarto-4;
+    escolherQuinteto(A);escolherQuinteto(B);
+    avLog('— Fim do '+(AV.quarto<=4?AV.quarto+'º quarto':'Prorrogação '+(AV.quarto-4))+' — '
+      +A.t.ab+' '+A.pts+' x '+B.pts+' '+B.t.ab,'q');
+    AV.run={lado:null,pts:0};
+    return {eventos:AV.novos, fimQuarto:true, quarto:AV.quarto};
+  }
+
+  const O=AV.posse, D=O===AV.A?AV.B:AV.A;
+  const ptsAntesO=O.pts;
+
+  // ---- momentum: bônus temporário no ataque de quem está embalado / saiu de timeout
+  aplicarMomentum(O);
+  aplicarMomentum(D);
+
+  const put=(txt,cls)=>avLog(txt,cls);
+  const gastoBase = AV.paceBase + R(-5,5.5);
+  let continuar=true, tentativas=0;
+  while(continuar && tentativas<4){
+    continuar=false;tentativas++;
+    const res = jogada(O,D,{primeira:tentativas===1,put,quarto:AV.quarto});
+    const gasto = tentativas===1? Math.max(3,gastoBase) : R(3,8);
+    AV.tempo-=gasto;
+    O.quinteto.forEach(p=>{p.seg+=gasto;p.fadiga=clamp(p.fadiga-(0.24+gasto*0.014)*(1-(p.at.res-50)/260),0,100);});
+    D.quinteto.forEach(p=>{p.seg+=gasto;p.fadiga=clamp(p.fadiga-(0.22+gasto*0.013)*(1-(p.at.res-50)/260),0,100);});
+    [AV.A,AV.B].forEach(g=>g.ps.forEach(p=>{if(!p.quadra)p.fadiga=clamp(p.fadiga+gasto*0.075,0,100);}));
+    // lesões
+    [AV.A,AV.B].forEach(g=>g.quinteto.forEach(p=>{
+      if(Math.random()<0.00008*(1+(100-p.fadiga)/110)){
+        const r=Math.random();const jogos = r<.68?RI(1,5): r<.92?RI(6,18):RI(20,52);
+        const tipo=pick(['torção de tornozelo','estiramento','lesão no joelho','contusão','problema muscular','fascite plantar']);
+        p.fora=true;p.ref._novaLesao={jogos,tipo};AV.lesoes.push({p,jogos,tipo,time:g.t.ab});
+        avLog('⚕ '+p.nome+' ('+g.t.ab+') sai de quadra — '+tipo+' ('+jogos+' jogos)','ev-to');
+        escolherQuinteto(g);
+      }
+    }));
+    if(res==='off'){continuar=true;}
+    else if(res==='mesma'){AV.posse=O;}
+    else AV.posse=D;
+  }
+  limparMomentum(O); limparMomentum(D);
+  AV.proxMod=null;
+
+  // ---- momentum: registra sequência de pontos
+  const marcou=O.pts-ptsAntesO;
+  if(marcou>0) registrarRun(O);
+
+  // troca de quinteto automática (só times controlados pela IA; o humano decide)
+  if(AV.ultSub-AV.tempo>=95 && AV.tempo>6){
+    AV.ultSub=AV.tempo;
+    if(AV.meuLado!=='A') escolherQuinteto(AV.A);
+    if(AV.meuLado!=='B') escolherQuinteto(AV.B);
+  }
+
+  // ---- entra em modo clutch?
+  const dif=Math.abs(AV.A.pts-AV.B.pts);
+  AV.clutch = (AV.quarto>=4 && AV.tempo<=120 && dif<=8);
+
+  AV.prot++; if(AV.prot>1600) return avEncerrar();
+
+  const out={eventos:AV.novos, placarA:AV.A.pts, placarB:AV.B.pts};
+  // sugere pausa: run forte do adversário (pra oferecer timeout) ou clutch na posse do humano
+  const meuG=AV.meuLado==='A'?AV.A:AV.B, advLado=AV.meuLado==='A'?'B':'A';
+  if(AV.run.lado===advLado && AV.run.pts>=8 && meuTemTimeout()){ out.sugereTimeout=true; }
+  if(AV.clutch){ out.clutch=true; out.minhaPosse=(AV.posse===meuG); }
+  return out;
+}
+
+function registrarRun(O){
+  const lado = O===AV.A?'A':'B';
+  if(AV.run.lado===lado){ AV.run.pts += (O.pts - (AV.run._base||0)); }
+  else { AV.run={lado, pts:(O.pts-(AV.run._base||0)), _base:0}; }
+  AV.run._base = O.pts;
+  AV.ultPontuador=lado;
+}
+
+function aplicarMomentum(g){
+  // embalo natural (run próprio) e impulso pós-timeout
+  let b=0;
+  const lado=g===AV.A?'A':'B';
+  if(AV.run.lado===lado && AV.run.pts>=6) b += 0.025;
+  if(g.momTimeout>0){ b += 0.03; g.momTimeout--; }
+  // decisão clutch do humano nesta posse
+  if(AV.proxMod && AV.proxMod.lado===lado) b += (AV.proxMod.bonus||0);
+  g.momBonus = b;
+}
+function limparMomentum(g){ g.momBonus=0; }
+
+function meuTemTimeout(){ return AV.meuLado==='A'?AV.temposA>0:AV.temposB>0; }
+
+// ---- ações do usuário ----
+function avPedirTempo(lado){
+  if(!AV||AV.fase==='fim') return false;
+  lado=lado||AV.meuLado;
+  if(lado==='A'){if(AV.temposA<=0)return false;AV.temposA--;}else{if(AV.temposB<=0)return false;AV.temposB--;}
+  const g=lado==='A'?AV.A:AV.B, adv=lado==='A'?'B':'A';
+  if(AV.run.lado===adv) AV.run={lado:null,pts:0,_base:(adv==='A'?AV.A.pts:AV.B.pts)};
+  g.quinteto.forEach(p=>p.fadiga=clamp(p.fadiga+9,0,100));
+  g.momTimeout=5;
+  AV.novos=[]; avLog('⏱️ Tempo técnico pedido por '+g.t.ab+' — quebra o ritmo adversário','q');
+  return {eventos:AV.novos};
+}
+
+function avSubstituir(lado, saiId, entraId){
+  const g=lado==='A'?AV.A:AV.B;
+  const sai=g.ps.find(p=>p.id===saiId), entra=g.ps.find(p=>p.id===entraId);
+  if(!sai||!entra||entra.fora||entra.faltas>=6) return false;
+  sai.quadra=false; entra.quadra=true;
+  g.quinteto = g.ps.filter(p=>p.quadra);
+  AV.novos=[]; avLog('🔄 '+g.t.ab+': '+entra.nome+' entra no lugar de '+sai.nome,'q');
+  return {eventos:AV.novos};
+}
+
+function avMudarPostura(lado, campo, valor){
+  const g=lado==='A'?AV.A:AV.B;
+  g.t.tatica[campo]=valor;
+  // recalcula pace
+  const ritmoSeg=[15.8,14.2,12.6];
+  AV.paceBase=(ritmoSeg[AV.A.t.tatica.ritmo]+ritmoSeg[AV.B.t.tatica.ritmo])/2;
+  return true;
+}
+
+// decisão clutch: define o modificador da próxima posse do humano
+function avDecisaoClutch(tipo){
+  const lado=AV.meuLado;
+  if(tipo==='craque'){ AV.proxMod={lado, bonus:0.06, foco:'craque'}; }
+  else if(tipo==='seguro'){ AV.proxMod={lado, bonus:0.02, lento:true}; }
+  else if(tipo==='triple'){ AV.proxMod={lado, bonus:-0.02, force3:true}; }
+  else if(tipo==='falta'){ AV.faltaProposital=true; }
+  else AV.proxMod=null;
+}
+
+function avEncerrar(){
+  AV.fase='fim';
+  const A=AV.A,B=AV.B;
+  const somaQ=g=>g.q.reduce((a,b)=>a+b,0);
+  if(somaQ(A)<A.pts)A.q[A.q.length-1]+=A.pts-somaQ(A);
+  if(somaQ(B)<B.pts)B.q[B.q.length-1]+=B.pts-somaQ(B);
+  [A,B].forEach(g=>g.ps.forEach(p=>p.b.seg=p.seg));
+  avLog('🏁 Fim de jogo! '+A.t.ab+' '+A.pts+' x '+B.pts+' '+B.t.ab,'q');
+  const res={casa:AV.A.t, fora:AV.B.t, A, B, ptsA:A.pts, ptsB:B.pts, log:AV.log,
+             lesoes:AV.lesoes, ot:Math.max(0,A.q.length-4)};
+  AV.resultado=res;
+  return {fim:true, eventos:AV.novos, resultado:res};
+}
 /* ============================================================
    LIGA — calendário, temporada, finanças, playoffs, offseason
    ============================================================ */
@@ -1065,7 +1307,7 @@ function financasRodada(rod){
 }
 
 /* ---------- TEMPORADA ---------- */
-function avancarRodada(){
+function avancarRodada(preRes){
   if(S.fase!=='regular') return null;
   let meuRes=null;
   // processa rodadas até encontrar (e jogar) uma em que o SEU time joga,
@@ -1077,7 +1319,9 @@ function avancarRodada(){
     rod.forEach(j=>{
       const A=S.times[j.c],B=S.times[j.f];
       const meu = j.c===S.meuTime||j.f===S.meuTime;
-      const res=simularJogo(A,B,{log:meu});
+      let res;
+      if(meu && preRes){ res=preRes; preRes=null; }
+      else res=simularJogo(A,B,{log:meu});
       gravarJogo(res);
       j.res=[res.ptsA,res.ptsB];
       if(meu){meuRes=res;S.ultimoJogo=serializarJogo(res);}
@@ -1934,7 +2178,8 @@ function vInicio(){
         <div class="row" style="justify-content:space-between;align-items:flex-end">
           <div><div class="big">${casa?'vs':'@'} ${esc(adv.nick)}</div>
           <div class="hint">${esc(adv.cidade)} · ${adv.v}-${adv.d} · força ${forcaTime(adv)} · ${casa?'Em casa':'Fora de casa'}</div></div>
-          <div class="row"><button class="btn" onclick="jogar()">Jogar rodada</button><button class="btn ghost" onclick="jogarVarias(5)">Simular 5 rodadas</button></div>
+          <div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular rápido</button></div>
+          <div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="jogarVarias(5)">Simular 5 rodadas</button></div>
         </div></div>`;
     } else {
       // seu time já jogou os 82 jogos, mas a temporada ainda não fechou no calendário
@@ -3320,6 +3565,297 @@ function camisasUI(){
     </div>
     ${corpo}
   </div>`;
+}
+/* ============================================================
+   UI DO MODO AO VIVO — tela de partida comandável
+   ============================================================ */
+let AVUI = null;
+
+function jogoDoUsuarioNaRodada(){
+  if(S.fase!=='regular') return null;
+  const rod=S.cal[S.rodada]; if(!rod) return null;
+  const j=rod.find(x=>x.c===S.meuTime||x.f===S.meuTime); if(!j) return null;
+  return {A:S.times[j.c], B:S.times[j.f]};
+}
+
+function jogarAoVivo(){
+  const jogo=jogoDoUsuarioNaRodada();
+  if(!jogo){ // usuário folga: avança normal
+    avancarRodada();
+    if(S.fase==='offseason'&&!S.avaliado){avaliarEmprego();S.avaliado=true;}
+    render(); return;
+  }
+  avIniciar(jogo.A, jogo.B, S.meuTime);
+  AVUI={ velocidade:'normal', pausado:true, timer:null, aba:'jogo' };
+  avRenderTela();
+  avSetVel('normal');
+}
+
+const AV_VEL={ lento:1100, normal:620, rapido:240 };
+
+function avSetVel(v){
+  AVUI.velocidade=v; AVUI.pausado=false;
+  clearInterval(AVUI.timer);
+  AVUI.timer=setInterval(avTick, AV_VEL[v]);
+  avAtualizaControles();
+}
+function avPausar(){
+  AVUI.pausado=true; clearInterval(AVUI.timer); AVUI.timer=null; avAtualizaControles();
+}
+
+function avTick(){
+  const r=avPasso();
+  avPintarNovos(r.eventos);
+  avAtualizaPlacar();
+  avAtualizaQuadra();
+
+  if(r.fim){ avPausar(); avFimDeJogo(r.resultado); return; }
+  if(r.fimQuarto){ avPausar(); avPainelIntervalo(r.quarto); return; }
+  if(r.clutch && r.minhaPosse){ avPausar(); avPainelClutch(); return; }
+  if(r.sugereTimeout && !AV._jaAvisou){ AV._jaAvisou=true; avPausar(); avSugereTimeout(); return; }
+}
+
+/* ---------- TELA PRINCIPAL ---------- */
+function avRenderTela(){
+  const A=AV.A, B=AV.B, meuA=AV.meuLado==='A';
+  el('view').innerHTML=`
+  <div class="avwrap">
+    <div class="avscore">
+      <div class="avteam ${meuA?'meu':''}">
+        <div class="avab">${A.t.ab}${meuA?' <span class="vc">você</span>':''}</div>
+        <div class="avpts" id="avPtsA">${A.pts}</div>
+        <div class="avto" id="avToA">${'●'.repeat(AV.temposA)}${'○'.repeat(7-AV.temposA)}</div>
+      </div>
+      <div class="avmid">
+        <div class="avq" id="avQuarto">${avNomeQuarto()}</div>
+        <div class="avclock" id="avClock">${avRel(AV.tempo)}</div>
+        <div class="avrun" id="avRun">${avRunTxt()}</div>
+      </div>
+      <div class="avteam ${!meuA?'meu':''}" style="text-align:right">
+        <div class="avab">${!meuA?'<span class="vc">você</span> ':''}${B.t.ab}</div>
+        <div class="avpts" id="avPtsB">${B.pts}</div>
+        <div class="avto" id="avToB">${'●'.repeat(AV.temposB)}${'○'.repeat(7-AV.temposB)}</div>
+      </div>
+    </div>
+
+    <div class="avctrl" id="avCtrl"></div>
+
+    <div class="avpbp" id="avPbp"></div>
+
+    <div class="avactions">
+      <button class="btn mini" onclick="avUITimeout()" id="btnTempo">⏱️ Pedir tempo</button>
+      <button class="btn mini ghost" onclick="avPainelSub()">🔄 Substituir</button>
+      <button class="btn mini ghost" onclick="avPainelPostura()">🎯 Postura</button>
+      <button class="btn mini ghost" onclick="avSimularResto()">⏩ Simular resto</button>
+    </div>
+
+    <div class="avquadra" id="avQuadra"></div>
+  </div>`;
+  avAtualizaControles();
+  avAtualizaQuadra();
+  avPintarNovos(AV.log); // pinta a jogada de abertura
+}
+
+function avNomeQuarto(){
+  if(AV.quarto>=4 && AV.ot>0) return 'PRORROG. '+AV.ot;
+  return (Math.min(AV.quarto,3)+1)+'º QUARTO';
+}
+function avRunTxt(){
+  if(AV.run.lado && AV.run.pts>=6){
+    const g=AV.run.lado==='A'?AV.A:AV.B;
+    return '🔥 '+g.t.ab+' embalado ('+AV.run.pts+'-0)';
+  }
+  return '';
+}
+
+function avAtualizaControles(){
+  const c=el('avCtrl'); if(!c) return;
+  const b=(v,txt)=>`<button class="avvel ${AVUI.velocidade===v&&!AVUI.pausado?'on':''}" onclick="avSetVel('${v}')">${txt}</button>`;
+  c.innerHTML = AVUI.pausado
+    ? `<button class="avvel play" onclick="avSetVel('${AVUI.velocidade}')">▶ Continuar</button>`+b('lento','🐢')+b('normal','▶▶')+b('rapido','⏩')
+    : `<button class="avvel" onclick="avPausar()">⏸ Pausar</button>`+b('lento','🐢')+b('normal','▶▶')+b('rapido','⏩');
+}
+
+function avAtualizaPlacar(){
+  if(el('avPtsA'))el('avPtsA').textContent=AV.A.pts;
+  if(el('avPtsB'))el('avPtsB').textContent=AV.B.pts;
+  if(el('avClock'))el('avClock').textContent=avRel(Math.max(0,AV.tempo));
+  if(el('avQuarto'))el('avQuarto').textContent=avNomeQuarto();
+  if(el('avToA'))el('avToA').textContent='●'.repeat(AV.temposA)+'○'.repeat(7-AV.temposA);
+  if(el('avToB'))el('avToB').textContent='●'.repeat(AV.temposB)+'○'.repeat(7-AV.temposB);
+  if(el('avRun'))el('avRun').textContent=avRunTxt();
+}
+
+function avPintarNovos(eventos){
+  const box=el('avPbp'); if(!box||!eventos) return;
+  eventos.forEach(l=>{
+    const d=document.createElement('div');
+    d.className='avline '+(l.cls||'');
+    d.innerHTML=`<span class="avsc">${l.q<4?(l.q+1)+'Q':'PR'} ${l.t}</span> ${esc(l.txt)} <span class="avmini">${AV.A.t.ab} ${l.pa}-${l.pb} ${AV.B.t.ab}</span>`;
+    box.appendChild(d);
+  });
+  box.scrollTop=box.scrollHeight;
+  // limita o DOM
+  while(box.children.length>60) box.removeChild(box.firstChild);
+}
+
+function avAtualizaQuadra(){
+  const q=el('avQuadra'); if(!q) return;
+  const linha=(g,meu)=>{
+    const emq=g.ps.filter(p=>p.quadra);
+    return `<div class="avqt ${meu?'meu':''}"><div class="avqtab">${g.t.ab}</div>`+
+      emq.map(p=>{
+        const fad=Math.round(p.fadiga), cor=fad>60?'#7ac77a':fad>38?'#e8a33d':'#d9534f';
+        const fl=p.faltas>=5?'<span class="fl5">'+p.faltas+'F</span>':p.faltas>=3?'<span class="fl3">'+p.faltas+'F</span>':'';
+        return `<span class="avpl"><b>${esc(p.nome.split(' ').slice(-1)[0])}</b> ${p.b.pts}pt ${fl}
+          <span class="fadbar"><span style="width:${fad}%;background:${cor}"></span></span></span>`;
+      }).join('')+`</div>`;
+  };
+  q.innerHTML=linha(AV.A,AV.meuLado==='A')+linha(AV.B,AV.meuLado==='B');
+}
+
+/* ---------- AÇÕES ---------- */
+function avUITimeout(){
+  const r=avPedirTempo(AV.meuLado);
+  if(!r){ toast('Sem tempos técnicos restantes'); return; }
+  avPintarNovos(r.eventos); avAtualizaPlacar();
+  toast('Tempo pedido — ritmo do adversário quebrado');
+}
+
+function avSugereTimeout(){
+  const adv=AV.meuLado==='A'?AV.B:AV.A;
+  avModal(`<h3 class="sub">Adversário embalou!</h3>
+    <p>${esc(adv.t.cidade)} fez uma sequência de ${AV.run.pts} pontos. Pedir tempo quebra o embalo e recupera o fôlego do seu time.</p>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" onclick="avFecharModal();avUITimeout();avSetVel(AVUI.velocidade)">⏱️ Pedir tempo</button>
+      <button class="btn ghost" onclick="avFecharModal();avSetVel(AVUI.velocidade)">Deixar rolar</button>
+    </div>`);
+}
+
+function avPainelIntervalo(q){
+  const meu=AV.meuLado==='A'?AV.A:AV.B, adv=AV.meuLado==='A'?AV.B:AV.A;
+  const dif=meu.pts-adv.pts;
+  const sit=dif>0?`Você vence por ${dif}`:dif<0?`Você perde por ${-dif}`:'Empate';
+  avModal(`<h3 class="sub">${esc(avNomeQuartoFim(q))} — ${AV.A.t.ab} ${AV.A.pts} x ${AV.B.pts} ${AV.B.t.ab}</h3>
+    <p style="color:${dif>=0?'#7ac77a':'#d9534f'};font-weight:700">${sit}</p>
+    <p class="hint">Ajuste antes de voltar: postura, substituições ou peça tempo.</p>
+    <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px">
+      <button class="btn mini ghost" onclick="avPainelPostura()">🎯 Postura</button>
+      <button class="btn mini ghost" onclick="avPainelSub()">🔄 Substituir</button>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" onclick="avFecharModal();avSetVel('normal')">▶ Voltar à quadra</button>
+    </div>`);
+}
+function avNomeQuartoFim(q){
+  if(q>4) return 'Fim da Prorrogação '+(q-4);
+  return 'Fim do '+q+'º quarto';
+}
+
+function avPainelClutch(){
+  const perde = (AV.meuLado==='A'?AV.A.pts<AV.B.pts:AV.B.pts<AV.A.pts);
+  avModal(`<h3 class="sub">⏱️ Reta final — ${avRel(AV.tempo)} no ${avNomeQuarto()}</h3>
+    <p>${AV.A.t.ab} ${AV.A.pts} x ${AV.B.pts} ${AV.B.t.ab}. Sua posse — como ataca?</p>
+    <div class="clutchopts">
+      <button class="btn mini" onclick="avClutch('craque')">⭐ Jogar pelo craque</button>
+      <button class="btn mini ghost" onclick="avClutch('seguro')">🛡️ Jogada segura</button>
+      <button class="btn mini ghost" onclick="avClutch('triple')">🎯 Forçar o de 3</button>
+    </div>
+    ${perde?`<div class="row" style="margin-top:8px"><button class="btn mini ghost" onclick="avClutch('falta')">✋ Falta proposital (parar relógio)</button></div>`:''}
+    <p class="hint" style="margin-top:8px">Decisões nos momentos decisivos definem o jogo.</p>`);
+}
+function avClutch(tipo){
+  avDecisaoClutch(tipo);
+  avFecharModal();
+  // executa uma posse já com a decisão aplicada e segue
+  avSetVel(AVUI.velocidade);
+}
+
+function avPainelSub(){
+  const g=AV.meuLado==='A'?AV.A:AV.B;
+  const emq=g.ps.filter(p=>p.quadra);
+  const banco=g.ps.filter(p=>!p.quadra && !p.fora && p.faltas<6);
+  AVUI._sub={sai:null,entra:null};
+  const opt=(p,tipo)=>`<button class="subpl" onclick="avPickSub('${tipo}','${p.id}')" id="sub_${tipo}_${p.id}">
+    ${bd(p.pos)} ${esc(p.nome.split(' ').slice(-1)[0])} <span class="hint">${p.b.pts}pt · ${Math.round(p.fadiga)}%${p.faltas?' · '+p.faltas+'F':''}</span></button>`;
+  avModal(`<h3 class="sub">Substituição — ${g.t.ab}</h3>
+    <p class="hint">Sai da quadra:</p><div class="subgrid">${emq.map(p=>opt(p,'sai')).join('')}</div>
+    <p class="hint" style="margin-top:10px">Entra do banco:</p><div class="subgrid">${banco.length?banco.map(p=>opt(p,'entra')).join(''):'<span class="hint">Sem reservas disponíveis</span>'}</div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" onclick="avConfirmaSub()">Confirmar troca</button>
+      <button class="btn ghost" onclick="avFecharModal()">Fechar</button>
+    </div>`);
+}
+function avPickSub(tipo,id){
+  AVUI._sub[tipo]=id;
+  ['sai','entra'].forEach(t=>{
+    const g=(AV.meuLado==='A'?AV.A:AV.B);
+    g.ps.forEach(p=>{const b=el('sub_'+t+'_'+p.id);if(b)b.classList.toggle('on',AVUI._sub[t]===''+p.id);});
+  });
+}
+function avConfirmaSub(){
+  const s=AVUI._sub;
+  if(!s.sai||!s.entra){ toast('Escolha quem sai e quem entra'); return; }
+  const r=avSubstituir(AV.meuLado, +s.sai, +s.entra);
+  if(!r){ toast('Troca inválida'); return; }
+  avPintarNovos(r.eventos); avAtualizaQuadra();
+  avFecharModal(); toast('Substituição feita');
+}
+
+function avPainelPostura(){
+  const g=AV.meuLado==='A'?AV.A:AV.B, t=g.t.tatica;
+  const seg=(campo,vals,lbls)=>vals.map((v,i)=>
+    `<button class="postopt ${t[campo]===v?'on':''}" onclick="avSetPostura('${campo}',${v})">${lbls[i]}</button>`).join('');
+  avModal(`<h3 class="sub">Postura — ${g.t.ab}</h3>
+    <p class="hint">Ritmo</p><div class="postrow" id="pr_ritmo">${seg('ritmo',[0,1,2],['🐢 Cadenciado','⚖️ Normal','⚡ Acelerado'])}</div>
+    <p class="hint" style="margin-top:8px">Foco ofensivo</p><div class="postrow" id="pr_foco">${seg('foco',[0,1,2],['🏀 Garrafão','⚖️ Equilíbrio','🎯 Perímetro'])}</div>
+    <p class="hint" style="margin-top:8px">Pressão defensiva</p><div class="postrow" id="pr_pressao">${seg('pressao',[0,1,2],['😌 Leve','⚖️ Normal','🔥 Total'])}</div>
+    <div class="row" style="margin-top:14px"><button class="btn" onclick="avFecharModal()">Pronto</button></div>`);
+}
+function avSetPostura(campo,valor){
+  avMudarPostura(AV.meuLado,campo,valor);
+  const row=el('pr_'+campo);
+  if(row)[...row.children].forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes(campo+"',"+valor)));
+}
+
+function avSimularResto(){
+  avPausar();
+  let g=0;
+  while(AV.fase!=='fim' && g++<3000){ const r=avPasso(); if(r.fim){ avFimDeJogo(r.resultado); return; } }
+}
+
+/* ---------- FIM DO JOGO ---------- */
+function avFimDeJogo(res){
+  clearInterval(AVUI.timer);
+  // grava e processa o resto da rodada usando este resultado
+  avancarRodada(res);
+  if(S.fase==='offseason'&&!S.avaliado){avaliarEmprego();S.avaliado=true;}
+  const meuA=res.A.t.id===S.meuTime;
+  const eu=meuA?res.ptsA:res.ptsB, ele=meuA?res.ptsB:res.ptsA;
+  const venceu=eu>ele;
+  render();
+  // mostra a súmula do jogo ao vivo
+  abrirModal(venceu?'🏆 Vitória!':'Derrota',`
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:30px;font-weight:800;color:${venceu?'#7ac77a':'#d9534f'}">${res.A.t.ab} ${res.ptsA} x ${res.ptsB} ${res.B.t.ab}</div>
+      <p class="hint">${venceu?'Bom trabalho na beira da quadra!':'Próximo jogo é revanche.'}</p>
+    </div>
+    <div class="row" style="justify-content:center"><button class="btn" onclick="closeModal();verJogo()">Ver súmula completa</button></div>`);
+}
+
+/* ---------- helpers de modal/toast do ao vivo ---------- */
+function avModal(html){
+  let m=el('avModal');
+  if(!m){ m=document.createElement('div'); m.id='avModal'; m.className='avmodal'; document.body.appendChild(m); }
+  m.innerHTML=`<div class="avmodalbox">${html}</div>`;
+  m.classList.add('on');
+}
+function avFecharModal(){ const m=el('avModal'); if(m)m.classList.remove('on'); }
+function toast(txt){
+  let t=el('avToast');
+  if(!t){ t=document.createElement('div'); t.id='avToast'; t.className='avtoast'; document.body.appendChild(t); }
+  t.textContent=txt; t.classList.add('on');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),1600);
 }
 /* ============================================================
    BOOT · SETUP · SAVE
