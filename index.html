@@ -190,20 +190,32 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .pill.l{background:rgba(216,64,47,.14);border-color:#6b2a22;color:#ff9d90}
 
 /* ---------- SETUP ---------- */
-#setup{max-width:900px;margin:40px auto;text-align:center}
-#setup .logo{font-family:var(--display);font-size:76px;line-height:.9;letter-spacing:-1px}
+#setup{max-width:920px;margin:0 auto;padding:34px 16px 64px;text-align:center;position:relative}
+#setup::before{content:'';position:fixed;top:0;left:0;right:0;height:380px;background:radial-gradient(ellipse 75% 100% at 50% -25%, rgba(232,163,61,.18), transparent 68%);pointer-events:none;z-index:0}
+#setup>*{position:relative;z-index:1}
+#setup .logo{font-family:var(--display);font-size:82px;line-height:.86;letter-spacing:-2px;text-shadow:0 6px 34px rgba(232,163,61,.28)}
 #setup .logo em{color:var(--wood);font-style:normal}
-#setup .sub{font-size:13px;letter-spacing:5px;color:var(--mute);text-transform:uppercase;font-weight:600;margin:6px 0 28px}
-.teamgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:6px;margin-top:14px}
+#setup .sub{font-size:12px;letter-spacing:6px;color:var(--amber);text-transform:uppercase;font-weight:600;margin:12px 0 0}
+.setup-line{width:64px;height:3px;background:linear-gradient(90deg,transparent,var(--wood),transparent);margin:18px auto 8px;border-radius:2px}
+#setup .card{background:linear-gradient(165deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.teamgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:8px;margin-top:16px}
 .teamgrid button{
-  background:var(--panel);border:1px solid var(--line);color:var(--bone);padding:9px;cursor:pointer;
-  text-align:left;transition:.15s;font-family:var(--ui);
+  position:relative;background:linear-gradient(160deg,var(--panel2),var(--panel));
+  border:1px solid var(--line);border-left-width:3px;color:var(--bone);padding:11px 12px;cursor:pointer;
+  text-align:left;transition:.18s cubic-bezier(.2,.7,.3,1);border-radius:11px;
 }
-.teamgrid button:hover{border-color:var(--wood);background:var(--panel2);transform:translateX(2px)}
-.teamgrid button.sel{border-color:var(--wood);background:rgba(200,121,46,.16)}
-.teamgrid .cty{font-size:11px;color:var(--mute);letter-spacing:1.4px;text-transform:uppercase}
-.teamgrid .nk{font-size:17px;font-weight:700;letter-spacing:.4px}
-.teamgrid .fr{font-family:var(--mono);font-size:11px;color:var(--wood);margin-top:3px}
+.teamgrid button:hover{border-color:var(--wood);transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.45),0 0 0 1px rgba(232,163,61,.18)}
+.teamgrid button.sel{border-color:var(--amber)!important;background:linear-gradient(160deg,rgba(232,163,61,.24),rgba(232,163,61,.07));box-shadow:0 8px 24px rgba(232,163,61,.28)}
+.teamgrid button.sel::after{content:'✓';position:absolute;top:7px;right:10px;color:var(--amber);font-weight:800;font-size:15px}
+.teamgrid .cty{font-size:10px;color:var(--mute);letter-spacing:1.2px;text-transform:uppercase}
+.teamgrid .cty .champ{color:var(--amber)}
+.teamgrid .nk{font-size:18px;font-weight:800;letter-spacing:.3px;margin:3px 0}
+.teamgrid .fr{font-family:var(--mono);font-size:10.5px;color:var(--wood);display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:6px}
+.teamgrid .fr .star{background:var(--wood);color:#150f0a;font-weight:800;border-radius:5px;padding:1px 6px;font-size:11px;white-space:nowrap}
+#setup #coachName{background:#0d0a08;border:1px solid var(--line);border-radius:10px;transition:.15s}
+#setup #coachName:focus{border-color:var(--wood);outline:none}
+#setup #startBtn{font-size:15px;padding:12px 26px;box-shadow:0 6px 20px rgba(232,163,61,.2)}
+#setup #startBtn:not(:disabled){background:linear-gradient(135deg,var(--amber),var(--wood));color:#150f0a;font-weight:700;border:none}
 .teamgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .teamsel{background:var(--panel);border:1px solid var(--line);color:var(--bone);padding:9px;cursor:pointer;text-align:left;transition:.15s;font-family:var(--ui)}
 .teamsel:hover{border-color:var(--wood);background:var(--panel2);transform:translateX(2px)}
@@ -309,6 +321,7 @@ input[type=range]{accent-color:var(--wood);width:100%}
 <div id="setup">
   <div class="logo">PARQU<em>Ê</em> '26</div>
   <div class="sub">Simulador de Temporada · Basquete</div>
+  <div class="setup-line"></div>
   <div class="row" style="justify-content:center;margin-bottom:6px"><span id="cloudSlot"></span></div>
   <div class="card" style="text-align:left">
     <h3 class="sub">1 · Seu nome de treinador</h3>
@@ -3046,8 +3059,8 @@ function vEditor(){
       <button class="btn ghost mini" onclick="importarSave()">Importar código</button></div>
     </div>
     <div class="card"><h3 class="sub">Ações rápidas</h3>
-      <p class="hint">Se você mudou muita coisa e quer recomeçar do zero com os elencos reais originais, reinicie a carreira. Isso apaga o progresso atual.</p>
-      <div class="row" style="margin-top:8px"><button class="btn danger mini" onclick="if(confirm('Reiniciar tudo com os elencos reais? O progresso será perdido.'))novoJogo()">Restaurar elencos originais</button></div>
+      <p class="hint">Começar uma nova carreira leva você de volta à tela de escolha de time. Sua carreira atual será substituída ao salvar a nova.</p>
+      <div class="row" style="margin-top:8px"><button class="btn danger mini" onclick="if(confirm('Começar uma nova carreira? A carreira atual neste aparelho será apagada.'))novaCarreira()">Começar nova carreira</button></div>
     </div>
   </div>`;
 }
@@ -4418,8 +4431,21 @@ function cloudInit(){
     if(typeof window!=='undefined' && window.supabase && window.supabase.createClient){
       CLOUD.client=window.supabase.createClient(CLOUD_URL,CLOUD_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
       CLOUD.ok=true;
-      CLOUD.client.auth.getSession().then(({data})=>{
-        if(data&&data.session){ CLOUD.user=data.session.user; cloudAtualizarUI(); }
+      CLOUD.client.auth.getSession().then(async ({data})=>{
+        if(!data||!data.session) return;
+        CLOUD.user=data.session.user; cloudAtualizarUI();
+        // sincroniza no boot: se a nuvem tiver algo mais novo (ou não houver save local), aplica
+        try{
+          const nuvem=await cloudBaixar();
+          if(nuvem&&nuvem.dados){
+            const nuvemAt=nuvem.updated_at? new Date(nuvem.updated_at).getTime():0;
+            const localAt=(typeof S!=='undefined'&&S&&S.savedAt)? S.savedAt : 0;
+            if(typeof S==='undefined' || !S || nuvemAt>localAt+1500){
+              cloudAplicarSave(nuvem.dados);
+              if(typeof toast==='function') setTimeout(()=>toast('☁ Carreira sincronizada da nuvem'),300);
+            }
+          }
+        }catch(e){ console.warn('sync boot',e); }
       }).catch(()=>{});
     }
   }catch(e){ console.warn('cloud init',e); }
@@ -4755,12 +4781,12 @@ function montarSetup(){
   const g=el('teamPick');
   const ord=[...PREVIEW].sort((a,b)=>forcaTime(b)-forcaTime(a));
   g.innerHTML=ord.map(t=>{
-    const tit=(typeof CAMPEOES!=='undefined'&&CAMPEOES[t.ab])?` · 🏆${CAMPEOES[t.ab][0]}`:'';
+    const tit=(typeof CAMPEOES!=='undefined'&&CAMPEOES[t.ab])?` · <span class="champ">🏆${CAMPEOES[t.ab][0]}</span>`:'';
     const est=[...t.elenco].sort((x,y)=>y.ovr-x.ovr)[0];
-    return `<button data-i="${t.id}" style="border-left:3px solid ${t.cor||'var(--line)'}">
+    return `<button data-i="${t.id}" style="border-left-color:${t.cor||'var(--line)'}">
     <div class="cty">${esc(t.cidade)} · ${t.conf==='L'?'Leste':'Oeste'}${tit}</div>
     <div class="nk">${esc(t.nick)}</div>
-    <div class="fr">força ${forcaTime(t)} · ${esc(est.nome.split(' ').slice(-1)[0])} ${est.ovr}</div></button>`;}).join('');
+    <div class="fr"><span>força ${forcaTime(t)}</span> <span class="star">${esc(est.nome.split(' ').slice(-1)[0])} ${est.ovr}</span></div></button>`;}).join('');
   g.querySelectorAll('button').forEach(b=>b.onclick=()=>{
     g.querySelectorAll('button').forEach(x=>x.classList.remove('sel'));
     b.classList.add('sel'); escolhido=+b.dataset.i; el('startBtn').disabled=false;
@@ -4798,6 +4824,15 @@ function entrarNoJogo(){
   ABA='inicio'; montarTabs(); render();
 }
 function novoJogo(){location.reload();}
+function novaCarreira(){
+  try{ localStorage.removeItem(CHAVE); }catch(e){}
+  S=null; escolhido=null;
+  if(el('shell'))el('shell').classList.add('hidden');
+  if(el('modal'))el('modal').classList.remove('on');
+  el('setup').classList.remove('hidden');
+  mostrarSetup();
+  try{ window.scrollTo(0,0); }catch(e){}
+}
 
 /* ---------- AUTO-SAVE reforçado ---------- */
 // salva na hora, sem debounce (para momentos críticos: app indo pra segundo plano, fechar)
@@ -4836,13 +4871,27 @@ el('loadBtn').onclick=carregar;
 el('importBtn').onclick=importarSave;
 el('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
-montarSetup();
 
-/* ---------- NUVEM: inicializa e popula o botão ---------- */
-if(typeof cloudInit==='function'){
-  cloudInit();
+/* ---------- INÍCIO DO APP: entra direto na carreira salva ---------- */
+function mostrarSetup(){
+  montarSetup();
   const slot=el('cloudSlot'); if(slot && typeof cloudBotaoHTML==='function') slot.innerHTML=cloudBotaoHTML();
 }
+async function iniciarApp(){
+  if(typeof cloudInit==='function') cloudInit();
+  let entrou=false;
+  try{
+    const raw=await storageGet(CHAVE);
+    if(raw){
+      const d=JSON.parse(raw);
+      if(d && d.times && d.times.length && d.meuTime!=null){
+        PID=d.pid||1000; delete d.pid; S=d; migrarSave(); entrarNoJogo(); entrou=true;
+      }
+    }
+  }catch(e){ console.warn('auto-load',e); }
+  if(!entrou) mostrarSetup();   // sem carreira local: mostra a tela de escolha
+}
+iniciarApp();
 
 /* ---------- PWA: registra o service worker (offline + instalável) ---------- */
 if('serviceWorker' in navigator){
