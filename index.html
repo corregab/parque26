@@ -216,6 +216,19 @@ input[type=range]{accent-color:var(--wood);width:100%}
 #setup #coachName:focus{border-color:var(--wood);outline:none}
 #setup #startBtn{font-size:15px;padding:12px 26px;box-shadow:0 6px 20px rgba(232,163,61,.2)}
 #setup #startBtn:not(:disabled){background:linear-gradient(135deg,var(--amber),var(--wood));color:#150f0a;font-weight:700;border:none}
+#hubList{display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0}
+.carreira-card{display:flex;align-items:center;gap:12px;background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:14px 16px;text-align:left;box-shadow:0 8px 28px rgba(0,0,0,.3)}
+.carreira-card .cc-main{flex:1;min-width:0}
+.carreira-card .cc-time{font-size:18px;font-weight:800;color:var(--bone)}
+.carreira-card .cc-meta{font-size:12px;color:var(--mute);margin-top:2px}
+.carreira-card .cc-tec{font-family:var(--mono);font-size:11px;color:var(--wood);margin-top:3px}
+.carreira-card .cc-btns{display:flex;flex-direction:column;gap:6px}
+.carreira-card .cc-cont{background:linear-gradient(135deg,var(--amber),var(--wood));color:#150f0a;border:none;font-weight:700;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;white-space:nowrap}
+.carreira-card .cc-del{background:transparent;border:1px solid #4a3428;color:#c77;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:11px}
+.carreira-card .cc-del:hover{border-color:#d9534f;color:#d9534f}
+.carreira-nova{display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;border:1.5px dashed #4a3d33;border-radius:14px;padding:16px;cursor:pointer;color:var(--amber);font-weight:600;font-size:14px;transition:.15s;width:100%}
+.carreira-nova:hover{border-color:var(--wood);background:rgba(200,121,46,.08)}
+.hub-cloud-hint{font-size:12px;color:var(--mute);margin:8px auto 0;max-width:460px}
 .teamgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .teamsel{background:var(--panel);border:1px solid var(--line);color:var(--bone);padding:9px;cursor:pointer;text-align:left;transition:.15s;font-family:var(--ui)}
 .teamsel:hover{border-color:var(--wood);background:var(--panel2);transform:translateX(2px)}
@@ -322,20 +335,31 @@ input[type=range]{accent-color:var(--wood);width:100%}
   <div class="logo">PARQU<em>Ê</em> '26</div>
   <div class="sub">Simulador de Temporada · Basquete</div>
   <div class="setup-line"></div>
-  <div class="row" style="justify-content:center;margin-bottom:6px"><span id="cloudSlot"></span></div>
-  <div class="card" style="text-align:left">
-    <h3 class="sub">1 · Seu nome de treinador</h3>
-    <input type="text" id="coachName" value="" placeholder="Digite seu nome" style="width:100%;font-size:16px;padding:9px">
-    <h3 class="sub" style="margin-top:18px">2 · Escolha a franquia</h3>
-    <p class="hint">Elenco, orçamento e força mudam por time. Times fracos = desafio maior, mais espaço salarial.</p>
-    <div class="teamgrid" id="teamPick"></div>
+  <div class="row" style="justify-content:center;margin-bottom:14px"><span id="cloudSlot"></span></div>
+
+  <div id="hub">
+    <h3 class="sub" style="letter-spacing:3px">Suas carreiras</h3>
+    <div id="hubList"></div>
+    <div class="row" style="justify-content:center;margin-top:16px">
+      <button class="btn ghost" id="importBtn">Importar código</button>
+    </div>
+    <p class="hint" style="margin-top:14px">Você pode ter até 3 carreiras. Entre na nuvem para acessá-las de qualquer aparelho.</p>
   </div>
-  <div class="row" style="justify-content:center;margin-top:18px">
-    <button class="btn" id="startBtn" disabled>Começar carreira</button>
-    <button class="btn ghost" id="loadBtn">Carregar jogo salvo</button>
-    <button class="btn ghost" id="importBtn">Importar código</button>
+
+  <div id="criar" class="hidden">
+    <div class="card" style="text-align:left">
+      <h3 class="sub">1 · Seu nome de treinador</h3>
+      <input type="text" id="coachName" value="" placeholder="Digite seu nome" style="width:100%;font-size:16px;padding:9px">
+      <h3 class="sub" style="margin-top:18px">2 · Escolha a franquia</h3>
+      <p class="hint">Elenco, orçamento e força mudam por time. Times fracos = desafio maior, mais espaço salarial.</p>
+      <div class="teamgrid" id="teamPick"></div>
+    </div>
+    <div class="row" style="justify-content:center;margin-top:18px">
+      <button class="btn" id="startBtn" disabled>Começar carreira</button>
+      <button class="btn ghost" id="voltarHubBtn">Voltar</button>
+    </div>
+    <p class="hint" style="margin-top:14px">Franquias e elencos reais da temporada 2026-27. Temporada de 82 jogos, play-in e playoffs.</p>
   </div>
-  <p class="hint" style="margin-top:14px">Franquias e elencos reais da temporada 2026-27. Temporada de 82 jogos, play-in e playoffs.</p>
 </div>
 
 <div id="shell" class="hidden">
@@ -4419,12 +4443,12 @@ function avQuadraDesenhar(){
   }
 }
 /* ============================================================
-   NUVEM — save de carreira entre dispositivos (Supabase)
-   Login por e-mail + senha, sincronização automática.
+   NUVEM — carreiras entre dispositivos (Supabase)
+   Login e-mail+senha, até 3 slots, sincronização em tempo real.
    ============================================================ */
 const CLOUD_URL='https://zvddkbvgszdvifugqqdq.supabase.co';
 const CLOUD_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2ZGRrYnZnc3pkdmlmdWdxcWRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUxNjM2NjYsImV4cCI6MjEwMDczOTY2Nn0.8Z4AbzhuUqV_c9YeJIeChK6mHQzv0QYN_kBx6iclz8w';
-let CLOUD={ client:null, user:null, syncTimer:null, ok:false, sincronizando:false };
+let CLOUD={ client:null, user:null, syncTimer:null, ok:false, canal:null, ultimoEnvio:0 };
 
 function cloudInit(){
   try{
@@ -4434,18 +4458,9 @@ function cloudInit(){
       CLOUD.client.auth.getSession().then(async ({data})=>{
         if(!data||!data.session) return;
         CLOUD.user=data.session.user; cloudAtualizarUI();
-        // sincroniza no boot: se a nuvem tiver algo mais novo (ou não houver save local), aplica
-        try{
-          const nuvem=await cloudBaixar();
-          if(nuvem&&nuvem.dados){
-            const nuvemAt=nuvem.updated_at? new Date(nuvem.updated_at).getTime():0;
-            const localAt=(typeof S!=='undefined'&&S&&S.savedAt)? S.savedAt : 0;
-            if(typeof S==='undefined' || !S || nuvemAt>localAt+1500){
-              cloudAplicarSave(nuvem.dados);
-              if(typeof toast==='function') setTimeout(()=>toast('☁ Carreira sincronizada da nuvem'),300);
-            }
-          }
-        }catch(e){ console.warn('sync boot',e); }
+        await cloudSyncTodas();
+        cloudRealtime();
+        cloudTalvezRenderHub();
       }).catch(()=>{});
     }
   }catch(e){ console.warn('cloud init',e); }
@@ -4469,7 +4484,6 @@ async function cloudCadastrar(email,senha){
   const {data,error}=await CLOUD.client.auth.signUp({email,password:senha});
   if(error) return {erro:cloudMsgErro(error)};
   if(!data.session){
-    // confirmação de e-mail ativa: tenta entrar já
     const r=await CLOUD.client.auth.signInWithPassword({email,password:senha});
     if(r.error) return {erro:'Conta criada! Confirme pelo e-mail para ativar o login.', pendente:true};
     CLOUD.user=r.data.user;
@@ -4484,58 +4498,140 @@ async function cloudEntrar(email,senha){
   return {ok:true};
 }
 async function cloudSair(){
+  try{ if(CLOUD.canal){ CLOUD.client.removeChannel(CLOUD.canal); CLOUD.canal=null; } }catch(e){}
   try{ if(CLOUD.client) await CLOUD.client.auth.signOut(); }catch(e){}
   CLOUD.user=null; cloudAtualizarUI();
 }
 
-async function cloudBaixar(){
-  if(!cloudLogado()) return null;
+async function cloudBaixarTodas(){
+  if(!cloudLogado()) return [];
   try{
-    const {data,error}=await CLOUD.client.from('saves').select('dados,updated_at').eq('user_id',CLOUD.user.id).maybeSingle();
-    if(error){ console.warn('cloud baixar',error); return null; }
-    return data;
-  }catch(e){ console.warn(e); return null; }
+    const {data,error}=await CLOUD.client.from('saves').select('slot,dados,updated_at').eq('user_id',CLOUD.user.id);
+    if(error){ console.warn('cloud baixar',error); return []; }
+    return data||[];
+  }catch(e){ console.warn(e); return []; }
 }
 
-// envia o save atual (com debounce, chamado pelo auto-save)
+// mescla nuvem <-> local por slot: o mais recente vence
+async function cloudSyncTodas(){
+  const remotas=await cloudBaixarTodas();
+  const idxLocal=(typeof lerIdx==='function')?lerIdx():[];
+  const localPorSlot={}; idxLocal.forEach(c=>localPorSlot[c.slot]=c);
+  for(const r of remotas){
+    const rAt=r.updated_at? new Date(r.updated_at).getTime():0;
+    const loc=localPorSlot[r.slot];
+    const lAt=loc? (loc.updatedAt||0):0;
+    if(!loc || rAt>lAt+1500){
+      try{
+        const d=(typeof r.dados==='string')?JSON.parse(r.dados):r.dados;
+        localStorage.setItem(slotKey(r.slot), JSON.stringify(d));
+        if(typeof atualizarIdx==='function') atualizarIdx(r.slot, d);
+      }catch(e){ console.warn('aplicar remota',e); }
+    }
+  }
+  const remotasPorSlot={}; remotas.forEach(r=>remotasPorSlot[r.slot]=r);
+  for(const loc of idxLocal){
+    const r=remotasPorSlot[loc.slot];
+    const rAt=r? new Date(r.updated_at).getTime():0;
+    if(!r || (loc.updatedAt||0)>rAt+1500){
+      try{ const raw=localStorage.getItem(slotKey(loc.slot)); if(raw) await cloudUpsertSlot(loc.slot, JSON.parse(raw)); }catch(e){}
+    }
+  }
+}
+
 function cloudAgendarSync(){
-  if(!cloudLogado()||!S) return;
+  if(!cloudLogado()||!S||!SLOT) return;
   clearTimeout(CLOUD.syncTimer);
-  CLOUD.syncTimer=setTimeout(cloudEnviar, 4000);
+  CLOUD.syncTimer=setTimeout(cloudEnviar, 3500);
 }
 async function cloudEnviar(){
-  if(!cloudLogado()||!S) return;
+  if(!cloudLogado()||!S||!SLOT) return;
+  await cloudUpsertSlot(SLOT, {...S, pid:PID});
+}
+async function cloudUpsertSlot(slot, dados){
+  if(!cloudLogado()) return;
   try{
-    const dados={...S, pid:PID};
-    const t=S.times&&S.times[S.meuTime];
+    const t=dados.times&&dados.times[dados.meuTime];
+    CLOUD.ultimoEnvio=Date.now();
     const {error}=await CLOUD.client.from('saves').upsert({
-      user_id:CLOUD.user.id, dados,
-      temporada:S.temporada||null,
+      user_id:CLOUD.user.id, slot,
+      dados, temporada:dados.temporada||null,
       time_nome: t? (t.cidade+' '+t.nick):null,
-      tecnico:S.tecnico||null,
-      updated_at:new Date().toISOString()
+      tecnico:dados.tecnico||null, updated_at:new Date().toISOString()
     });
     if(error) console.warn('cloud upsert',error);
-    else { cloudAtualizarUI('☁ salvo na nuvem'); }
+    else if(slot===SLOT) cloudAtualizarUI('☁ salvo na nuvem');
   }catch(e){ console.warn(e); }
 }
-
-// ao entrar: usa o save mais recente (nuvem vs local) pra não perder progresso
-async function cloudSyncAoEntrar(){
-  const nuvem=await cloudBaixar();
-  const localAt = (S&&S.savedAt)? S.savedAt : 0;
-  const nuvemAt = (nuvem&&nuvem.updated_at)? new Date(nuvem.updated_at).getTime() : 0;
-  if(nuvem&&nuvem.dados&&nuvemAt>=localAt){ cloudAplicarSave(nuvem.dados); return {aplicou:'nuvem'}; }
-  if(S){ await cloudEnviar(); return {aplicou:'local'}; }
-  if(nuvem&&nuvem.dados){ cloudAplicarSave(nuvem.dados); return {aplicou:'nuvem'}; }
-  return {aplicou:'nada'};
+async function cloudApagarSlot(slot){
+  if(!cloudLogado()) return;
+  try{ CLOUD.ultimoEnvio=Date.now(); await CLOUD.client.from('saves').delete().eq('user_id',CLOUD.user.id).eq('slot',slot); }catch(e){ console.warn(e); }
 }
+
+// ---- TEMPO REAL entre dispositivos ----
+function cloudRealtime(){
+  if(!cloudLogado()||!CLOUD.client) return;
+  try{ if(CLOUD.canal){ CLOUD.client.removeChannel(CLOUD.canal); CLOUD.canal=null; } }catch(e){}
+  CLOUD.canal=CLOUD.client
+    .channel('saves-'+CLOUD.user.id)
+    .on('postgres_changes',
+      {event:'*', schema:'public', table:'saves', filter:'user_id=eq.'+CLOUD.user.id},
+      (payload)=>cloudEventoRemoto(payload))
+    .subscribe();
+}
+function cloudEventoRemoto(payload){
+  if(Date.now()-CLOUD.ultimoEnvio < 4000) return;   // ignora eco do próprio envio
+  const row=payload.new || payload.old; if(!row) return;
+  const slot=row.slot;
+  if(payload.eventType==='DELETE'){
+    try{ localStorage.removeItem(slotKey(slot)); if(typeof salvarIdx==='function') salvarIdx(lerIdx().filter(c=>c.slot!==slot)); }catch(e){}
+    if(SLOT===slot){ if(typeof toast==='function')toast('Carreira apagada em outro aparelho'); mostrarHub(); return; }
+    cloudTalvezRenderHub(); return;
+  }
+  const dados=row.dados; if(!dados) return;
+  try{
+    const d=(typeof dados==='string')?JSON.parse(dados):dados;
+    localStorage.setItem(slotKey(slot), JSON.stringify(d));
+    if(typeof atualizarIdx==='function') atualizarIdx(slot, d);
+  }catch(e){ return; }
+  if(SLOT===slot && S){
+    const remotoAt=row.updated_at? new Date(row.updated_at).getTime():0;
+    if(remotoAt>(S.savedAt||0)+1500){
+      try{
+        const d=(typeof dados==='string')?JSON.parse(dados):dados;
+        PID=d.pid||1000; delete d.pid; S=d;
+        if(typeof migrarSave==='function')migrarSave();
+        if(typeof render==='function')render();
+        if(typeof toast==='function')toast('☁ Atualizado de outro aparelho');
+      }catch(e){}
+    }
+  } else { cloudTalvezRenderHub(); }
+}
+function cloudTalvezRenderHub(){
+  const hub=document.getElementById('hub');
+  if(typeof renderHub==='function' && hub && !hub.classList.contains('hidden')) renderHub();
+}
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && cloudLogado()){
+    cloudSyncTodas().then(()=>cloudTalvezRenderHub()).catch(()=>{});
+  }
+});
+
+// compat com botões manuais
+async function cloudBaixar(){
+  if(!cloudLogado()) return null;
+  const todas=await cloudBaixarTodas();
+  if(!todas.length) return null;
+  const alvo = SLOT? todas.find(r=>r.slot===SLOT) : todas.slice().sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0];
+  return alvo? {dados:alvo.dados, updated_at:alvo.updated_at} : null;
+}
+async function cloudSyncAoEntrar(){ await cloudSyncTodas(); return {aplicou:'sync'}; }
 function cloudAplicarSave(dados){
   try{
     const d=typeof dados==='string'?JSON.parse(dados):dados;
     PID=d.pid||1000; delete d.pid; S=d;
     if(typeof migrarSave==='function')migrarSave();
-    if(typeof storageSet==='function')storageSet(CHAVE, JSON.stringify({...S,pid:PID}));
     entrarNoJogo();
   }catch(e){ console.error('aplicar save nuvem',e); }
 }
@@ -4597,35 +4693,37 @@ async function cloudSubmeter(modo){
   btn.disabled=false;
   if(r.erro){ msg.textContent=r.erro; msg.className='cloudmsg '+(r.pendente?'':'erro'); cloudAtualizarUI(); return; }
   msg.textContent='Sincronizando…';
-  const sync=await cloudSyncAoEntrar();
+  await cloudSyncAoEntrar();
+  if(typeof cloudRealtime==='function') cloudRealtime();
   cloudAtualizarUI();
   cloudFechar();
-  if(sync.aplicou==='nuvem'){ toast && toast('☁ Carreira carregada da nuvem'); }
-  else { if(typeof render==='function' && S) render(); toast && toast('☁ Conectado — carreira sincronizada'); }
+  if(typeof renderHub==='function') renderHub();
+  if(typeof toast==='function') toast('☁ Conectado — carreiras sincronizadas');
 }
 
 function cloudPainelConta(){
   cloudModal(`
     <h3 class="sub">☁ Conta conectada</h3>
     <p>Logado como <b>${esc(cloudEmail())}</b>.</p>
-    <p class="hint">Sua carreira sincroniza sozinha. Em outro aparelho, entre com esse e-mail para continuar de onde parou.</p>
+    <p class="hint">Suas carreiras sincronizam sozinhas e em tempo real. Em outro aparelho, entre com esse e-mail para vê-las e continuar de onde parou.</p>
     <div class="cloudform" style="margin-top:12px">
-      <button class="btn" onclick="cloudBaixarAgora()">⬇ Carregar carreira da nuvem</button>
-      <button class="btn ghost" onclick="cloudEnviar().then(()=>toast&&toast('☁ Enviado para a nuvem'));cloudFechar()">⬆ Enviar para a nuvem agora</button>
-      <button class="btn ghost mini" onclick="cloudSair();cloudFechar();toast&&toast('Você saiu da nuvem')">Sair da conta</button>
+      <button class="btn" onclick="cloudSincronizarAgora()">🔄 Sincronizar agora</button>
+      <button class="btn ghost mini" onclick="cloudSair();cloudFechar();mostrarHub&&mostrarHub();toast&&toast('Você saiu da nuvem')">Sair da conta</button>
       <button class="btn ghost mini" onclick="cloudFechar()">Fechar</button>
     </div>`);
 }
-async function cloudBaixarAgora(){
-  const nuvem=await cloudBaixar();
-  if(nuvem&&nuvem.dados){ cloudAplicarSave(nuvem.dados); cloudFechar(); toast&&toast('☁ Carreira carregada da nuvem'); }
-  else { toast&&toast('Nenhuma carreira na nuvem ainda'); }
+async function cloudSincronizarAgora(){
+  if(typeof cloudSyncTodas==='function'){ await cloudSyncTodas(); }
+  cloudFechar();
+  if(typeof renderHub==='function') renderHub();
+  toast&&toast('☁ Sincronizado');
 }
+async function cloudBaixarAgora(){ return cloudSincronizarAgora(); }
 
 function cloudBotoesEditor(){
   if(cloudLogado()){
     return `<span class="pill w" style="margin-right:6px">☁ ${esc(cloudEmail())}</span>
-      <button class="btn ghost mini" onclick="cloudBaixarAgora()">Carregar da nuvem</button>
+      <button class="btn ghost mini" onclick="cloudSincronizarAgora()">Sincronizar</button>
       <button class="btn ghost mini" onclick="cloudSair();render()">Sair</button>`;
   }
   return `<button class="btn mini" onclick="cloudPainelLogin('entrar')">Entrar na nuvem</button>
@@ -4646,10 +4744,70 @@ async function storageGet(k){
   try{ if(window.localStorage){const v=localStorage.getItem(k);if(v)return v;} }catch(e){}
   return MEM;
 }
+
+/* ===== SLOTS DE CARREIRA (até 3) ===== */
+const IDX_KEY='parque26:idx';
+let SLOT=null;                          // slot da carreira ativa (1..3)
+function slotAtual(){return SLOT;}
+const slotKey=s=>'parque26:save:'+s;
+function lerIdx(){ try{const r=localStorage.getItem(IDX_KEY);return r?JSON.parse(r):[];}catch(e){return [];} }
+function salvarIdx(idx){ try{localStorage.setItem(IDX_KEY,JSON.stringify(idx));}catch(e){} }
+function metaCarreira(s,save){
+  const t=save.times&&save.times[save.meuTime];
+  return {slot:s, tecnico:save.tecnico||'Treinador',
+          time:t?(t.cidade+' '+t.nick):'—', ab:t?t.ab:'',
+          temporada:save.temporada||2027, updatedAt:save.savedAt||Date.now()};
+}
+function atualizarIdx(s,save){
+  const idx=lerIdx().filter(c=>c.slot!==s);
+  idx.push(metaCarreira(s,save));
+  idx.sort((a,b)=>a.slot-b.slot);
+  salvarIdx(idx);
+}
+function slotLivre(){
+  const usados=lerIdx().map(c=>c.slot);
+  for(let s=1;s<=3;s++) if(!usados.includes(s)) return s;
+  return null;
+}
+// migra o save único legado para o slot 1 (uma vez)
+function migrarLegado(){
+  if(lerIdx().length) return;
+  try{
+    const raw=localStorage.getItem(CHAVE);
+    if(raw){
+      const d=JSON.parse(raw);
+      if(d&&d.times&&d.meuTime!=null){
+        if(!d.savedAt)d.savedAt=Date.now();
+        localStorage.setItem(slotKey(1),JSON.stringify(d));
+        atualizarIdx(1,d);
+        localStorage.removeItem(CHAVE);
+      }
+    }
+  }catch(e){}
+}
+function abrirCarreira(s){
+  const raw=localStorage.getItem(slotKey(s));
+  if(!raw){ if(typeof toast==='function')toast('Carreira vazia'); return; }
+  try{
+    const d=JSON.parse(raw);
+    PID=d.pid||1000; delete d.pid; S=d; SLOT=s;
+    if(typeof migrarSave==='function')migrarSave();
+    try{localStorage.setItem('parque26:ultimoSlot',s);}catch(e){}
+    entrarNoJogo();
+  }catch(e){ alert('Save corrompido.'); console.error(e); }
+}
+function apagarCarreira(s){
+  try{localStorage.removeItem(slotKey(s));}catch(e){}
+  salvarIdx(lerIdx().filter(c=>c.slot!==s));
+  if(typeof cloudApagarSlot==='function' && typeof cloudLogado==='function' && cloudLogado()) cloudApagarSlot(s);
+  if(SLOT===s){ SLOT=null; S=null; }
+  mostrarHub();
+}
 function salvar(){
   clearTimeout(salvarTimer);
   salvarTimer=setTimeout(async()=>{
-    try{ if(S)S.savedAt=Date.now(); await storageSet(CHAVE, JSON.stringify({...S, pid:PID})); if(typeof flashSalvo==='function')flashSalvo(); if(typeof cloudAgendarSync==='function')cloudAgendarSync(); }catch(e){console.warn('save falhou',e);}
+    if(!S||!SLOT)return;
+    try{ S.savedAt=Date.now(); localStorage.setItem(slotKey(SLOT), JSON.stringify({...S, pid:PID})); atualizarIdx(SLOT,S); if(typeof flashSalvo==='function')flashSalvo(); if(typeof cloudAgendarSync==='function')cloudAgendarSync(); }catch(e){console.warn('save falhou',e);}
   },1200);
 }
 async function carregar(){
@@ -4794,6 +4952,9 @@ function montarSetup(){
 }
 function iniciarCarreira(){
   if(escolhido===null)return;
+  const s=slotLivre();
+  if(!s){ alert('Você já tem 3 carreiras. Apague uma para começar outra.'); return; }
+  SLOT=s;
   S={
     tecnico: el('coachName').value||'Treinador',
     meuTime: escolhido, times: PREVIEW, temporada: 2027,
@@ -4816,32 +4977,37 @@ function iniciarCarreira(){
   if(typeof atualizarOlheiro==='function')atualizarOlheiro();
   noticia('🏀 Bem-vindo, '+S.tecnico+'. Temporada 2026-27 começando com '+S.times[S.meuTime].cidade+' '+S.times[S.meuTime].nick+'.','p');
   noticia('🎯 Objetivo da diretoria: '+S.objetivo.txt,'p');
+  S.savedAt=Date.now();
+  try{ localStorage.setItem(slotKey(SLOT), JSON.stringify({...S, pid:PID})); atualizarIdx(SLOT,S); }catch(e){}
   entrarNoJogo();
 }
 function entrarNoJogo(){
   el('setup').classList.add('hidden');
   el('shell').classList.remove('hidden');
   ABA='inicio'; montarTabs(); render();
+  if(typeof cloudRealtime==='function') cloudRealtime();
 }
 function novoJogo(){location.reload();}
+// "nova carreira": vai para a escolha de time (NÃO apaga as existentes)
 function novaCarreira(){
-  try{ localStorage.removeItem(CHAVE); }catch(e){}
-  S=null; escolhido=null;
+  if(!slotLivre()){ alert('Você já tem 3 carreiras. Apague uma para criar outra.'); mostrarHub(); return; }
+  S=null; SLOT=null; escolhido=null;
   if(el('shell'))el('shell').classList.add('hidden');
   if(el('modal'))el('modal').classList.remove('on');
   el('setup').classList.remove('hidden');
-  mostrarSetup();
+  mostrarCriar();
   try{ window.scrollTo(0,0); }catch(e){}
 }
 
 /* ---------- AUTO-SAVE reforçado ---------- */
 // salva na hora, sem debounce (para momentos críticos: app indo pra segundo plano, fechar)
 async function salvarAgora(){
-  if(!S) return;
+  if(!S||!SLOT) return;
   clearTimeout(salvarTimer);
   try{
     S.savedAt=Date.now();
-    await storageSet(CHAVE, JSON.stringify({...S, pid:PID}));
+    localStorage.setItem(slotKey(SLOT), JSON.stringify({...S, pid:PID}));
+    atualizarIdx(SLOT,S);
     flashSalvo();
     if(typeof cloudEnviar==='function' && typeof cloudLogado==='function' && cloudLogado()) cloudEnviar();
   }catch(e){console.warn('save falhou',e);}
@@ -4867,29 +5033,71 @@ window.addEventListener('pagehide', salvarAgora);
 window.addEventListener('beforeunload', ()=>{ if(S){ try{ localStorage.setItem(CHAVE, JSON.stringify({...S, pid:PID})); }catch(e){} } });
 
 el('startBtn').onclick=iniciarCarreira;
-el('loadBtn').onclick=carregar;
+{ const vb=el('voltarHubBtn'); if(vb) vb.onclick=mostrarHub; }
 el('importBtn').onclick=importarSave;
 el('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 
-/* ---------- INÍCIO DO APP: entra direto na carreira salva ---------- */
-function mostrarSetup(){
-  montarSetup();
-  const slot=el('cloudSlot'); if(slot && typeof cloudBotaoHTML==='function') slot.innerHTML=cloudBotaoHTML();
+/* ---------- HUB DE CARREIRAS (tela de início) ---------- */
+function tempoRelativo(ts){
+  if(!ts) return '';
+  const s=(Date.now()-ts)/1000;
+  if(s<60) return 'agora há pouco';
+  if(s<3600) return Math.floor(s/60)+' min atrás';
+  if(s<86400) return Math.floor(s/3600)+'h atrás';
+  const dias=Math.floor(s/86400);
+  if(dias===1) return 'ontem';
+  if(dias<30) return dias+' dias atrás';
+  try{ return new Date(ts).toLocaleDateString('pt-BR'); }catch(e){ return ''; }
 }
+function renderHub(){
+  const idx=lerIdx().slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  let html='';
+  if(!idx.length){
+    html+=`<p class="hint" style="margin:6px 0 14px">Você ainda não tem nenhuma carreira. Crie a primeira!</p>`;
+  }
+  idx.forEach(c=>{
+    html+=`<div class="carreira-card">
+      <div class="cc-main">
+        <div class="cc-time">${esc(c.time||'—')}</div>
+        <div class="cc-meta">Temporada ${c.temporada||2027} · ${tempoRelativo(c.updatedAt)}</div>
+        <div class="cc-tec">Téc. ${esc(c.tecnico||'Treinador')}</div>
+      </div>
+      <div class="cc-btns">
+        <button class="cc-cont" onclick="abrirCarreira(${c.slot})">Continuar</button>
+        <button class="cc-del" onclick="if(confirm('Apagar esta carreira? Isso não pode ser desfeito.'))apagarCarreira(${c.slot})">Apagar</button>
+      </div>
+    </div>`;
+  });
+  if(idx.length<3){
+    html+=`<button class="carreira-nova" onclick="novaCarreira()">＋ Nova carreira</button>`;
+  }
+  const cont=el('hubList'); if(cont) cont.innerHTML=html;
+}
+function mostrarHub(){
+  S=null; SLOT=null;
+  if(el('shell')) el('shell').classList.add('hidden');
+  if(el('modal')) el('modal').classList.remove('on');
+  el('setup').classList.remove('hidden');
+  el('hub').classList.remove('hidden');
+  el('criar').classList.add('hidden');
+  const slot=el('cloudSlot'); if(slot && typeof cloudBotaoHTML==='function') slot.innerHTML=cloudBotaoHTML();
+  renderHub();
+  try{ window.scrollTo(0,0); }catch(e){}
+}
+function mostrarCriar(){
+  el('hub').classList.add('hidden');
+  el('criar').classList.remove('hidden');
+  montarSetup();
+  escolhido=null; if(el('startBtn'))el('startBtn').disabled=true;
+  const nome=el('coachName'); if(nome)nome.value='';
+}
+function mostrarSetup(){ mostrarHub(); }
+
 async function iniciarApp(){
   if(typeof cloudInit==='function') cloudInit();
-  let entrou=false;
-  try{
-    const raw=await storageGet(CHAVE);
-    if(raw){
-      const d=JSON.parse(raw);
-      if(d && d.times && d.times.length && d.meuTime!=null){
-        PID=d.pid||1000; delete d.pid; S=d; migrarSave(); entrarNoJogo(); entrou=true;
-      }
-    }
-  }catch(e){ console.warn('auto-load',e); }
-  if(!entrou) mostrarSetup();   // sem carreira local: mostra a tela de escolha
+  migrarLegado();
+  mostrarHub();   // primeiro acesso (e todo acesso) abre na tela de início/hub
 }
 iniciarApp();
 
