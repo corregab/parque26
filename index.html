@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --bg:#0c0a09;
@@ -294,6 +295,13 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .funcopt2{background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:8px;padding:10px 8px;cursor:pointer;font-size:12px;text-align:center}
 .funcopt2.on{border-color:var(--amber);background:rgba(232,163,61,.16);color:var(--amber)}
 .avjgd{font-size:10px;color:var(--wood);text-align:center;margin-top:2px}
+.cloudform{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.cloudform input{width:100%;font-size:15px;padding:10px;background:#0d0a08;border:1px solid #2a2119;border-radius:8px;color:var(--bone)}
+.cloudform input:focus{border-color:var(--wood);outline:none}
+.cloudmsg{font-size:12px;color:#9a8a76;min-height:16px}
+.cloudmsg.erro{color:#d9534f}
+.cloudalt{font-size:12px;color:#9a8a76;text-align:center}
+.cloudalt a{color:var(--amber);cursor:pointer;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -301,6 +309,7 @@ input[type=range]{accent-color:var(--wood);width:100%}
 <div id="setup">
   <div class="logo">PARQU<em>Ê</em> '26</div>
   <div class="sub">Simulador de Temporada · Basquete</div>
+  <div class="row" style="justify-content:center;margin-bottom:6px"><span id="cloudSlot"></span></div>
   <div class="card" style="text-align:left">
     <h3 class="sub">1 · Seu nome de treinador</h3>
     <input type="text" id="coachName" value="" placeholder="Digite seu nome" style="width:100%;font-size:16px;padding:9px">
@@ -3027,6 +3036,10 @@ function vEditor(){
         <span>${bd(p.pos)} ${esc(p.nome)} <span class="muted">${p.ovr}</span></span>
         <select onchange="edMoverLivre(${p.id},this.value)"><option value="">→ time</option>
           ${S.times.map(x=>`<option value="${x.id}">${esc(x.ab)}</option>`).join('')}</select></div>`).join('')||'<p class="hint">nenhum</p>'}</div></div>
+    <div class="card"><h3 class="sub">☁ Nuvem — jogar em vários aparelhos</h3>
+      <p class="hint">Entre com e-mail e senha para salvar sua carreira na nuvem. Em qualquer outro aparelho, é só entrar com a mesma conta para continuar de onde parou. A sincronização é automática.</p>
+      <div class="row" style="margin-top:8px" id="cloudEditorBtns">${typeof cloudBotoesEditor==='function'?cloudBotoesEditor():''}</div>
+    </div>
     <div class="card"><h3 class="sub">Backup da carreira</h3>
       <p class="hint">Gere um código com toda a sua carreira para levar para outra versão do jogo (ou guardar como backup). Na outra versão, use "Importar código" na tela inicial.</p>
       <div class="row" style="margin-top:8px"><button class="btn mini" onclick="exportarSave()">Exportar código da carreira</button>
@@ -4393,6 +4406,206 @@ function avQuadraDesenhar(){
   }
 }
 /* ============================================================
+   NUVEM — save de carreira entre dispositivos (Supabase)
+   Login por e-mail + senha, sincronização automática.
+   ============================================================ */
+const CLOUD_URL='https://zvddkbvgszdvifugqqdq.supabase.co';
+const CLOUD_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2ZGRrYnZnc3pkdmlmdWdxcWRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUxNjM2NjYsImV4cCI6MjEwMDczOTY2Nn0.8Z4AbzhuUqV_c9YeJIeChK6mHQzv0QYN_kBx6iclz8w';
+let CLOUD={ client:null, user:null, syncTimer:null, ok:false, sincronizando:false };
+
+function cloudInit(){
+  try{
+    if(typeof window!=='undefined' && window.supabase && window.supabase.createClient){
+      CLOUD.client=window.supabase.createClient(CLOUD_URL,CLOUD_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+      CLOUD.ok=true;
+      CLOUD.client.auth.getSession().then(({data})=>{
+        if(data&&data.session){ CLOUD.user=data.session.user; cloudAtualizarUI(); }
+      }).catch(()=>{});
+    }
+  }catch(e){ console.warn('cloud init',e); }
+}
+function cloudLogado(){ return !!CLOUD.user; }
+function cloudEmail(){ return CLOUD.user? CLOUD.user.email : ''; }
+
+function cloudMsgErro(error){
+  const m=(error&&error.message||'').toLowerCase();
+  if(m.includes('invalid login')) return 'E-mail ou senha incorretos.';
+  if(m.includes('already registered')||m.includes('already been registered')) return 'Esse e-mail já tem conta. Tente entrar.';
+  if(m.includes('password')&&m.includes('6')) return 'A senha precisa ter ao menos 6 caracteres.';
+  if(m.includes('email')&&m.includes('invalid')) return 'E-mail inválido.';
+  if(m.includes('confirm')) return 'Confirme seu e-mail antes de entrar.';
+  if(m.includes('rate')) return 'Muitas tentativas. Aguarde um instante.';
+  return error&&error.message || 'Erro ao conectar com a nuvem.';
+}
+
+async function cloudCadastrar(email,senha){
+  if(!CLOUD.ok) return {erro:'Nuvem indisponível. Verifique sua conexão.'};
+  const {data,error}=await CLOUD.client.auth.signUp({email,password:senha});
+  if(error) return {erro:cloudMsgErro(error)};
+  if(!data.session){
+    // confirmação de e-mail ativa: tenta entrar já
+    const r=await CLOUD.client.auth.signInWithPassword({email,password:senha});
+    if(r.error) return {erro:'Conta criada! Confirme pelo e-mail para ativar o login.', pendente:true};
+    CLOUD.user=r.data.user;
+  } else CLOUD.user=data.user;
+  return {ok:true};
+}
+async function cloudEntrar(email,senha){
+  if(!CLOUD.ok) return {erro:'Nuvem indisponível. Verifique sua conexão.'};
+  const {data,error}=await CLOUD.client.auth.signInWithPassword({email,password:senha});
+  if(error) return {erro:cloudMsgErro(error)};
+  CLOUD.user=data.user;
+  return {ok:true};
+}
+async function cloudSair(){
+  try{ if(CLOUD.client) await CLOUD.client.auth.signOut(); }catch(e){}
+  CLOUD.user=null; cloudAtualizarUI();
+}
+
+async function cloudBaixar(){
+  if(!cloudLogado()) return null;
+  try{
+    const {data,error}=await CLOUD.client.from('saves').select('dados,updated_at').eq('user_id',CLOUD.user.id).maybeSingle();
+    if(error){ console.warn('cloud baixar',error); return null; }
+    return data;
+  }catch(e){ console.warn(e); return null; }
+}
+
+// envia o save atual (com debounce, chamado pelo auto-save)
+function cloudAgendarSync(){
+  if(!cloudLogado()||!S) return;
+  clearTimeout(CLOUD.syncTimer);
+  CLOUD.syncTimer=setTimeout(cloudEnviar, 4000);
+}
+async function cloudEnviar(){
+  if(!cloudLogado()||!S) return;
+  try{
+    const dados={...S, pid:PID};
+    const t=S.times&&S.times[S.meuTime];
+    const {error}=await CLOUD.client.from('saves').upsert({
+      user_id:CLOUD.user.id, dados,
+      temporada:S.temporada||null,
+      time_nome: t? (t.cidade+' '+t.nick):null,
+      tecnico:S.tecnico||null,
+      updated_at:new Date().toISOString()
+    });
+    if(error) console.warn('cloud upsert',error);
+    else { cloudAtualizarUI('☁ salvo na nuvem'); }
+  }catch(e){ console.warn(e); }
+}
+
+// ao entrar: usa o save mais recente (nuvem vs local) pra não perder progresso
+async function cloudSyncAoEntrar(){
+  const nuvem=await cloudBaixar();
+  const localAt = (S&&S.savedAt)? S.savedAt : 0;
+  const nuvemAt = (nuvem&&nuvem.updated_at)? new Date(nuvem.updated_at).getTime() : 0;
+  if(nuvem&&nuvem.dados&&nuvemAt>=localAt){ cloudAplicarSave(nuvem.dados); return {aplicou:'nuvem'}; }
+  if(S){ await cloudEnviar(); return {aplicou:'local'}; }
+  if(nuvem&&nuvem.dados){ cloudAplicarSave(nuvem.dados); return {aplicou:'nuvem'}; }
+  return {aplicou:'nada'};
+}
+function cloudAplicarSave(dados){
+  try{
+    const d=typeof dados==='string'?JSON.parse(dados):dados;
+    PID=d.pid||1000; delete d.pid; S=d;
+    if(typeof migrarSave==='function')migrarSave();
+    if(typeof storageSet==='function')storageSet(CHAVE, JSON.stringify({...S,pid:PID}));
+    entrarNoJogo();
+  }catch(e){ console.error('aplicar save nuvem',e); }
+}
+/* ============================================================
+   UI DA NUVEM — login/cadastro e status de sincronização
+   ============================================================ */
+function cloudBotaoHTML(){
+  if(cloudLogado()){
+    return `<button class="btn ghost mini" onclick="cloudPainelConta()" id="cloudBtn">☁ ${esc(cloudEmail().split('@')[0])}</button>`;
+  }
+  return `<button class="btn ghost mini" onclick="cloudPainelLogin()" id="cloudBtn">☁ Entrar na nuvem</button>`;
+}
+function cloudAtualizarUI(msg){
+  const b=document.getElementById('cloudBtn');
+  if(b){
+    if(cloudLogado()) b.innerHTML='☁ '+esc(cloudEmail().split('@')[0]);
+    else b.innerHTML='☁ Entrar na nuvem';
+  }
+  if(msg && typeof flashSalvo==='function'){ const f=document.getElementById('saveflash'); if(f){f.textContent=msg;f.style.opacity='1';clearTimeout(f._t);f._t=setTimeout(()=>f.style.opacity='0',1300);} }
+}
+
+function cloudModal(html){
+  let m=document.getElementById('cloudModal');
+  if(!m){ m=document.createElement('div'); m.id='cloudModal'; m.className='avmodal'; document.body.appendChild(m); }
+  m.innerHTML=`<div class="avmodalbox">${html}</div>`;
+  m.classList.add('on');
+}
+function cloudFechar(){ const m=document.getElementById('cloudModal'); if(m)m.classList.remove('on'); }
+
+function cloudPainelLogin(modo){
+  modo=modo||'entrar';
+  const ent=modo==='entrar';
+  cloudModal(`
+    <h3 class="sub">☁ ${ent?'Entrar na nuvem':'Criar conta'}</h3>
+    <p class="hint">Sua carreira fica salva na nuvem e você acessa de qualquer aparelho.</p>
+    <div class="cloudform">
+      <input type="email" id="cloudEmail" placeholder="seu@email.com" autocomplete="email">
+      <input type="password" id="cloudSenha" placeholder="senha (mín. 6 caracteres)" autocomplete="current-password">
+      <div id="cloudMsg" class="cloudmsg"></div>
+      <button class="btn" id="cloudGo" onclick="cloudSubmeter('${modo}')">${ent?'Entrar':'Criar conta e entrar'}</button>
+      <div class="cloudalt">
+        ${ent
+          ? `Não tem conta? <a onclick="cloudPainelLogin('criar')">Criar agora</a>`
+          : `Já tem conta? <a onclick="cloudPainelLogin('entrar')">Entrar</a>`}
+      </div>
+      <button class="btn ghost mini" onclick="cloudFechar()">Agora não</button>
+    </div>`);
+}
+
+async function cloudSubmeter(modo){
+  const email=(document.getElementById('cloudEmail').value||'').trim();
+  const senha=document.getElementById('cloudSenha').value||'';
+  const msg=document.getElementById('cloudMsg');
+  const btn=document.getElementById('cloudGo');
+  if(!email||!senha){ msg.textContent='Preencha e-mail e senha.'; msg.className='cloudmsg erro'; return; }
+  if(senha.length<6){ msg.textContent='A senha precisa de ao menos 6 caracteres.'; msg.className='cloudmsg erro'; return; }
+  btn.disabled=true; msg.className='cloudmsg'; msg.textContent='Conectando…';
+  const r = modo==='criar' ? await cloudCadastrar(email,senha) : await cloudEntrar(email,senha);
+  btn.disabled=false;
+  if(r.erro){ msg.textContent=r.erro; msg.className='cloudmsg '+(r.pendente?'':'erro'); cloudAtualizarUI(); return; }
+  msg.textContent='Sincronizando…';
+  const sync=await cloudSyncAoEntrar();
+  cloudAtualizarUI();
+  cloudFechar();
+  if(sync.aplicou==='nuvem'){ toast && toast('☁ Carreira carregada da nuvem'); }
+  else { if(typeof render==='function' && S) render(); toast && toast('☁ Conectado — carreira sincronizada'); }
+}
+
+function cloudPainelConta(){
+  cloudModal(`
+    <h3 class="sub">☁ Conta conectada</h3>
+    <p>Logado como <b>${esc(cloudEmail())}</b>.</p>
+    <p class="hint">Sua carreira sincroniza sozinha. Em outro aparelho, entre com esse e-mail para continuar de onde parou.</p>
+    <div class="cloudform" style="margin-top:12px">
+      <button class="btn" onclick="cloudBaixarAgora()">⬇ Carregar carreira da nuvem</button>
+      <button class="btn ghost" onclick="cloudEnviar().then(()=>toast&&toast('☁ Enviado para a nuvem'));cloudFechar()">⬆ Enviar para a nuvem agora</button>
+      <button class="btn ghost mini" onclick="cloudSair();cloudFechar();toast&&toast('Você saiu da nuvem')">Sair da conta</button>
+      <button class="btn ghost mini" onclick="cloudFechar()">Fechar</button>
+    </div>`);
+}
+async function cloudBaixarAgora(){
+  const nuvem=await cloudBaixar();
+  if(nuvem&&nuvem.dados){ cloudAplicarSave(nuvem.dados); cloudFechar(); toast&&toast('☁ Carreira carregada da nuvem'); }
+  else { toast&&toast('Nenhuma carreira na nuvem ainda'); }
+}
+
+function cloudBotoesEditor(){
+  if(cloudLogado()){
+    return `<span class="pill w" style="margin-right:6px">☁ ${esc(cloudEmail())}</span>
+      <button class="btn ghost mini" onclick="cloudBaixarAgora()">Carregar da nuvem</button>
+      <button class="btn ghost mini" onclick="cloudSair();render()">Sair</button>`;
+  }
+  return `<button class="btn mini" onclick="cloudPainelLogin('entrar')">Entrar na nuvem</button>
+    <button class="btn ghost mini" onclick="cloudPainelLogin('criar')">Criar conta</button>`;
+}
+/* ============================================================
    BOOT · SETUP · SAVE
    ============================================================ */
 const CHAVE='parque26:save';
@@ -4410,7 +4623,7 @@ async function storageGet(k){
 function salvar(){
   clearTimeout(salvarTimer);
   salvarTimer=setTimeout(async()=>{
-    try{ await storageSet(CHAVE, JSON.stringify({...S, pid:PID})); if(typeof flashSalvo==='function')flashSalvo(); }catch(e){console.warn('save falhou',e);}
+    try{ if(S)S.savedAt=Date.now(); await storageSet(CHAVE, JSON.stringify({...S, pid:PID})); if(typeof flashSalvo==='function')flashSalvo(); if(typeof cloudAgendarSync==='function')cloudAgendarSync(); }catch(e){console.warn('save falhou',e);}
   },1200);
 }
 async function carregar(){
@@ -4592,8 +4805,10 @@ async function salvarAgora(){
   if(!S) return;
   clearTimeout(salvarTimer);
   try{
+    S.savedAt=Date.now();
     await storageSet(CHAVE, JSON.stringify({...S, pid:PID}));
     flashSalvo();
+    if(typeof cloudEnviar==='function' && typeof cloudLogado==='function' && cloudLogado()) cloudEnviar();
   }catch(e){console.warn('save falhou',e);}
 }
 // pequeno indicador visual "salvo ✓" no canto
@@ -4622,6 +4837,12 @@ el('importBtn').onclick=importarSave;
 el('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 montarSetup();
+
+/* ---------- NUVEM: inicializa e popula o botão ---------- */
+if(typeof cloudInit==='function'){
+  cloudInit();
+  const slot=el('cloudSlot'); if(slot && typeof cloudBotaoHTML==='function') slot.innerHTML=cloudBotaoHTML();
+}
 
 /* ---------- PWA: registra o service worker (offline + instalável) ---------- */
 if('serviceWorker' in navigator){

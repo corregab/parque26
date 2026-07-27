@@ -1,5 +1,5 @@
 /* Service Worker do PARQUÊ '26 — cache offline */
-const CACHE = 'parque26-v1';
+const CACHE = 'parque26-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -30,6 +30,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  // só gerencia arquivos do próprio site; deixa nuvem (Supabase) e CDNs passarem direto
+  if (url.origin !== self.location.origin) return;
   const isHTML = req.mode === 'navigate' || url.pathname.endsWith('index.html') || url.pathname.endsWith('/');
   if (isHTML) {
     // network-first: sempre tenta a versão mais nova, cai pro cache se estiver offline
