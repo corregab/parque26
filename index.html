@@ -329,8 +329,14 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .cloudmsg.erro{color:#d9534f}
 .cloudalt{font-size:12px;color:#9a8a76;text-align:center}
 .cloudalt a{color:var(--amber);cursor:pointer;text-decoration:underline}
-.camisa-wrap{display:flex;justify-content:center;padding:6px}
-.camisa-svg{width:100%;max-width:190px;height:auto;filter:drop-shadow(0 8px 18px rgba(0,0,0,.4))}
+.camisa-wrap{display:flex;justify-content:center;padding:6px;min-height:210px;align-items:center}
+.camisa-svg{width:100%;max-width:210px;height:auto;filter:drop-shadow(0 10px 22px rgba(0,0,0,.5))}
+.mk-uni-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.mk-toggle{display:inline-flex;background:#12100d;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.mk-toggle button{background:transparent;border:none;color:var(--mute);padding:6px 14px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.mk-toggle button.on{background:linear-gradient(135deg,var(--amber),var(--wood));color:#150f0a}
+.mk-zone.vazio{opacity:.9}
+.mk-zone:hover rect{stroke-width:.8}
 .slot-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
 .slot-row:last-child{border-bottom:none}
 .slot-main{display:flex;flex-direction:column;gap:1px;min-width:0}
@@ -2375,17 +2381,17 @@ const SLOTS_CAMISA=[
 ];
 const PADROES_CAMISA=[
   {id:'liso',    nome:'Liso'},
-  {id:'faixa',   nome:'Faixa lateral'},
-  {id:'listras', nome:'Listras'},
-  {id:'v',       nome:'Gola V'}
+  {id:'faixa',   nome:'Faixas laterais'},
+  {id:'listras', nome:'Listras'}
 ];
 const CORES_CAMISA=['#c8792e','#e8a33d','#1d4ed8','#0ea5e9','#059669','#16a34a','#dc2626','#e11d48','#7c3aed','#9333ea','#0f172a','#1e293b','#f3ede2','#facc15'];
 
 function initMarketing(){
   const t=S.times[S.meuTime];
   if(!S.camisa){
-    S.camisa={ corPrim:t.cor||'#c8792e', corSec:'#f3ede2', padrao:'liso', patrocinios:{} };
+    S.camisa={ corPrim:t.cor||'#c8792e', corSec:'#f3ede2', padrao:'liso', numero:RI(0,55), patrocinios:{} };
   }
+  if(S.camisa.numero==null) S.camisa.numero=RI(0,55);
   if(!S.camisa.patrocinios) S.camisa.patrocinios={};
   if(!S.ofertasPatroc) gerarOfertas();
 }
@@ -4652,15 +4658,21 @@ function vMarketing(){
   <p class="hint" style="margin-top:10px">O valor dos patrocínios cresce com o <b>hype</b> (mercado, estrelas, títulos) e o <b>desempenho</b> esportivo. Ganhe jogos e contrate craques para atrair marcas maiores.</p>
 
   <div class="grid g2" style="margin-top:16px">
-    <div class="card"><h3 class="sub">👕 Uniforme</h3>
-      <div class="camisa-wrap">${camisaSVG(S.camisa, t)}</div>
-      <div class="row" style="justify-content:center;margin-top:10px;flex-wrap:wrap;gap:6px">
+    <div class="card"><div class="mk-uni-head">
+        <h3 class="sub" style="margin:0">👕 Uniforme</h3>
+        <div class="mk-toggle">
+          <button class="${mkVista==='frente'?'on':''}" onclick="mkSetVista('frente')">Frente</button>
+          <button class="${mkVista==='costas'?'on':''}" onclick="mkSetVista('costas')">Costas</button>
+        </div>
+      </div>
+      <div class="camisa-wrap" id="mkPreview">${camisaSVG(S.camisa, t, mkVista)}</div>
+      <div class="row" style="justify-content:center;margin-top:6px;flex-wrap:wrap;gap:6px">
         <button class="btn mini ghost" onclick="mkPainelCores()">🎨 Cores</button>
         <button class="btn mini ghost" onclick="mkPainelPadrao()">✳️ Design</button>
       </div>
     </div>
-    <div class="card"><h3 class="sub">🤝 Espaços de patrocínio</h3>
-      <p class="hint" style="margin-bottom:8px">Até ${SLOTS_CAMISA.length} espaços. Toque para contratar ou trocar.</p>
+    <div class="card"><h3 class="sub">🏆 Espaços de patrocínio</h3>
+      <p class="hint" style="margin-bottom:8px">Até ${SLOTS_CAMISA.length} espaços. Toque num espaço da camisa ou na lista para contratar ou trocar.</p>
       ${SLOTS_CAMISA.map(slot=>{
         const c=S.camisa.patrocinios[slot.id];
         if(c){
@@ -4679,43 +4691,114 @@ function vMarketing(){
     </div>
   </div>`;
 }
+var mkVista='frente';
+function mkSetVista(v){
+  mkVista=v;
+  document.querySelectorAll('.mk-toggle button').forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes("'"+v+"'")));
+  const prev=el('mkPreview'); if(prev)prev.innerHTML=camisaSVG(S.camisa,S.times[S.meuTime],v);
+}
 
 /* ---------- PREVIEW DA CAMISA (SVG) ---------- */
-function camisaSVG(cam, t){
-  const p=cam.corPrim, s=cam.corSec;
-  const nome=(t.nick||'').toUpperCase();
-  // padrões
-  let padrao='';
-  if(cam.padrao==='faixa') padrao=`<path d="M24,30 L34,34 L30,86 L20,82 Z" fill="${s}" opacity=".85"/><path d="M76,30 L66,34 L70,86 L80,82 Z" fill="${s}" opacity=".85"/>`;
-  else if(cam.padrao==='listras') padrao=`<g stroke="${s}" stroke-width="2.4" opacity=".7"><line x1="40" y1="30" x2="40" y2="86"/><line x1="50" y1="26" x2="50" y2="86"/><line x1="60" y1="30" x2="60" y2="86"/></g>`;
-  else if(cam.padrao==='v') padrao=`<path d="M40,14 L50,30 L60,14 L57,14 L50,25 L43,14 Z" fill="${s}"/>`;
-  // patrocínios
-  const patr=SLOTS_CAMISA.map(slot=>{
-    const c=cam.patrocinios[slot.id]; if(!c)return '';
-    const fs = slot.big?4.2:2.8;
-    const txt=c.marca.length>11?c.marca.slice(0,10)+'…':c.marca;
-    return `<text x="${slot.x}" y="${slot.y}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="${legivel(p)}" style="paint-order:stroke" stroke="${c.cor}" stroke-width="${slot.big?0.5:0.3}">${esc(txt)}</text>`;
-  }).join('');
-  return `<svg viewBox="0 0 100 100" class="camisa-svg">
-    <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${p}"/><stop offset="1" stop-color="${sombra(p)}"/></linearGradient></defs>
-    <path d="M28,14 L44,14 Q50,21 56,14 L72,14 L77,31 L67,35 L70,88 L30,88 L33,35 L23,31 Z"
-      fill="url(#cg)" stroke="${s}" stroke-width="1.2"/>
-    ${padrao}
-    <path d="M44,14 Q50,21 56,14" fill="none" stroke="${s}" stroke-width="1.4"/>
-    ${patr}
-    ${!cam.patrocinios.peito?`<text x="50" y="43" text-anchor="middle" font-size="5.5" font-weight="800" fill="${legivel(p)}" opacity=".9">${esc(nome)}</text>`:''}
-    <text x="50" y="66" text-anchor="middle" font-size="12" font-weight="800" fill="${legivel(p)}" opacity=".95">${RI(0,9)}${RI(0,9)}</text>
-  </svg>`;
+function mkAbrev(nome, max){ return nome.length>max? nome.slice(0,max-1)+'…' : nome; }
+
+function mkPlaca(slotId, cx, cy, w, h, cam, big){
+  const c=cam.patrocinios[slotId];
+  const x=(cx-w/2).toFixed(1), y=(cy-h/2).toFixed(1);
+  const fs=big?4:2.5;
+  if(c){
+    const txt=mkAbrev(c.marca, big?13:9);
+    return `<g class="mk-zone" onclick="mkOfertas('${slotId}')" style="cursor:pointer">
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${(h*0.32).toFixed(1)}" fill="${c.cor}" stroke="rgba(0,0,0,.4)" stroke-width=".35"/>
+      <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="800" fill="${legivel(c.cor)}">${esc(txt)}</text>
+    </g>`;
+  }
+  return `<g class="mk-zone vazio" onclick="mkOfertas('${slotId}')" style="cursor:pointer">
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${(h*0.32).toFixed(1)}" fill="rgba(255,255,255,.10)" stroke="rgba(255,255,255,.45)" stroke-width=".4" stroke-dasharray="1.6 1.2"/>
+    <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${big?4:2.6}" font-weight="700" fill="rgba(255,255,255,.65)">＋</text>
+  </g>`;
 }
-function legivel(hex){ // texto claro ou escuro conforme o fundo
-  const c=hex.replace('#',''); if(c.length<6)return '#fff';
+
+// regata desenhada em coords 0..100 (x) por ~14..112 (y)
+function regataCorpo(cam,t,vista){
+  const p=cam.corPrim, s=cam.corSec, esc2=v=>v;
+  const nome=(t.nick||'').toUpperCase();
+  const num=cam.numero!=null?cam.numero:41;
+  const gid='g'+(vista==='costas'?'B':'F');
+  // padrão
+  let padrao='';
+  if(cam.padrao==='faixa') padrao=`<path d="M30,46 L37,50 L34,104 L26,100 Z" fill="${s}" opacity=".8"/><path d="M70,46 L63,50 L66,104 L74,100 Z" fill="${s}" opacity=".8"/>`;
+  else if(cam.padrao==='listras') padrao=`<g stroke="${s}" stroke-width="2.2" opacity=".55"><line x1="42" y1="48" x2="40" y2="104"/><line x1="50" y1="46" x2="50" y2="104"/><line x1="58" y1="48" x2="60" y2="104"/></g>`;
+  // corpo da regata
+  const corpo=`M27,25 Q17,23 13,36 Q21,48 32,48 L29,105 Q50,111 71,105 L68,48 Q79,48 87,36 Q83,23 73,25 L61,25 Q50,46 39,25 Z`;
+  // gola
+  const gola = vista==='frente'
+    ? `<path d="M35,24 Q50,48 65,24 L58,24 Q50,38 42,24 Z" fill="${s}"/><path d="M39,25 Q50,44 61,25" fill="none" stroke="${sombra(s)}" stroke-width=".5" opacity=".5"/>`
+    : `<path d="M39,25 Q50,32 61,25 L61,21 Q50,27 39,21 Z" fill="${s}"/>`;
+  let conteudo;
+  if(vista==='frente'){
+    conteudo=`
+      ${mkPlaca('ombroE', 29, 34, 20, 7, cam)}
+      ${mkPlaca('ombroD', 71, 34, 20, 7, cam)}
+      ${!cam.patrocinios.peito?`<text x="50" y="50" text-anchor="middle" font-size="6.5" font-weight="800" fill="${legivel(p)}" opacity=".92" letter-spacing=".5">${esc(nome)}</text>`:''}
+      ${mkPlaca('peito', 50, 60, 34, 11, cam, true)}
+      <text x="50" y="86" text-anchor="middle" font-size="18" font-weight="900" fill="${legivel(p)}" opacity=".96">${num}</text>`;
+  } else {
+    conteudo=`
+      ${mkPlaca('costas', 50, 40, 30, 9, cam)}
+      <text x="50" y="72" text-anchor="middle" font-size="22" font-weight="900" fill="${legivel(p)}" opacity=".96">${num}</text>`;
+  }
+  return `
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="0.25" y2="1">
+        <stop offset="0" stop-color="${clarear(p)}"/><stop offset="0.5" stop-color="${p}"/><stop offset="1" stop-color="${sombra(p)}"/>
+      </linearGradient>
+    </defs>
+    <ellipse cx="50" cy="110" rx="30" ry="4" fill="rgba(0,0,0,.35)"/>
+    <path d="${corpo}" fill="url(#${gid})" stroke="${s}" stroke-width="1.3" stroke-linejoin="round"/>
+    <path d="${corpo}" fill="none" stroke="rgba(0,0,0,.25)" stroke-width=".5" opacity=".5"/>
+    <path d="M28,46 L26,102" stroke="rgba(255,255,255,.18)" stroke-width="2" fill="none"/>
+    <path d="M72,46 L74,102" stroke="rgba(0,0,0,.22)" stroke-width="3" fill="none"/>
+    ${padrao}
+    ${gola}
+    ${conteudo}`;
+}
+
+function calcaoCorpo(cam){
+  const p=cam.corPrim, s=cam.corSec;
+  const shorts=`M20,20 L80,20 L82,40 L74,84 L56,84 L50,52 L44,84 L26,84 L18,40 Z`;
+  return `
+    <defs><linearGradient id="gsh" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="${clarear(p)}"/><stop offset="1" stop-color="${sombra(p)}"/></linearGradient></defs>
+    <ellipse cx="50" cy="88" rx="30" ry="3.5" fill="rgba(0,0,0,.3)"/>
+    <path d="${shorts}" fill="url(#gsh)" stroke="${s}" stroke-width="1.6" stroke-linejoin="round"/>
+    <rect x="18" y="20" width="64" height="5" fill="${s}" opacity=".7"/>
+    ${mkPlaca('calcao', 32, 46, 22, 9, cam)}`;
+}
+
+function camisaSVG(cam, t, vista){
+  vista=vista||(typeof mkVista!=='undefined'?mkVista:'frente');
+  if(vista==='costas'){
+    return `<svg viewBox="0 0 128 118" class="camisa-svg">
+      <g transform="translate(-4,4) scale(0.62)">${regataCorpo(cam,t,'costas')}</g>
+      <g transform="translate(64,20) scale(0.52)">${calcaoCorpo(cam)}</g>
+    </svg>`;
+  }
+  return `<svg viewBox="0 0 100 118" class="camisa-svg">${regataCorpo(cam,t,'frente')}</svg>`;
+}
+
+function legivel(hex){
+  const c=(hex||'#000').replace('#',''); if(c.length<6)return '#fff';
   const r=parseInt(c.slice(0,2),16),g=parseInt(c.slice(2,4),16),b=parseInt(c.slice(4,6),16);
-  return (r*0.299+g*0.587+b*0.114)>150?'#150f0a':'#f3ede2';
+  return (r*0.299+g*0.587+b*0.114)>150?'#150f0a':'#f7f2ea';
 }
 function sombra(hex){
-  const c=hex.replace('#',''); if(c.length<6)return hex;
-  const d=x=>Math.max(0,parseInt(x,16)-40).toString(16).padStart(2,'0');
+  const c=(hex||'#000').replace('#',''); if(c.length<6)return hex;
+  const d=x=>Math.max(0,parseInt(x,16)-48).toString(16).padStart(2,'0');
+  return '#'+d(c.slice(0,2))+d(c.slice(2,4))+d(c.slice(4,6));
+}
+function clarear(hex){
+  const c=(hex||'#000').replace('#',''); if(c.length<6)return hex;
+  const d=x=>Math.min(255,parseInt(x,16)+38).toString(16).padStart(2,'0');
   return '#'+d(c.slice(0,2))+d(c.slice(2,4))+d(c.slice(4,6));
 }
 
@@ -4726,12 +4809,12 @@ function mkPainelCores(){
   abrirModal('🎨 Cores do uniforme', `
     <p class="hint">Cor principal</p><div class="cor-grid">${grid('corPrim')}</div>
     <p class="hint" style="margin-top:10px">Cor secundária</p><div class="cor-grid">${grid('corSec')}</div>
-    <div class="camisa-wrap" style="margin-top:12px" id="mkPrev">${camisaSVG(cam,S.times[S.meuTime])}</div>
+    <div class="camisa-wrap" style="margin-top:12px" id="mkPrev">${camisaSVG(cam,S.times[S.meuTime],'frente')}</div>
     <div class="row" style="margin-top:12px"><button class="btn" onclick="closeModal();render()">Pronto</button></div>`);
 }
 function mkSetCor(campo,cor){
   S.camisa[campo]=cor;
-  const prev=el('mkPrev'); if(prev)prev.innerHTML=camisaSVG(S.camisa,S.times[S.meuTime]);
+  const prev=el('mkPrev'); if(prev)prev.innerHTML=camisaSVG(S.camisa,S.times[S.meuTime],'frente');
   document.querySelectorAll('.cor-grid').forEach(g=>{});
   // re-render dos seletores
   mkPainelCores();
@@ -4742,12 +4825,12 @@ function mkPainelPadrao(){
     <div class="padrao-grid">
       ${PADROES_CAMISA.map(pd=>`<button class="padrao-opt ${cam.padrao===pd.id?'on':''}" onclick="mkSetPadrao('${pd.id}')">${pd.nome}</button>`).join('')}
     </div>
-    <div class="camisa-wrap" style="margin-top:12px" id="mkPrev2">${camisaSVG(cam,S.times[S.meuTime])}</div>
+    <div class="camisa-wrap" style="margin-top:12px" id="mkPrev2">${camisaSVG(cam,S.times[S.meuTime],'frente')}</div>
     <div class="row" style="margin-top:12px"><button class="btn" onclick="closeModal();render()">Pronto</button></div>`);
 }
 function mkSetPadrao(id){
   S.camisa.padrao=id;
-  const prev=el('mkPrev2'); if(prev)prev.innerHTML=camisaSVG(S.camisa,S.times[S.meuTime]);
+  const prev=el('mkPrev2'); if(prev)prev.innerHTML=camisaSVG(S.camisa,S.times[S.meuTime],'frente');
   document.querySelectorAll('.padrao-opt').forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes("'"+id+"'")));
 }
 
