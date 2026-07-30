@@ -279,6 +279,8 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .subgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:5px}
 .subpl{background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:7px;padding:7px 8px;font-size:12px;cursor:pointer;text-align:left}
 .subpl.on{border-color:var(--amber);background:rgba(232,163,61,.14)}
+.subcont{margin-top:10px;font-size:12px;color:var(--mute);text-align:center;font-weight:600}
+.subcont.ok{color:#7ac77a}.subcont.erro{color:#d98a6a}
 .postrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
 .postopt{background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer}
 .postopt.on{border-color:var(--amber);background:rgba(232,163,61,.16);color:var(--amber);font-weight:600}
@@ -327,6 +329,23 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .cloudmsg.erro{color:#d9534f}
 .cloudalt{font-size:12px;color:#9a8a76;text-align:center}
 .cloudalt a{color:var(--amber);cursor:pointer;text-decoration:underline}
+.camisa-wrap{display:flex;justify-content:center;padding:6px}
+.camisa-svg{width:100%;max-width:190px;height:auto;filter:drop-shadow(0 8px 18px rgba(0,0,0,.4))}
+.slot-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.slot-row:last-child{border-bottom:none}
+.slot-main{display:flex;flex-direction:column;gap:1px;min-width:0}
+.slot-nome{font-size:13px;font-weight:600;color:var(--bone)}
+.slot-marca{font-size:12px;font-weight:700}
+.slot-row.ocupado{background:rgba(232,163,61,.05)}
+.cor-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:5px}
+.cor-opt{width:100%;aspect-ratio:1;border-radius:8px;border:2px solid transparent;cursor:pointer}
+.cor-opt.on{border-color:var(--bone);box-shadow:0 0 0 2px var(--wood)}
+.padrao-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.padrao-opt{background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:9px;padding:11px;cursor:pointer;font-size:13px}
+.padrao-opt.on{border-color:var(--amber);background:rgba(232,163,61,.16);color:var(--amber);font-weight:600}
+.oferta-card{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#12100d;border:1px solid #2a2119;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.oferta-marca{font-size:14px;font-weight:700}
+.oferta-val{font-family:var(--mono);font-size:12px;color:var(--wood);margin-top:2px}
 </style>
 </head>
 <body>
@@ -1659,6 +1678,7 @@ function proximaFasePO(){
 function processarOffseason(){
   const rel=[];
   S.livres=S.livres||[];
+  if(typeof avancarPatrocinios==='function') avancarPatrocinios();
   S.times.forEach(t=>{
     const sai=[];
     t.elenco.forEach(p=>{
@@ -2321,6 +2341,161 @@ function aposentarCamisa(p, timeAb){
   return true;
 }
 /* ============================================================
+   MARKETING — hype, patrocinadores e personalização da camisa
+   ============================================================ */
+
+// marcas fictícias (nada de marcas reais). tier A=premium, B=médio, C=básico
+const PATROCINADORES=[
+  {nome:'Aurora Airlines', tier:'A', cat:'Companhia aérea', cor:'#3b7dd8'},
+  {nome:'NexBank',         tier:'A', cat:'Banco digital',    cor:'#1faa6b'},
+  {nome:'Vantblack Motors',tier:'A', cat:'Automóveis',       cor:'#c9ccd1'},
+  {nome:'Órbita Telecom',  tier:'A', cat:'Telecom',          cor:'#8b5cf6'},
+  {nome:'Lumière',         tier:'A', cat:'Luxo',             cor:'#e8c15a'},
+  {nome:'Voltz Energia',   tier:'B', cat:'Energético',       cor:'#f0b429'},
+  {nome:'Tigre Sportswear',tier:'B', cat:'Esporte',          cor:'#e8732e'},
+  {nome:'MaxFibra',        tier:'B', cat:'Internet',         cor:'#38bdf8'},
+  {nome:'BrasaGrill',      tier:'B', cat:'Alimentação',      cor:'#d9433f'},
+  {nome:'PrimeCred',       tier:'B', cat:'Financeira',       cor:'#2f9e5f'},
+  {nome:'Zapp Delivery',   tier:'C', cat:'Delivery',         cor:'#e0483d'},
+  {nome:'Serra Café',      tier:'C', cat:'Café',             cor:'#8a5a3b'},
+  {nome:'GoMobi',          tier:'C', cat:'Aplicativo',       cor:'#22c3c3'},
+  {nome:'Pão Quente',      tier:'C', cat:'Padaria',          cor:'#caa46a'},
+  {nome:'Kap Acessórios',  tier:'C', cat:'Acessórios',       cor:'#9aa0a6'}
+];
+const TIER_MULT={A:1.32, B:1.0, C:0.64};
+const TIER_HYPE_MIN={A:55, B:26, C:0};
+
+// slots da camisa (limite: 5)
+const SLOTS_CAMISA=[
+  {id:'peito',  nome:'Peito (master)',   frac:1.0,  x:50, y:42, big:true},
+  {id:'costas', nome:'Nas costas',        frac:0.46, x:50, y:24},
+  {id:'ombroE', nome:'Ombro esquerdo',    frac:0.32, x:29, y:23},
+  {id:'ombroD', nome:'Ombro direito',     frac:0.32, x:71, y:23},
+  {id:'calcao', nome:'Calção',            frac:0.40, x:50, y:80}
+];
+const PADROES_CAMISA=[
+  {id:'liso',    nome:'Liso'},
+  {id:'faixa',   nome:'Faixa lateral'},
+  {id:'listras', nome:'Listras'},
+  {id:'v',       nome:'Gola V'}
+];
+const CORES_CAMISA=['#c8792e','#e8a33d','#1d4ed8','#0ea5e9','#059669','#16a34a','#dc2626','#e11d48','#7c3aed','#9333ea','#0f172a','#1e293b','#f3ede2','#facc15'];
+
+function initMarketing(){
+  const t=S.times[S.meuTime];
+  if(!S.camisa){
+    S.camisa={ corPrim:t.cor||'#c8792e', corSec:'#f3ede2', padrao:'liso', patrocinios:{} };
+  }
+  if(!S.camisa.patrocinios) S.camisa.patrocinios={};
+  if(!S.ofertasPatroc) gerarOfertas();
+}
+
+function desempenhoScore(){
+  const t=S.times[S.meuTime];
+  const jogos=t.v+t.d;
+  const pct= jogos? t.v/jogos : 0.5;
+  return clamp(pct,0,1);
+}
+
+function calcHype(){
+  const t=S.times[S.meuTime];
+  let h=0;
+  h += (t.mercado||5)*3.6;                       // tamanho do mercado
+  h += ((t.prestigio||70)-64)*0.42;              // prestígio da franquia
+  h += (desempenhoScore()-0.5)*44;               // desempenho na temporada
+  h += t.elenco.filter(p=>p.ovr>=88).length*5.5; // estrelas
+  h += t.elenco.filter(p=>p.ovr>=92).length*4;   // superestrelas (bônus extra)
+  const tit=(S.carreiraTec&&S.carreiraTec.titulos)||0;
+  h += tit*4;
+  // momento (últimos resultados)
+  const seq=(t.seq||[]).slice(-8);
+  if(seq.length){ const vit=seq.filter(x=>x==='V').length; h += (vit/seq.length-0.5)*10; }
+  return clamp(Math.round(h),5,99);
+}
+
+function valorMaster(){
+  // valor do patrocínio master (peito), por temporada, em R$
+  const hype=calcHype();
+  return Math.round((6 + hype*0.86) * 1e6);
+}
+function valorOferta(slotFrac, tier){
+  const desemp=0.72 + desempenhoScore()*0.56;
+  const v=valorMaster()*slotFrac*TIER_MULT[tier]*desemp;
+  // arredonda para 100 mil
+  return Math.round(v/1e5)*1e5;
+}
+
+function gerarOfertas(){
+  const hype=calcHype();
+  S.ofertasPatroc={};
+  SLOTS_CAMISA.forEach(slot=>{
+    if(S.camisa && S.camisa.patrocinios[slot.id]) return; // slot ocupado não recebe ofertas
+    // tiers disponíveis conforme o hype
+    const tiers=['A','B','C'].filter(tr=>hype>=TIER_HYPE_MIN[tr]);
+    const pool=PATROCINADORES.filter(p=>tiers.includes(p.tier));
+    // 3 ofertas distintas por slot
+    const escolhidas=[]; const usados=new Set();
+    let tentativas=0;
+    while(escolhidas.length<3 && tentativas<40){
+      tentativas++;
+      const m=pick(pool);
+      if(usados.has(m.nome))continue; usados.add(m.nome);
+      const anos=RI(1,3);
+      escolhidas.push({marca:m.nome, tier:m.tier, cat:m.cat, cor:m.cor,
+        valor:valorOferta(slot.frac, m.tier), anos});
+    }
+    S.ofertasPatroc[slot.id]=escolhidas;
+  });
+}
+
+function aceitarPatrocinio(slotId, idx){
+  const ofertas=S.ofertasPatroc[slotId]; if(!ofertas||!ofertas[idx])return false;
+  const o=ofertas[idx];
+  S.camisa.patrocinios[slotId]={marca:o.marca, tier:o.tier, cat:o.cat, cor:o.cor,
+    valor:o.valor, anos:o.anos, anosRest:o.anos};
+  delete S.ofertasPatroc[slotId];
+  if(typeof noticia==='function') noticia('🤝 Novo patrocínio: '+o.marca+' ('+SLOTS_CAMISA.find(s=>s.id===slotId).nome+') — '+M$(o.valor)+'/ano por '+o.anos+' ano(s).','p');
+  return true;
+}
+function removerPatrocinio(slotId){
+  delete S.camisa.patrocinios[slotId];
+  gerarOfertasSlot(slotId);
+}
+function gerarOfertasSlot(slotId){
+  const slot=SLOTS_CAMISA.find(s=>s.id===slotId); if(!slot)return;
+  const hype=calcHype();
+  const tiers=['A','B','C'].filter(tr=>hype>=TIER_HYPE_MIN[tr]);
+  const pool=PATROCINADORES.filter(p=>tiers.includes(p.tier));
+  const escolhidas=[]; const usados=new Set(); let t=0;
+  while(escolhidas.length<3 && t<40){ t++; const m=pick(pool); if(usados.has(m.nome))continue; usados.add(m.nome);
+    escolhidas.push({marca:m.nome,tier:m.tier,cat:m.cat,cor:m.cor,valor:valorOferta(slot.frac,m.tier),anos:RI(1,3)}); }
+  if(!S.ofertasPatroc)S.ofertasPatroc={};
+  S.ofertasPatroc[slotId]=escolhidas;
+}
+
+// soma dos contratos ativos (usado nas finanças)
+function receitaPatrocinios(){
+  let s=0;
+  if(S.camisa && S.camisa.patrocinios){
+    Object.values(S.camisa.patrocinios).forEach(c=>{ s+=c.valor||0; });
+  }
+  return s;
+}
+
+// virada de temporada: decrementa anos e expira contratos
+function avancarPatrocinios(){
+  if(!S.camisa||!S.camisa.patrocinios)return;
+  Object.keys(S.camisa.patrocinios).forEach(slotId=>{
+    const c=S.camisa.patrocinios[slotId];
+    c.anosRest=(c.anosRest||1)-1;
+    if(c.anosRest<=0){
+      if(typeof noticia==='function') noticia('📄 O contrato com '+c.marca+' expirou. Há novas ofertas no Marketing.','p');
+      delete S.camisa.patrocinios[slotId];
+    }
+  });
+  gerarOfertas(); // renova ofertas dos slots vagos com o hype atual
+}
+/* ============================================================
    INTERFACE
    ============================================================ */
 var S=null, ABA='inicio';
@@ -2328,7 +2503,7 @@ const el=id=>document.getElementById(id);
 const bd=p=>`<span class="badge b-${p.toLowerCase()}">${p}</span>`;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ABAS=[['inicio','Escritório'],['elenco','Elenco'],['taticas','Táticas'],['calendario','Calendário'],
-            ['tabela','Classificação'],['mercado','Mercado'],['treino','Treino'],['financas','Finanças'],['stats','Estatísticas'],['carreira','Carreira'],['premios','Prêmios'],['editor','Editar liga']];
+            ['tabela','Classificação'],['mercado','Mercado'],['treino','Treino'],['financas','Finanças'],['marketing','Marketing'],['stats','Estatísticas'],['carreira','Carreira'],['premios','Prêmios'],['editor','Editar liga']];
 
 function montarTabs(){
   el('tabs').innerHTML=ABAS.map(([k,n])=>`<button data-t="${k}" class="${ABA===k?'on':''}">${n}</button>`).join('');
@@ -2347,7 +2522,7 @@ function hud(){
 function render(){
   hud();
   const f={inicio:vInicio,elenco:vElenco,taticas:vTaticas,calendario:vCal,tabela:vTabela,
-           mercado:vMercado,treino:vTreino,financas:vFin,stats:vStats,carreira:vCarreira,premios:vPremios,editor:vEditor}[ABA];
+           mercado:vMercado,treino:vTreino,financas:vFin,marketing:vMarketing,stats:vStats,carreira:vCarreira,premios:vPremios,editor:vEditor}[ABA];
   el('view').innerHTML=f();
   if(f.pos)f.pos();
   salvar();
@@ -2866,7 +3041,8 @@ function vFin(){
   // RECEITAS anuais
   const recBilheteria=Math.round(pub*t.ingresso*jogosCasa);
   const recConsumo=Math.round(pub*13*jogosCasa);
-  const recPatroc=t.patroc;
+  const recPatrocContratos=(typeof receitaPatrocinios==='function')?receitaPatrocinios():0;
+  const recPatroc=Math.round(t.patroc*0.3)+recPatrocContratos;  // base institucional + contratos da camisa
   const recTV=t.tv||60e6;
   const receitaTotal=recBilheteria+recConsumo+recPatroc+recTV;
   // DESPESAS anuais
@@ -4110,31 +4286,46 @@ function avPainelSub(){
   const g=AV.meuLado==='A'?AV.A:AV.B;
   const emq=g.ps.filter(p=>p.quadra);
   const banco=g.ps.filter(p=>!p.quadra && !p.fora && p.faltas<6);
-  AVUI._sub={sai:null,entra:null};
-  const opt=(p,tipo)=>`<button class="subpl" onclick="avPickSub('${tipo}','${p.id}')" id="sub_${tipo}_${p.id}">
+  AVUI._sub={sai:[],entra:[]};
+  const opt=(p,tipo)=>`<button class="subpl" onclick="avPickSub('${tipo}',${p.id})" id="sub_${tipo}_${p.id}">
     ${bd(p.pos)} ${esc(p.nome.split(' ').slice(-1)[0])} <span class="hint">${p.b.pts}pt · ${Math.round(p.fadiga)}%${p.faltas?' · '+p.faltas+'F':''}</span></button>`;
-  avModal(`<h3 class="sub">Substituição — ${g.t.ab}</h3>
-    <p class="hint">Sai da quadra:</p><div class="subgrid">${emq.map(p=>opt(p,'sai')).join('')}</div>
-    <p class="hint" style="margin-top:10px">Entra do banco:</p><div class="subgrid">${banco.length?banco.map(p=>opt(p,'entra')).join(''):'<span class="hint">Sem reservas disponíveis</span>'}</div>
-    <div class="row" style="margin-top:14px">
-      <button class="btn" onclick="avConfirmaSub()">Confirmar troca</button>
+  avModal(`<h3 class="sub">Substituições — ${g.t.ab}</h3>
+    <p class="hint">Escolha quantos quiser: o nº de quem sai deve ser igual ao de quem entra.</p>
+    <p class="hint" style="margin-top:8px">Saem da quadra:</p><div class="subgrid">${emq.map(p=>opt(p,'sai')).join('')}</div>
+    <p class="hint" style="margin-top:10px">Entram do banco:</p><div class="subgrid">${banco.length?banco.map(p=>opt(p,'entra')).join(''):'<span class="hint">Sem reservas disponíveis</span>'}</div>
+    <div id="subContador" class="subcont">0 saem · 0 entram</div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" onclick="avConfirmaSub()">Confirmar</button>
       <button class="btn ghost" onclick="avFecharModal()">Fechar</button>
     </div>`);
+  avSubContador();
 }
 function avPickSub(tipo,id){
-  AVUI._sub[tipo]=id;
-  ['sai','entra'].forEach(t=>{
-    const g=(AV.meuLado==='A'?AV.A:AV.B);
-    g.ps.forEach(p=>{const b=el('sub_'+t+'_'+p.id);if(b)b.classList.toggle('on',AVUI._sub[t]===''+p.id);});
-  });
+  const arr=AVUI._sub[tipo];
+  const i=arr.indexOf(id);
+  if(i>=0) arr.splice(i,1); else arr.push(id);
+  const b=el('sub_'+tipo+'_'+id); if(b)b.classList.toggle('on',arr.includes(id));
+  avSubContador();
+}
+function avSubContador(){
+  const c=el('subContador'); if(!c)return;
+  const ns=AVUI._sub.sai.length, ne=AVUI._sub.entra.length;
+  const ok=ns===ne&&ns>0;
+  c.textContent=ns+(ns===1?' sai':' saem')+' · '+ne+(ne===1?' entra':' entram')+(ns!==ne?'  (precisa ser igual)':ok?'  ✓':'');
+  c.className='subcont'+(ok?' ok':(ns!==ne?' erro':''));
 }
 function avConfirmaSub(){
-  const s=AVUI._sub;
-  if(!s.sai||!s.entra){ toast('Escolha quem sai e quem entra'); return; }
-  const r=avSubstituir(AV.meuLado, +s.sai, +s.entra);
-  if(!r){ toast('Troca inválida'); return; }
-  avPintarNovos(r.eventos); avAtualizaQuadra();
-  avFecharModal(); toast('Substituição feita');
+  const {sai,entra}=AVUI._sub;
+  if(!sai.length||!entra.length){ toast('Escolha quem sai e quem entra'); return; }
+  if(sai.length!==entra.length){ toast('Nº de quem sai deve ser igual ao de quem entra'); return; }
+  let feitas=0;
+  for(let i=0;i<sai.length;i++){
+    const r=avSubstituir(AV.meuLado, sai[i], entra[i]);
+    if(r){ feitas++; avPintarNovos(r.eventos); }
+  }
+  avAtualizaQuadra();
+  avFecharModal();
+  toast(feitas>1? feitas+' substituições feitas' : 'Substituição feita');
 }
 
 /* ---------- JOGADA OFENSIVA ---------- */
@@ -4441,6 +4632,148 @@ function avQuadraDesenhar(){
     const cy=QA.alvoCima?14:H-14;
     ctx.beginPath(); ctx.arc(W/2,cy,18*(1.5-QA.placarFlash),0,7); ctx.fill();
   }
+}
+/* ============================================================
+   UI MARKETING — hype, camisa e patrocínios
+   ============================================================ */
+function vMarketing(){
+  initMarketing();
+  const t=S.times[S.meuTime];
+  const hype=calcHype();
+  const desemp=Math.round(desempenhoScore()*100);
+  const receita=receitaPatrocinios();
+  const nivel = hype>=75?'Fenômeno nacional': hype>=55?'Grande apelo': hype>=35?'Em ascensão': hype>=18?'Regional':'Discreto';
+  return `<h2 class="sec">Marketing do clube</h2>
+  <div class="grid g3">
+    ${kpi('Hype do clube', hype+'/100', nivel)}
+    ${kpi('Desempenho', desemp+'%', 'aproveitamento')}
+    ${kpi('Receita de patrocínio', $(receita), receita>0?'contratos ativos':'nenhum contrato')}
+  </div>
+  <p class="hint" style="margin-top:10px">O valor dos patrocínios cresce com o <b>hype</b> (mercado, estrelas, títulos) e o <b>desempenho</b> esportivo. Ganhe jogos e contrate craques para atrair marcas maiores.</p>
+
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card"><h3 class="sub">👕 Uniforme</h3>
+      <div class="camisa-wrap">${camisaSVG(S.camisa, t)}</div>
+      <div class="row" style="justify-content:center;margin-top:10px;flex-wrap:wrap;gap:6px">
+        <button class="btn mini ghost" onclick="mkPainelCores()">🎨 Cores</button>
+        <button class="btn mini ghost" onclick="mkPainelPadrao()">✳️ Design</button>
+      </div>
+    </div>
+    <div class="card"><h3 class="sub">🤝 Espaços de patrocínio</h3>
+      <p class="hint" style="margin-bottom:8px">Até ${SLOTS_CAMISA.length} espaços. Toque para contratar ou trocar.</p>
+      ${SLOTS_CAMISA.map(slot=>{
+        const c=S.camisa.patrocinios[slot.id];
+        if(c){
+          return `<div class="slot-row ocupado">
+            <div class="slot-main"><span class="slot-nome">${slot.nome}</span>
+              <span class="slot-marca" style="color:${c.cor}">● ${esc(c.marca)}</span>
+              <span class="hint">${$(c.valor)}/ano · ${c.anosRest} ano(s) restante(s)</span></div>
+            <button class="btn ghost mini" onclick="mkRemover('${slot.id}')">Encerrar</button>
+          </div>`;
+        }
+        return `<div class="slot-row">
+          <div class="slot-main"><span class="slot-nome">${slot.nome}</span><span class="hint">Espaço livre</span></div>
+          <button class="btn mini" onclick="mkOfertas('${slot.id}')">Ver ofertas</button>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+/* ---------- PREVIEW DA CAMISA (SVG) ---------- */
+function camisaSVG(cam, t){
+  const p=cam.corPrim, s=cam.corSec;
+  const nome=(t.nick||'').toUpperCase();
+  // padrões
+  let padrao='';
+  if(cam.padrao==='faixa') padrao=`<path d="M24,30 L34,34 L30,86 L20,82 Z" fill="${s}" opacity=".85"/><path d="M76,30 L66,34 L70,86 L80,82 Z" fill="${s}" opacity=".85"/>`;
+  else if(cam.padrao==='listras') padrao=`<g stroke="${s}" stroke-width="2.4" opacity=".7"><line x1="40" y1="30" x2="40" y2="86"/><line x1="50" y1="26" x2="50" y2="86"/><line x1="60" y1="30" x2="60" y2="86"/></g>`;
+  else if(cam.padrao==='v') padrao=`<path d="M40,14 L50,30 L60,14 L57,14 L50,25 L43,14 Z" fill="${s}"/>`;
+  // patrocínios
+  const patr=SLOTS_CAMISA.map(slot=>{
+    const c=cam.patrocinios[slot.id]; if(!c)return '';
+    const fs = slot.big?4.2:2.8;
+    const txt=c.marca.length>11?c.marca.slice(0,10)+'…':c.marca;
+    return `<text x="${slot.x}" y="${slot.y}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="${legivel(p)}" style="paint-order:stroke" stroke="${c.cor}" stroke-width="${slot.big?0.5:0.3}">${esc(txt)}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 100 100" class="camisa-svg">
+    <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${p}"/><stop offset="1" stop-color="${sombra(p)}"/></linearGradient></defs>
+    <path d="M28,14 L44,14 Q50,21 56,14 L72,14 L77,31 L67,35 L70,88 L30,88 L33,35 L23,31 Z"
+      fill="url(#cg)" stroke="${s}" stroke-width="1.2"/>
+    ${padrao}
+    <path d="M44,14 Q50,21 56,14" fill="none" stroke="${s}" stroke-width="1.4"/>
+    ${patr}
+    ${!cam.patrocinios.peito?`<text x="50" y="43" text-anchor="middle" font-size="5.5" font-weight="800" fill="${legivel(p)}" opacity=".9">${esc(nome)}</text>`:''}
+    <text x="50" y="66" text-anchor="middle" font-size="12" font-weight="800" fill="${legivel(p)}" opacity=".95">${RI(0,9)}${RI(0,9)}</text>
+  </svg>`;
+}
+function legivel(hex){ // texto claro ou escuro conforme o fundo
+  const c=hex.replace('#',''); if(c.length<6)return '#fff';
+  const r=parseInt(c.slice(0,2),16),g=parseInt(c.slice(2,4),16),b=parseInt(c.slice(4,6),16);
+  return (r*0.299+g*0.587+b*0.114)>150?'#150f0a':'#f3ede2';
+}
+function sombra(hex){
+  const c=hex.replace('#',''); if(c.length<6)return hex;
+  const d=x=>Math.max(0,parseInt(x,16)-40).toString(16).padStart(2,'0');
+  return '#'+d(c.slice(0,2))+d(c.slice(2,4))+d(c.slice(4,6));
+}
+
+/* ---------- EDITAR CORES / DESIGN ---------- */
+function mkPainelCores(){
+  const cam=S.camisa;
+  const grid=(campo)=>CORES_CAMISA.map(c=>`<button class="cor-opt ${cam[campo]===c?'on':''}" style="background:${c}" onclick="mkSetCor('${campo}','${c}')"></button>`).join('');
+  abrirModal('🎨 Cores do uniforme', `
+    <p class="hint">Cor principal</p><div class="cor-grid">${grid('corPrim')}</div>
+    <p class="hint" style="margin-top:10px">Cor secundária</p><div class="cor-grid">${grid('corSec')}</div>
+    <div class="camisa-wrap" style="margin-top:12px" id="mkPrev">${camisaSVG(cam,S.times[S.meuTime])}</div>
+    <div class="row" style="margin-top:12px"><button class="btn" onclick="closeModal();render()">Pronto</button></div>`);
+}
+function mkSetCor(campo,cor){
+  S.camisa[campo]=cor;
+  const prev=el('mkPrev'); if(prev)prev.innerHTML=camisaSVG(S.camisa,S.times[S.meuTime]);
+  document.querySelectorAll('.cor-grid').forEach(g=>{});
+  // re-render dos seletores
+  mkPainelCores();
+}
+function mkPainelPadrao(){
+  const cam=S.camisa;
+  abrirModal('✳️ Design da camisa', `
+    <div class="padrao-grid">
+      ${PADROES_CAMISA.map(pd=>`<button class="padrao-opt ${cam.padrao===pd.id?'on':''}" onclick="mkSetPadrao('${pd.id}')">${pd.nome}</button>`).join('')}
+    </div>
+    <div class="camisa-wrap" style="margin-top:12px" id="mkPrev2">${camisaSVG(cam,S.times[S.meuTime])}</div>
+    <div class="row" style="margin-top:12px"><button class="btn" onclick="closeModal();render()">Pronto</button></div>`);
+}
+function mkSetPadrao(id){
+  S.camisa.padrao=id;
+  const prev=el('mkPrev2'); if(prev)prev.innerHTML=camisaSVG(S.camisa,S.times[S.meuTime]);
+  document.querySelectorAll('.padrao-opt').forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes("'"+id+"'")));
+}
+
+/* ---------- OFERTAS DE PATROCÍNIO ---------- */
+function mkOfertas(slotId){
+  if(!S.ofertasPatroc||!S.ofertasPatroc[slotId]) gerarOfertasSlot(slotId);
+  const ofertas=S.ofertasPatroc[slotId]||[];
+  const slot=SLOTS_CAMISA.find(s=>s.id===slotId);
+  const tierNome={A:'Premium',B:'Média',C:'Básica'};
+  abrirModal('Ofertas — '+slot.nome, `
+    ${ofertas.length? ofertas.map((o,i)=>`
+      <div class="oferta-card">
+        <div class="oferta-main">
+          <div class="oferta-marca" style="color:${o.cor}">● ${esc(o.marca)}</div>
+          <div class="hint">${esc(o.cat)} · marca ${tierNome[o.tier]}</div>
+          <div class="oferta-val">${$(o.valor)}/ano · ${o.anos} ano(s)</div>
+        </div>
+        <button class="btn mini" onclick="mkAceitar('${slotId}',${i})">Fechar</button>
+      </div>`).join('') : '<p class="hint">Sem ofertas para este espaço agora. Aumente o hype do clube.</p>'}
+    <div class="row" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">Voltar</button></div>`);
+}
+function mkAceitar(slotId,i){
+  if(aceitarPatrocinio(slotId,i)){ closeModal(); render(); }
+}
+function mkRemover(slotId){
+  if(confirm('Encerrar este patrocínio? Você perde a receita, mas libera o espaço.')){ removerPatrocinio(slotId); render(); }
 }
 /* ============================================================
    NUVEM — carreiras entre dispositivos (Supabase)
@@ -4908,6 +5241,7 @@ function migrarSave(){
   if(!S.propostas)S.propostas=[];
   if(!S.premiacoes)S.premiacoes=[];
   if(!S.camisas)S.camisas={};
+  if(typeof initMarketing==='function')initMarketing();
   if(typeof initCarreira==='function')initCarreira();
   // regenera o calendário se foi removido na exportação (código enxuto)
   if(!S.cal || !S.cal.length){
@@ -4975,6 +5309,7 @@ function iniciarCarreira(){
   S.premiacoes=[];
   S.camisas={};
   if(typeof atualizarOlheiro==='function')atualizarOlheiro();
+  if(typeof initMarketing==='function')initMarketing();
   noticia('🏀 Bem-vindo, '+S.tecnico+'. Temporada 2026-27 começando com '+S.times[S.meuTime].cidade+' '+S.times[S.meuTime].nick+'.','p');
   noticia('🎯 Objetivo da diretoria: '+S.objetivo.txt,'p');
   S.savedAt=Date.now();
