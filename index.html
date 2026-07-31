@@ -241,6 +241,18 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .liga-teams{max-height:44vh;overflow-y:auto;margin-top:6px}
 .liga-teams button{padding:8px 10px}
 .liga-teams .nk{font-size:15px}
+.liga-rodada{font:700 15px 'Barlow Condensed',sans-serif;letter-spacing:1px;color:var(--amber);text-transform:uppercase;margin-top:8px}
+.liga-results{display:flex;flex-direction:column;gap:3px}
+.liga-res{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--bone);padding:3px 6px;border-radius:5px}
+.liga-res .x{color:var(--mute);font-size:10px}
+.liga-res.meu{background:rgba(232,163,61,.14);color:var(--amber)}
+.liga-conf-tit{font:700 11px 'Barlow Condensed',sans-serif;letter-spacing:1.5px;color:var(--wood);text-transform:uppercase;margin:8px 0 3px}
+.liga-tab{width:100%;border-collapse:collapse;font-size:12px}
+.liga-tab td{padding:3px 5px;border-bottom:1px solid var(--line)}
+.liga-tab td:first-child{color:var(--mute);width:20px}
+.liga-tab td.nm{font-weight:600}
+.liga-tab tr.meu td{color:var(--amber)}
+.liga-tab .dono{font-size:10px}
 .teamgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .teamsel{background:var(--panel);border:1px solid var(--line);color:var(--bone);padding:9px;cursor:pointer;text-align:left;transition:.15s;font-family:var(--ui)}
 .teamsel:hover{border-color:var(--wood);background:var(--panel2);transform:translateX(2px)}
@@ -5265,6 +5277,70 @@ async function ligaPublicarEstado(ligaId, estado, rodada, fase){
   await CLOUD.client.from('ligas').update({ rodada, fase, status:'ativa', atualizada_em:new Date().toISOString() }).eq('id',ligaId);
   return {ok:true};
 }
+
+/* ---------- SIMULAÇÃO DE RODADA ONLINE ---------- */
+// simula a rodada atual do estado da liga (reusa o motor sobre um S temporário)
+function simularRodadaLiga(estado, configs){
+  const bkp=(typeof S!=='undefined')?S:null;
+  S=estado;
+  try{
+    // aplica as táticas escolhidas por cada jogador humano
+    if(configs){ Object.keys(configs).forEach(tid=>{ const t=S.times[tid]; const cfg=configs[tid];
+      if(t&&cfg&&cfg.tatica) Object.assign(t.tatica,cfg.tatica); }); }
+    const resultados=[];
+    if(S.fase==='regular' && S.rodada<S.cal.length){
+      const rod=S.cal[S.rodada];
+      rod.forEach(j=>{
+        const A=S.times[j.c], B=S.times[j.f];
+        const res=simularJogo(A,B,{log:false});
+        gravarJogo(res);
+        j.res=[res.ptsA,res.ptsB];
+        resultados.push({ab:A.ab, ba:B.ab, ca:A.cidade, na:A.nick, cb:B.cidade, nb:B.nick, pa:res.ptsA, pb:res.ptsB});
+      });
+      S.times.forEach(t=>t.elenco.forEach(p=>{
+        if(p.lesao>0){p.lesao--; if(p.lesao===0){p.lesaoTxt=''; p.forma=clamp(p.forma-8,50,100);}}
+        p.forma=clamp(p.forma+R(1,4),0,100);
+      }));
+      if(typeof atualizarMoral==='function') atualizarMoral();
+      S.rodada++;
+      if(S.rodada>=S.cal.length){ S.fase='fim_regular'; }
+    }
+    const novo=S;
+    return {resultados, estado:novo, rodada:novo.rodada, fase:novo.fase};
+  } finally { S=bkp; }
+}
+
+async function ligaIniciar(ligaId){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {error}=await CLOUD.client.from('ligas').update({status:'ativa'}).eq('id',ligaId);
+  return error?{erro:error.message}:{ok:true};
+}
+
+async function ligaProcessarRodada(ligaId){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const estadoRow=await ligaCarregarEstado(ligaId);
+  if(!estadoRow||!estadoRow.estado) return {erro:'Estado da liga não encontrado.'};
+  if(estadoRow.estado.fase!=='regular') return {erro:'A temporada regular já terminou (playoffs online em breve).'};
+  const membros=await ligaMembros(ligaId);
+  const configs={}; membros.forEach(m=>{ if(m.config&&m.time_id!=null) configs[m.time_id]=m.config; });
+  const r=simularRodadaLiga(estadoRow.estado, configs);
+  const pub=await ligaPublicarEstado(ligaId, r.estado, r.rodada, r.fase);
+  if(pub.erro) return {erro:pub.erro};
+  return {ok:true, resultados:r.resultados, rodada:r.rodada, fase:r.fase};
+}
+
+async function ligaSalvarConfig(ligaId, config){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {error}=await CLOUD.client.from('liga_membros').update({config}).eq('liga_id',ligaId).eq('user_id',CLOUD.user.id);
+  return error?{erro:error.message}:{ok:true};
+}
+
+// monta a classificação a partir de um estado (sem depender do S global)
+function classificacaoLiga(estado, conf){
+  return estado.times.filter(t=>!conf||t.conf===conf)
+    .map(t=>({t, pct:(t.v+t.d)?t.v/(t.v+t.d):0, sg:(t.pf||0)-(t.pc||0)}))
+    .sort((a,b)=> b.pct-a.pct || b.sg-a.sg || (b.t.pf||0)-(a.t.pf||0));
+}
 /* ============================================================
    UI LIGAS ONLINE — lobby multiplayer
    ============================================================ */
@@ -5322,52 +5398,127 @@ async function ligaEntrarFluxo(){
 }
 
 async function ligaLobby(ligaId){
-  abrirModal('Lobby da liga', '<p class="hint">Carregando…</p>');
+  abrirModal('Liga', '<p class="hint">Carregando…</p>');
   const {data:liga}=await CLOUD.client.from('ligas').select('*').eq('id',ligaId).single();
   if(!liga){ el('mBody').innerHTML='<p class="hint">Liga não encontrada.</p>'; return; }
   const membros=await ligaMembros(ligaId);
   const estadoRow=await ligaCarregarEstado(ligaId);
+  const est=estadoRow&&estadoRow.estado;
   const uid=CLOUD.user.id;
   const meu=membros.find(m=>m.user_id===uid);
+  const ehHost=liga.host_id===uid;
   const usados=new Set(membros.map(m=>m.time_id));
   el('mTitle').textContent=esc(liga.nome||'Liga');
-  let html=`<div class="liga-cod">Código da liga: <b>${liga.codigo}</b>
-    <button class="btn ghost mini" onclick="ligaCopiar('${liga.codigo}')">copiar</button></div>
-    <p class="hint">${membros.length} de ${liga.max_membros} jogadores · situação: ${liga.status}</p>
-    <h3 class="sub" style="margin-top:10px">Jogadores na liga</h3>`;
-  if(!membros.length) html+=`<p class="hint">Ninguém entrou ainda.</p>`;
-  membros.forEach(m=>{
-    html+=`<div class="liga-row"><span>${esc(m.tecnico||'Treinador')} — <b>${esc(m.time_nome||'?')}</b>${m.user_id===liga.host_id?' <span class="host-badge">👑 host</span>':''}</span></div>`;
-  });
-  if(!meu && estadoRow && estadoRow.estado && estadoRow.estado.times){
-    html+=`<h3 class="sub" style="margin-top:14px">Escolha seu time</h3>
-      <div class="teamgrid liga-teams">`;
-    estadoRow.estado.times.slice().sort((a,b)=>forcaTime(b)-forcaTime(a)).forEach(t=>{
-      if(usados.has(t.id)) return;
-      html+=`<button onclick="ligaEscolher('${ligaId}',${t.id})" style="border-left-color:${t.cor||'var(--line)'}">
-        <div class="cty">${esc(t.cidade)} · ${t.conf==='L'?'Leste':'Oeste'}</div>
-        <div class="nk">${esc(t.nick)}</div>
-        <div class="fr"><span>força ${forcaTime(t)}</span></div></button>`;
-    });
+
+  let html=`<div class="liga-cod">Código: <b>${liga.codigo}</b>
+    <button class="btn ghost mini" onclick="ligaCopiar('${liga.codigo}')">copiar</button></div>`;
+
+  if(liga.status==='lobby'){
+    html+=`<p class="hint">${membros.length}/${liga.max_membros} jogadores no lobby</p>
+      <h3 class="sub" style="margin-top:10px">Jogadores</h3>`;
+    membros.forEach(m=>{ html+=`<div class="liga-row"><span>${esc(m.tecnico||'Treinador')} — <b>${esc(m.time_nome||'?')}</b>${m.user_id===liga.host_id?' <span class="host-badge">👑 host</span>':''}</span></div>`; });
+    if(!meu && est && est.times){
+      html+=`<h3 class="sub" style="margin-top:14px">Escolha seu time</h3><div class="teamgrid liga-teams">`;
+      est.times.slice().sort((a,b)=>forcaTime(b)-forcaTime(a)).forEach(t=>{ if(usados.has(t.id))return;
+        html+=`<button onclick="ligaEscolher('${ligaId}',${t.id})" style="border-left-color:${t.cor||'var(--line)'}">
+          <div class="cty">${esc(t.cidade)} · ${t.conf==='L'?'Leste':'Oeste'}</div><div class="nk">${esc(t.nick)}</div>
+          <div class="fr"><span>força ${forcaTime(t)}</span></div></button>`; });
+      html+=`</div>`;
+    } else if(meu){
+      html+=`<div class="liga-meu">Você controla <b>${esc(meu.time_nome)}</b> 🏀</div>`;
+      if(ehHost){
+        html+=`<div class="row" style="margin-top:12px"><button class="btn" onclick="ligaIniciarFluxo('${ligaId}')">▶ Iniciar campeonato</button></div>
+          <p class="hint" style="margin-top:6px">Quando todos tiverem entrado, inicie a temporada. Depois você comanda as rodadas.</p>`;
+      } else {
+        html+=`<p class="hint" style="margin-top:10px">Aguardando o host iniciar o campeonato.</p>`;
+      }
+    }
+  } else {
+    // CAMPEONATO ATIVO
+    const totalJ=est&&est.cal?est.cal.length:82;
+    const rod=est?est.rodada:0;
+    const fimReg=est&&est.fase!=='regular';
+    html+=`<div class="liga-rodada">${fimReg?'Temporada regular encerrada':'Rodada '+(rod+1)+' de '+totalJ}</div>`;
+    if(meu) html+=`<div class="liga-meu">Seu time: <b>${esc(meu.time_nome)}</b></div>`;
+    // ações
+    html+=`<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px">`;
+    if(meu) html+=`<button class="btn mini ghost" onclick="ligaPainelTatica('${ligaId}')">⚙ Minha tática</button>`;
+    if(ehHost && !fimReg) html+=`<button class="btn mini" onclick="ligaProcessarFluxo('${ligaId}')">▶ Processar rodada</button>`;
+    if(!ehHost && !fimReg) html+=`<span class="hint" style="align-self:center">O host processa as rodadas.</span>`;
     html+=`</div>`;
-  } else if(meu){
-    html+=`<div class="liga-meu">Você controla <b>${esc(meu.time_nome)}</b> 🏀</div>
-      <p class="hint" style="margin-top:8px">A liga está montada! O modo de <b>jogar as rodadas online</b> (o host inicia o campeonato e todos disputam) é o próximo passo que estou construindo. Por enquanto, convide seus amigos com o código acima — cada um entra e pega um time.</p>`;
+    // resultados da última rodada
+    if(est && rod>0 && est.cal[rod-1]){
+      html+=`<h3 class="sub" style="margin-top:14px">Resultados — rodada ${rod}</h3><div class="liga-results">`;
+      est.cal[rod-1].forEach(j=>{ if(!j.res)return; const A=est.times[j.c],B=est.times[j.f];
+        const meuJogo=meu&&(j.c===meu.time_id||j.f===meu.time_id);
+        html+=`<div class="liga-res ${meuJogo?'meu':''}"><span>${A.ab} <b>${j.res[0]}</b></span><span class="x">×</span><span><b>${j.res[1]}</b> ${B.ab}</span></div>`; });
+      html+=`</div>`;
+    }
+    // classificação
+    if(est){
+      html+=`<h3 class="sub" style="margin-top:14px">Classificação</h3>`;
+      ['L','O'].forEach(cf=>{
+        html+=`<div class="liga-conf-tit">${cf==='L'?'Leste':'Oeste'}</div><table class="liga-tab"><tbody>`;
+        classificacaoLiga(est,cf).slice(0,8).forEach((r,i)=>{
+          const dono=membros.find(m=>m.time_id===r.t.id);
+          html+=`<tr class="${meu&&r.t.id===meu.time_id?'meu':''}"><td>${i+1}</td><td class="nm">${esc(r.t.ab)}${dono?' <span class="dono">👤</span>':''}</td><td>${r.t.v}-${r.t.d}</td></tr>`;
+        });
+        html+=`</tbody></table>`;
+      });
+    }
   }
   html+=`<div class="row" style="margin-top:14px">
     <button class="btn ghost" onclick="closeModal()">Fechar</button>
     <button class="btn ghost mini" onclick="ligaLobby('${ligaId}')">Atualizar</button>
-    ${meu?`<button class="btn ghost mini" onclick="ligaSairFluxo('${ligaId}')">Sair da liga</button>`:''}</div>`;
+    ${meu?`<button class="btn ghost mini" onclick="ligaSairFluxo('${ligaId}')">Sair</button>`:''}</div>`;
   el('mBody').innerHTML=html;
 
-  // realtime: atualiza o lobby quando alguém entra
+  // realtime: relobby quando membros ou estado mudam
   if(LIGA_CANAL){ try{CLOUD.client.removeChannel(LIGA_CANAL);}catch(e){} }
-  LIGA_CANAL=CLOUD.client.channel('lobby-'+ligaId)
-    .on('postgres_changes',{event:'*',schema:'public',table:'liga_membros',filter:'liga_id=eq.'+ligaId},
-      ()=>{ const m=el('modal'); if(m&&m.classList.contains('on')) ligaLobby(ligaId); })
+  LIGA_CANAL=CLOUD.client.channel('sala-'+ligaId)
+    .on('postgres_changes',{event:'*',schema:'public',table:'liga_membros',filter:'liga_id=eq.'+ligaId},()=>{ const m=el('modal'); if(m&&m.classList.contains('on')) ligaLobby(ligaId); })
+    .on('postgres_changes',{event:'*',schema:'public',table:'liga_estado',filter:'liga_id=eq.'+ligaId},()=>{ const m=el('modal'); if(m&&m.classList.contains('on')) ligaLobby(ligaId); })
+    .on('postgres_changes',{event:'*',schema:'public',table:'ligas',filter:'id=eq.'+ligaId},()=>{ const m=el('modal'); if(m&&m.classList.contains('on')) ligaLobby(ligaId); })
     .subscribe();
 }
 let LIGA_CANAL=null;
+
+async function ligaIniciarFluxo(ligaId){
+  if(!confirm('Iniciar o campeonato? Novos jogadores ainda poderão entrar em times livres.')) return;
+  const r=await ligaIniciar(ligaId);
+  if(r.erro){ toast&&toast(r.erro); return; }
+  toast&&toast('Campeonato iniciado! 🏀');
+  ligaLobby(ligaId);
+}
+async function ligaProcessarFluxo(ligaId){
+  el('mBody').innerHTML='<p class="hint">Simulando a rodada…</p>';
+  const r=await ligaProcessarRodada(ligaId);
+  if(r.erro){ toast&&toast(r.erro); ligaLobby(ligaId); return; }
+  toast&&toast(r.fase!=='regular'?'Temporada regular encerrada!':'Rodada '+r.rodada+' processada!');
+  ligaLobby(ligaId);
+}
+
+async function ligaPainelTatica(ligaId){
+  const membros=await ligaMembros(ligaId);
+  const meu=membros.find(m=>m.user_id===CLOUD.user.id);
+  const cfg=(meu&&meu.config&&meu.config.tatica)||{ritmo:1,foco:1,pressao:1,jogada:'balanceado'};
+  const seg=(campo,vals,lbls)=>vals.map((v,i)=>`<button class="postopt ${cfg[campo]===v?'on':''}" onclick="ligaSetTat('${campo}',${v})">${lbls[i]}</button>`).join('');
+  window._ligaCfg=JSON.parse(JSON.stringify(cfg)); window._ligaId=ligaId;
+  abrirModal('⚙ Minha tática — '+(meu?esc(meu.time_nome):''), `
+    <p class="hint">Ritmo</p><div class="postrow" id="lt_ritmo">${seg('ritmo',[0,1,2],['🐢 Lento','⚖️ Normal','⚡ Rápido'])}</div>
+    <p class="hint" style="margin-top:8px">Foco</p><div class="postrow" id="lt_foco">${seg('foco',[0,1,2],['🏀 Garrafão','⚖️ Equilíbrio','🎯 Perímetro'])}</div>
+    <p class="hint" style="margin-top:8px">Pressão</p><div class="postrow" id="lt_pressao">${seg('pressao',[0,1,2],['😌 Leve','⚖️ Normal','🔥 Total'])}</div>
+    <p class="hint" style="margin-top:8px">Jogada</p><div class="postrow" id="lt_jogada">${ORDEM_JOGADAS.map(k=>`<button class="postopt ${cfg.jogada===k?'on':''}" onclick="ligaSetJogada('${k}')">${JOGADAS[k].emoji} ${JOGADAS[k].nome}</button>`).join('')}</div>
+    <div class="row" style="margin-top:14px"><button class="btn" onclick="ligaSalvarTatica()">Salvar</button><button class="btn ghost" onclick="ligaLobby('${ligaId}')">Voltar</button></div>`);
+}
+function ligaSetTat(campo,v){ window._ligaCfg[campo]=v; const row=el('lt_'+campo); if(row)[...row.children].forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes(campo+"',"+v))); }
+function ligaSetJogada(k){ window._ligaCfg.jogada=k; const row=el('lt_jogada'); if(row)[...row.children].forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes("'"+k+"'"))); }
+async function ligaSalvarTatica(){
+  const r=await ligaSalvarConfig(window._ligaId,{tatica:window._ligaCfg});
+  if(r.erro){ toast&&toast(r.erro); return; }
+  toast&&toast('Tática salva! Vale a partir da próxima rodada.');
+  ligaLobby(window._ligaId);
+}
 
 async function ligaEscolher(ligaId, timeId){
   const estadoRow=await ligaCarregarEstado(ligaId);
