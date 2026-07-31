@@ -253,6 +253,7 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .liga-tab td.nm{font-weight:600}
 .liga-tab tr.meu td{color:var(--amber)}
 .liga-tab .dono{font-size:10px}
+.liga-badge{background:linear-gradient(135deg,rgba(30,58,138,.4),rgba(59,91,217,.25));border:1px solid #3b5bd9!important}
 .teamgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .teamsel{background:var(--panel);border:1px solid var(--line);color:var(--bone);padding:9px;cursor:pointer;text-align:left;transition:.15s;font-family:var(--ui)}
 .teamsel:hover{border-color:var(--wood);background:var(--panel2);transform:translateX(2px)}
@@ -2572,8 +2573,10 @@ function vInicio(){
         <div class="row" style="justify-content:space-between;align-items:flex-end">
           <div><div class="big">${casa?'vs':'@'} ${esc(adv.nick)}</div>
           <div class="hint">${esc(adv.cidade)} · ${adv.v}-${adv.d} · força ${forcaTime(adv)} · ${casa?'Em casa':'Fora de casa'}</div></div>
-          <div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular rápido</button></div>
-          <div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="jogarVarias(5)">Simular 5 rodadas</button></div>
+          ${S.online
+            ? `<div class="hint" style="text-align:right">⏳ A rodada é processada pelo host da liga.<br>Prepare seu time — sua tática vale na próxima rodada.</div>`
+            : `<div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular rápido</button></div>`}
+          ${S.online?'':`<div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="jogarVarias(5)">Simular 5 rodadas</button></div>`}
         </div></div>`;
     } else {
       // seu time já jogou os 82 jogos, mas a temporada ainda não fechou no calendário
@@ -2603,6 +2606,13 @@ function vInicio(){
   }
   const cls=classificacao(t.conf), pos=cls.findIndex(x=>x.id===t.id)+1;
   return `<div class="split"><div>
+    ${S.online?`<div class="card liga-badge">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div><b>🌐 ${esc(S.ligaNome||'Liga')}</b> <span class="hint">· código ${esc(S.ligaCodigo||'')}</span></div>
+        <div class="row" style="gap:6px">${S.ehHost?`<button class="btn mini" onclick="ligaAvancarDia()">▶ Avançar rodada</button>`:''}<button class="btn ghost mini" onclick="ligaSairDoJogo()">Sair da liga</button></div>
+      </div>
+      <p class="hint" style="margin-top:6px">${S.ehHost?'Você é o host: avance a rodada quando quiser (o horário automático vem depois).':'O host comanda o avanço das rodadas.'} Ajuste seu time à vontade — sua tática vale na próxima rodada.</p>
+    </div>`:''}
     ${bloco}
     <div class="grid g4" style="margin-top:14px">
       ${kpi('Posição',pos+'º',t.conf==='L'?'Leste':'Oeste')}
@@ -5439,7 +5449,11 @@ async function ligaLobby(ligaId){
     const rod=est?est.rodada:0;
     const fimReg=est&&est.fase!=='regular';
     html+=`<div class="liga-rodada">${fimReg?'Temporada regular encerrada':'Rodada '+(rod+1)+' de '+totalJ}</div>`;
-    if(meu) html+=`<div class="liga-meu">Seu time: <b>${esc(meu.time_nome)}</b></div>`;
+    if(meu){
+      html+=`<div class="liga-meu">Seu time: <b>${esc(meu.time_nome)}</b></div>
+        <div class="row" style="margin-top:10px"><button class="btn" onclick="ligaJogar('${ligaId}')">▶ Jogar minha carreira na liga</button></div>
+        <p class="hint" style="margin-top:6px">Abre o jogo completo (elenco, tática, treino, mercado, marketing) com seu time no mundo compartilhado.</p>`;
+    }
     // ações
     html+=`<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px">`;
     if(meu) html+=`<button class="btn mini ghost" onclick="ligaPainelTatica('${ligaId}')">⚙ Minha tática</button>`;
@@ -5539,6 +5553,98 @@ async function ligaSairFluxo(ligaId){
 function ligaCopiar(codigo){
   try{ navigator.clipboard.writeText(codigo); toast&&toast('Código copiado!'); }
   catch(e){ toast&&toast('Código: '+codigo); }
+}
+
+/* ============================================================
+   MODO LIGA — jogar a carreira completa no mundo compartilhado
+   ============================================================ */
+// monta o S do jogo a partir do mundo da liga + o time do jogador (função testável, sem rede)
+function ligaEntrarNoJogo(estado, meuTimeId, tecnico, config){
+  S=estado;
+  S.meuTime=meuTimeId;
+  S.online=true;
+  S.tecnico=tecnico||'Treinador';
+  if(typeof SLOT!=='undefined') SLOT=null;   // liga online não usa slot local
+  if(config){
+    if(config.tatica) Object.assign(S.times[meuTimeId].tatica, config.tatica);
+    if(config.camisa) S.camisa=config.camisa;
+  }
+  if(S.avisos==null)S.avisos=0;
+  if(!S.carreiraTec && typeof initCarreira==='function') initCarreira();
+  if(typeof definirObjetivo==='function' && !S.objetivo) definirObjetivo();
+  if(typeof initMarketing==='function') initMarketing();
+  if(typeof PID!=='undefined') PID=(estado.pid||PID||5000);
+  entrarNoJogo();
+}
+
+async function ligaJogar(ligaId){
+  if(el('mBody')) el('mBody').innerHTML='<p class="hint">Entrando na liga…</p>';
+  const estadoRow=await ligaCarregarEstado(ligaId);
+  const membros=await ligaMembros(ligaId);
+  const {data:liga}=await CLOUD.client.from('ligas').select('*').eq('id',ligaId).single();
+  const meu=membros.find(m=>m.user_id===CLOUD.user.id);
+  if(!estadoRow||!estadoRow.estado||!meu){ toast&&toast('Entre na liga e escolha um time primeiro.'); return; }
+  const est=estadoRow.estado;
+  est.ligaId=ligaId;
+  est.ligaCodigo=liga?liga.codigo:'';
+  est.ligaNome=liga?liga.nome:'Liga';
+  est.ehHost=liga&&liga.host_id===CLOUD.user.id;
+  closeModal();
+  ligaEntrarNoJogo(est, meu.time_id, meu.tecnico, meu.config);
+  // ouve mudanças do mundo (outra pessoa jogou / rodada avançou)
+  ligaOuvirMundo(ligaId);
+  toast&&toast('Você está na '+(liga?esc(liga.nome):'liga')+' com '+esc(meu.time_nome));
+}
+
+let LIGA_MUNDO_CANAL=null;
+function ligaOuvirMundo(ligaId){
+  if(!CLOUD||!CLOUD.client) return;
+  if(LIGA_MUNDO_CANAL){ try{CLOUD.client.removeChannel(LIGA_MUNDO_CANAL);}catch(e){} }
+  LIGA_MUNDO_CANAL=CLOUD.client.channel('mundo-'+ligaId)
+    .on('postgres_changes',{event:'*',schema:'public',table:'liga_estado',filter:'liga_id=eq.'+ligaId},async ()=>{
+      if(!S||!S.online||S.ligaId!==ligaId) return;
+      const row=await ligaCarregarEstado(ligaId);
+      if(row&&row.estado){
+        const meuTime=S.meuTime, tec=S.tecnico, cam=S.camisa, obj=S.objetivo, ct=S.carreiraTec;
+        const ligaId2=S.ligaId, cod=S.ligaCodigo, nome=S.ligaNome, host=S.ehHost;
+        S=row.estado; S.meuTime=meuTime; S.online=true; S.tecnico=tec; S.camisa=cam; S.objetivo=obj; S.carreiraTec=ct;
+        S.ligaId=ligaId2; S.ligaCodigo=cod; S.ligaNome=nome; S.ehHost=host;
+        if(typeof render==='function') render();
+        toast&&toast('🌐 Mundo da liga atualizado');
+      }
+    }).subscribe();
+}
+
+// salva a config do meu time (tática/camisa) no servidor
+async function ligaSincronizarMeuTime(){
+  if(!S||!S.online||!S.ligaId||!ligaPronta()) return;
+  const t=S.times[S.meuTime];
+  const config={ tatica:t.tatica, camisa:S.camisa };
+  await ligaSalvarConfig(S.ligaId, config);
+}
+
+// host: avança o dia (processa a rodada no mundo compartilhado)
+async function ligaAvancarDia(){
+  if(!S||!S.ehHost){ toast&&toast('Só o host avança as rodadas.'); return; }
+  toast&&toast('Processando a rodada do dia…');
+  const r=await ligaProcessarRodada(S.ligaId);
+  if(r.erro){ toast&&toast(r.erro); return; }
+  // recarrega o mundo atualizado
+  const row=await ligaCarregarEstado(S.ligaId);
+  if(row&&row.estado){
+    const meuTime=S.meuTime,tec=S.tecnico,cam=S.camisa,obj=S.objetivo,ct=S.carreiraTec,li=S.ligaId,cod=S.ligaCodigo,nm=S.ligaNome,hs=S.ehHost;
+    S=row.estado;S.meuTime=meuTime;S.online=true;S.tecnico=tec;S.camisa=cam;S.objetivo=obj;S.carreiraTec=ct;S.ligaId=li;S.ligaCodigo=cod;S.ligaNome=nm;S.ehHost=hs;
+    render();
+  }
+  toast&&toast(r.fase!=='regular'?'Temporada regular encerrada!':'Rodada '+r.rodada+' processada!');
+}
+
+function ligaSairDoJogo(){
+  if(!confirm('Sair da liga e voltar ao início? Seu time continua na liga.')) return;
+  ligaSincronizarMeuTime();
+  if(LIGA_MUNDO_CANAL){ try{CLOUD.client.removeChannel(LIGA_MUNDO_CANAL);}catch(e){} LIGA_MUNDO_CANAL=null; }
+  S=null;
+  if(typeof mostrarHub==='function') mostrarHub();
 }
 /* ============================================================
    BOOT · SETUP · SAVE
