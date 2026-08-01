@@ -254,6 +254,7 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .liga-tab tr.meu td{color:var(--amber)}
 .liga-tab .dono{font-size:10px}
 .liga-badge{background:linear-gradient(135deg,rgba(30,58,138,.4),rgba(59,91,217,.25));border:1px solid #3b5bd9!important}
+.liga-proxima{margin-top:8px;font-size:12px;color:#9ec3ff;background:rgba(59,91,217,.15);border-radius:7px;padding:6px 9px}
 .teamgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .teamsel{background:var(--panel);border:1px solid var(--line);color:var(--bone);padding:9px;cursor:pointer;text-align:left;transition:.15s;font-family:var(--ui)}
 .teamsel:hover{border-color:var(--wood);background:var(--panel2);transform:translateX(2px)}
@@ -2613,7 +2614,8 @@ function vInicio(){
         <div><b>🌐 ${esc(S.ligaNome||'Liga')}</b> <span class="hint">· código ${esc(S.ligaCodigo||'')}</span></div>
         <div class="row" style="gap:6px">${S.ehHost?`<button class="btn mini" onclick="ligaAvancarDia()">▶ Avançar rodada</button>`:''}<button class="btn ghost mini" onclick="ligaSairDoJogo()">Sair da liga</button></div>
       </div>
-      <p class="hint" style="margin-top:6px">${S.ehHost?'Você é o host: avance a rodada quando quiser (o horário automático vem depois).':'O host comanda o avanço das rodadas.'} Ajuste seu time à vontade — sua tática vale na próxima rodada.</p>
+      <p class="hint" style="margin-top:6px">${S.ehHost?'Você é o host: pode forçar "Avançar rodada" quando quiser.':'O campeonato avança sozinho no horário.'} Ajuste seu time — sua tática vale na próxima rodada.</p>
+      ${S.ligaProxima&&S.ligaAuto?`<div class="liga-proxima">⏰ Próxima rodada automática: <b>${fmtProxima(S.ligaProxima)}</b></div>`:''}
     </div>`:''}
     ${bloco}
     <div class="grid g4" style="margin-top:14px">
@@ -5364,9 +5366,13 @@ function simularRodadaLiga(estado, configs, preJogados){
   } finally { S=bkp; }
 }
 
-async function ligaIniciar(ligaId){
+async function ligaIniciar(ligaId, proximaEm, intervaloMin, auto){
   if(!ligaPronta()) return {erro:'Sem conexão.'};
-  const {error}=await CLOUD.client.from('ligas').update({status:'ativa'}).eq('id',ligaId);
+  const upd={status:'ativa'};
+  if(proximaEm) upd.proxima_rodada_em=proximaEm;
+  if(intervaloMin!=null) upd.intervalo_min=intervaloMin;
+  if(auto!=null) upd.auto=auto;
+  const {error}=await CLOUD.client.from('ligas').update(upd).eq('id',ligaId);
   return error?{erro:error.message}:{ok:true};
 }
 
@@ -5575,11 +5581,30 @@ async function ligaLobby(ligaId){
 }
 let LIGA_CANAL=null;
 
-async function ligaIniciarFluxo(ligaId){
-  if(!confirm('Iniciar o campeonato? Novos jogadores ainda poderão entrar em times livres.')) return;
-  const r=await ligaIniciar(ligaId);
+function ligaIniciarFluxo(ligaId){
+  window._ligaFreq='1440';
+  abrirModal('▶ Iniciar campeonato', `
+    <p class="hint">As rodadas rodam sozinhas no servidor, no intervalo escolhido. Quem estiver online joga sua partida ao vivo; quem não estiver, vai no automático.</p>
+    <p class="hint" style="margin-top:12px">Com que frequência as rodadas acontecem?</p>
+    <div class="postrow" id="ligaFreq">
+      <button class="postopt on" onclick="ligaSetFreq(this,'1440')">1 por dia (24h)</button>
+      <button class="postopt" onclick="ligaSetFreq(this,'720')">a cada 12h</button>
+      <button class="postopt" onclick="ligaSetFreq(this,'60')">a cada 1h</button>
+      <button class="postopt" onclick="ligaSetFreq(this,'10')">🧪 teste: 10 min</button>
+    </div>
+    <p class="hint" style="margin-top:12px">A primeira rodada acontece um intervalo depois de agora. Você (host) também pode forçar "Avançar rodada" a qualquer momento.</p>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" onclick="ligaIniciarConfirma('${ligaId}')">Iniciar campeonato</button>
+      <button class="btn ghost" onclick="ligaLobby('${ligaId}')">Voltar</button>
+    </div>`);
+}
+function ligaSetFreq(b,f){ window._ligaFreq=f; [...b.parentNode.children].forEach(x=>x.classList.remove('on')); b.classList.add('on'); }
+async function ligaIniciarConfirma(ligaId){
+  const min=parseInt(window._ligaFreq||'1440',10);
+  const proxima=new Date(Date.now()+min*60*1000).toISOString();
+  const r=await ligaIniciar(ligaId, proxima, min, true);
   if(r.erro){ toast&&toast(r.erro); return; }
-  toast&&toast('Campeonato iniciado! 🏀');
+  toast&&toast('Campeonato iniciado! 🏀 Primeira rodada em '+(min>=60?(min/60)+'h':min+' min'));
   ligaLobby(ligaId);
 }
 async function ligaProcessarFluxo(ligaId){
@@ -5667,6 +5692,9 @@ async function ligaJogar(ligaId){
   est.ligaCodigo=liga?liga.codigo:'';
   est.ligaNome=liga?liga.nome:'Liga';
   est.ehHost=liga&&liga.host_id===CLOUD.user.id;
+  est.ligaProxima=liga?liga.proxima_rodada_em:null;
+  est.ligaAuto=liga?liga.auto:false;
+  est.ligaIntervalo=liga?liga.intervalo_min:1440;
   closeModal();
   ligaEntrarNoJogo(est, meu.time_id, meu.tecnico, meu.config);
   // ouve mudanças do mundo (outra pessoa jogou / rodada avançou)
@@ -5723,6 +5751,16 @@ function ligaSairDoJogo(){
   if(LIGA_MUNDO_CANAL){ try{CLOUD.client.removeChannel(LIGA_MUNDO_CANAL);}catch(e){} LIGA_MUNDO_CANAL=null; }
   S=null;
   if(typeof mostrarHub==='function') mostrarHub();
+}
+
+function fmtProxima(iso){
+  if(!iso) return '—';
+  const d=new Date(iso), diff=(d-new Date())/1000;
+  if(diff<=0) return 'a qualquer instante';
+  const h=Math.floor(diff/3600), m=Math.floor((diff%3600)/60);
+  let q = h>0 ? ('em '+h+'h'+(m?' '+m+'min':'')) : ('em '+m+'min');
+  try{ q+=' · '+d.toLocaleString('pt-BR',{weekday:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){}
+  return q;
 }
 /* ============================================================
    BOOT · SETUP · SAVE
