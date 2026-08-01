@@ -2574,7 +2574,9 @@ function vInicio(){
           <div><div class="big">${casa?'vs':'@'} ${esc(adv.nick)}</div>
           <div class="hint">${esc(adv.cidade)} · ${adv.v}-${adv.d} · força ${forcaTime(adv)} · ${casa?'Em casa':'Fora de casa'}</div></div>
           ${S.online
-            ? `<div class="hint" style="text-align:right">⏳ A rodada é processada pelo host da liga.<br>Prepare seu time — sua tática vale na próxima rodada.</div>`
+            ? (S.jogueiRodada===S.rodada
+                ? `<div class="hint" style="text-align:right">✅ Você já jogou esta rodada.<br>Aguardando o host fechar.</div>`
+                : `<div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogarOnlineRapido()">⏩ Simular minha partida</button></div>`)
             : `<div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular rápido</button></div>`}
           ${S.online?'':`<div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="jogarVarias(5)">Simular 5 rodadas</button></div>`}
         </div></div>`;
@@ -3166,6 +3168,24 @@ function fecharTemporada(){
     avancarRodada();
   }
   render();
+}
+// MODO ONLINE: simula só a minha partida e envia o resultado (não avança o mundo)
+function jogarOnlineRapido(){
+  if(!S.online||!S.ligaId) return;
+  if(S.jogueiRodada===S.rodada){ toast&&toast('Você já jogou esta rodada'); return; }
+  const px=proximoJogo(); if(!px){ toast&&toast('Sem jogo nesta rodada'); return; }
+  const j=px.j, A=S.times[j.c], B=S.times[j.f];
+  const res=simularJogo(A,B,{log:false});
+  S.jogueiRodada=S.rodada;
+  if(typeof ligaGravarResultado==='function') ligaGravarResultado(S.ligaId, S.rodada, A.id, B.id, res.ptsA, res.ptsB);
+  const meuA=j.c===S.meuTime, eu=meuA?res.ptsA:res.ptsB, ele=meuA?res.ptsB:res.ptsA;
+  render();
+  abrirModal(eu>ele?'🏆 Vitória!':'Derrota',`
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:30px;font-weight:800;color:${eu>ele?'#7ac77a':'#d9534f'}">${A.ab} ${res.ptsA} x ${res.ptsB} ${B.ab}</div>
+      <p class="hint">Resultado enviado! Vale quando o host fechar a rodada.</p>
+    </div>
+    <div class="row" style="justify-content:center"><button class="btn" onclick="closeModal()">Fechar</button></div>`);
 }
 function jogar(){
   const r = S.fase==='playin'? jogarPlayIn() : S.fase==='playoffs'? jogarRodadaPO() : avancarRodada();
@@ -4447,6 +4467,23 @@ function avSimularResto(){
 /* ---------- FIM DO JOGO ---------- */
 function avFimDeJogo(res){
   clearInterval(AVUI.timer);
+  // MODO ONLINE: grava o resultado da minha partida; não avança o mundo (o host fecha a rodada)
+  if(S.online && S.ligaId){
+    const meuA=res.A.t.id===S.meuTime;
+    const eu=meuA?res.ptsA:res.ptsB, ele=meuA?res.ptsB:res.ptsA;
+    const venceu=eu>ele;
+    S.jogueiRodada=S.rodada;
+    if(typeof ligaGravarResultado==='function')
+      ligaGravarResultado(S.ligaId, S.rodada, res.A.t.id, res.B.t.id, res.ptsA, res.ptsB);
+    render();
+    abrirModal(venceu?'🏆 Vitória!':'Derrota',`
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:30px;font-weight:800;color:${venceu?'#7ac77a':'#d9534f'}">${res.A.t.ab} ${res.ptsA} x ${res.ptsB} ${res.B.t.ab}</div>
+        <p class="hint">Resultado enviado! Vale quando o host fechar a rodada. Quem não jogar vai no automático.</p>
+      </div>
+      <div class="row" style="justify-content:center"><button class="btn" onclick="closeModal();verJogo()">Ver súmula</button></div>`);
+    return;
+  }
   // grava e processa a fase usando este resultado
   const fase=AVUI.faseOrigem;
   if(fase==='playin') jogarPlayIn(res);
@@ -5290,22 +5327,29 @@ async function ligaPublicarEstado(ligaId, estado, rodada, fase){
 
 /* ---------- SIMULAÇÃO DE RODADA ONLINE ---------- */
 // simula a rodada atual do estado da liga (reusa o motor sobre um S temporário)
-function simularRodadaLiga(estado, configs){
+function simularRodadaLiga(estado, configs, preJogados){
   const bkp=(typeof S!=='undefined')?S:null;
   S=estado;
   try{
-    // aplica as táticas escolhidas por cada jogador humano
     if(configs){ Object.keys(configs).forEach(tid=>{ const t=S.times[tid]; const cfg=configs[tid];
       if(t&&cfg&&cfg.tatica) Object.assign(t.tatica,cfg.tatica); }); }
+    const pre=preJogados||{};   // { time_casa: {pc, pf} }
     const resultados=[];
     if(S.fase==='regular' && S.rodada<S.cal.length){
       const rod=S.cal[S.rodada];
       rod.forEach(j=>{
         const A=S.times[j.c], B=S.times[j.f];
-        const res=simularJogo(A,B,{log:false});
-        gravarJogo(res);
-        j.res=[res.ptsA,res.ptsB];
-        resultados.push({ab:A.ab, ba:B.ab, ca:A.cidade, na:A.nick, cb:B.cidade, nb:B.nick, pa:res.ptsA, pb:res.ptsB});
+        let pa, pb, aoVivo=false;
+        if(pre[j.c] && pre[j.c].pf!=null){
+          pa=pre[j.c].pc; pb=pre[j.c].pf; aoVivo=true;
+          aplicarPlacarLiga(A, B, pa, pb);
+        } else {
+          const res=simularJogo(A,B,{log:false});
+          gravarJogo(res);
+          pa=res.ptsA; pb=res.ptsB;
+        }
+        j.res=[pa,pb];
+        resultados.push({ab:A.ab, ba:B.ab, ca:A.cidade, na:A.nick, cb:B.cidade, nb:B.nick, pa, pb, vivo:aoVivo});
       });
       S.times.forEach(t=>t.elenco.forEach(p=>{
         if(p.lesao>0){p.lesao--; if(p.lesao===0){p.lesaoTxt=''; p.forma=clamp(p.forma-8,50,100);}}
@@ -5326,6 +5370,37 @@ async function ligaIniciar(ligaId){
   return error?{erro:error.message}:{ok:true};
 }
 
+// aplica um placar já definido (jogo ao vivo) na classificação
+function aplicarPlacarLiga(A, B, pc, pf){
+  const vA=pc>pf;
+  A.v+=vA?1:0; A.d+=vA?0:1; B.v+=vA?0:1; B.d+=vA?1:0;
+  A.pf=(A.pf||0)+pc; A.pc=(A.pc||0)+pf;
+  B.pf=(B.pf||0)+pf; B.pc=(B.pc||0)+pc;
+  A.seq=A.seq||[]; B.seq=B.seq||[];
+  A.seq.unshift(vA?'V':'D'); B.seq.unshift(vA?'D':'V');
+  A.seq=A.seq.slice(0,8); B.seq=B.seq.slice(0,8);
+}
+async function ligaGravarResultado(ligaId, rodada, timeCasa, timeFora, pc, pf){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {error}=await CLOUD.client.from('liga_resultados').upsert({
+    liga_id:ligaId, rodada, time_casa:timeCasa, time_fora:timeFora,
+    placar_casa:pc, placar_fora:pf, jogado_por:CLOUD.user.id
+  }, {onConflict:'liga_id,rodada,time_casa', ignoreDuplicates:true});
+  if(error) return {erro:error.message};
+  return {ok:true};
+}
+async function ligaResultadosDaRodada(ligaId, rodada){
+  if(!ligaPronta()) return {};
+  const {data,error}=await CLOUD.client.from('liga_resultados').select('*').eq('liga_id',ligaId).eq('rodada',rodada);
+  if(error||!data) return {};
+  const map={}; data.forEach(r=>{ map[r.time_casa]={pc:r.placar_casa, pf:r.placar_fora}; });
+  return map;
+}
+async function ligaLimparResultados(ligaId, rodada){
+  if(!ligaPronta()) return;
+  await CLOUD.client.from('liga_resultados').delete().eq('liga_id',ligaId).eq('rodada',rodada);
+}
+
 async function ligaProcessarRodada(ligaId){
   if(!ligaPronta()) return {erro:'Sem conexão.'};
   const estadoRow=await ligaCarregarEstado(ligaId);
@@ -5333,9 +5408,12 @@ async function ligaProcessarRodada(ligaId){
   if(estadoRow.estado.fase!=='regular') return {erro:'A temporada regular já terminou (playoffs online em breve).'};
   const membros=await ligaMembros(ligaId);
   const configs={}; membros.forEach(m=>{ if(m.config&&m.time_id!=null) configs[m.time_id]=m.config; });
-  const r=simularRodadaLiga(estadoRow.estado, configs);
+  const rodadaAtual=estadoRow.estado.rodada;
+  const preJogados=await ligaResultadosDaRodada(ligaId, rodadaAtual);
+  const r=simularRodadaLiga(estadoRow.estado, configs, preJogados);
   const pub=await ligaPublicarEstado(ligaId, r.estado, r.rodada, r.fase);
   if(pub.erro) return {erro:pub.erro};
+  await ligaLimparResultados(ligaId, rodadaAtual);
   return {ok:true, resultados:r.resultados, rodada:r.rodada, fase:r.fase};
 }
 
