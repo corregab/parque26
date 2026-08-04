@@ -5518,6 +5518,20 @@ async function ligaAceitarProposta(id){
   if(data&&data.erro) return {erro:data.erro};
   return {ok:true};
 }
+
+// propõe uma troca a um time da IA (avaliada na hora pelo servidor)
+async function ligaTrocaIA(ligaId, paraTime, oferecidos, pedidos, extra){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  extra=extra||{};
+  const {data,error}=await CLOUD.client.functions.invoke('troca-ia',{ body:{
+    liga_id:ligaId, para_time:paraTime, oferecidos, pedidos,
+    picks_ofer:extra.picksOfer||[], picks_ped:extra.picksPed||[],
+    dinheiro_ofer:extra.dinheiroOfer||0, dinheiro_ped:extra.dinheiroPed||0
+  }});
+  if(error){ let msg='Erro ao negociar com a IA.'; try{const c=await error.context.json(); if(c&&c.erro)msg=c.erro;}catch(e){} return {erro:msg}; }
+  if(data&&data.erro) return {erro:data.erro};
+  return data;
+}
 /* ============================================================
    UI LIGAS ONLINE — lobby multiplayer
    ============================================================ */
@@ -5882,7 +5896,7 @@ async function ligaNegociacoes(ligaId){
   if(!recebidas.length) html+='<p class="hint">Nenhuma proposta pendente.</p>';
   recebidas.forEach(p=>{
     html+=`<div class="prop-card">
-      <div class="prop-de">${esc(info[p.de_user]?info[p.de_user].time:'Time')} propõe:</div>
+      <div class="prop-de">${p.de_ia?'🤖 '+esc(S.times[p.de_time]?S.times[p.de_time].nick:'IA'):esc(info[p.de_user]?info[p.de_user].time:'Time')} propõe:</div>
       <div class="prop-linha"><span class="da">você dá</span> ${fmtLado(p.para_time,p.pedidos,p.picks_pedidos,p.dinheiro_ped)}</div>
       <div class="prop-linha"><span class="recebe">você recebe</span> ${fmtLado(p.de_time,p.oferecidos,p.picks_oferecidos,p.dinheiro_ofer)}</div>
       ${p.mensagem?`<div class="hint">"${esc(p.mensagem)}"</div>`:''}
@@ -5905,15 +5919,21 @@ async function ligaNegociacoes(ligaId){
 
 async function ligaNovaProposta(ligaId){
   const membros=await ligaMembros(ligaId);
-  const outros=membros.filter(m=>m.user_id!==CLOUD.user.id && m.time_id!=null);
-  abrirModal('Nova proposta', outros.length?
-    `<p class="hint">Com qual time você quer negociar?</p>`+
-    outros.map(m=>`<button class="btn ghost" style="width:100%;margin-bottom:6px;text-align:left" onclick="ligaMontarProposta('${ligaId}',${m.time_id},'${m.user_id}')"><b>${esc(m.time_nome)}</b> — ${esc(m.tecnico)}</button>`).join('')+
-    `<div class="row" style="margin-top:8px"><button class="btn ghost" onclick="ligaNegociacoes('${ligaId}')">Voltar</button></div>`
-    : `<p class="hint">Ainda não há outros jogadores humanos na liga. Convide amigos!</p><div class="row" style="margin-top:10px"><button class="btn ghost" onclick="ligaNegociacoes('${ligaId}')">Voltar</button></div>`);
+  const humanos={}; membros.forEach(m=>{ if(m.time_id!=null) humanos[m.time_id]=m; });
+  let html='<p class="hint">Com qual time negociar? <b>👤</b> humano · <b>🤖</b> IA</p><div class="teamgrid liga-teams">';
+  S.times.slice().sort((a,b)=>forcaTime(b)-forcaTime(a)).forEach(t=>{
+    if(t.id===S.meuTime) return;
+    const h=humanos[t.id], paraUser=h?h.user_id:'';
+    html+=`<button onclick="ligaMontarProposta('${ligaId}',${t.id},'${paraUser}')" style="border-left-color:${t.cor||'var(--line)'}">
+      <div class="cty">${h?'👤 '+esc(h.tecnico):'🤖 Comandado pela IA'}</div>
+      <div class="nk">${esc(t.nick)}</div>
+      <div class="fr"><span>força ${forcaTime(t)}</span></div></button>`;
+  });
+  html+='</div><div class="row" style="margin-top:10px"><button class="btn ghost" onclick="ligaNegociacoes(\''+ligaId+'\')">Voltar</button></div>';
+  abrirModal('Nova proposta', html);
 }
 function ligaMontarProposta(ligaId, paraTime, paraUser){
-  window._prop={ligaId, paraTime, paraUser, oferecidos:[], pedidos:[], picksOfer:[], picksPed:[], dinheiroOfer:0, dinheiroPed:0};
+  window._prop={ligaId, paraTime, paraUser:paraUser||'', ehIA:!paraUser, oferecidos:[], pedidos:[], picksOfer:[], picksPed:[], dinheiroOfer:0, dinheiroPed:0};
   ligaRenderMontar();
 }
 function ligaRenderMontar(){
@@ -5928,6 +5948,7 @@ function ligaRenderMontar(){
   };
   const caixaMeu=meu.caixa||0, caixaAlvo=alvo.caixa||0;
   abrirModal('Proposta → '+esc(alvo.nick), `
+    ${P.ehIA?'<p class="hint" style="color:#9ec3ff">🤖 Time da IA — ela avalia por valor e responde na hora.</p>':''}
     <div class="prop-lado ofer"><div class="prop-lado-tit">▲ Você oferece (${esc(meu.nick)})</div>
       <div class="jog-grid">${listaJog(meu,P.oferecidos,'ofer')}</div>
       <div class="prop-sub">Picks:</div><div class="jog-grid">${listaPicks(S.meuTime,P.picksOfer,'ofer')}</div>
@@ -5938,8 +5959,8 @@ function ligaRenderMontar(){
       <div class="prop-sub">Picks:</div><div class="jog-grid">${listaPicks(P.paraTime,P.picksPed,'ped')}</div>
       <div class="prop-din">💰 Verba que você pede: <input type="number" min="0" step="1000000" id="dinPed" value="${P.dinheiroPed}" oninput="ligaSetDin('ped',this.value)"> <span class="hint">(caixa dele: ${$(caixaAlvo)})</span></div>
     </div>
-    <input id="propMsg" class="prop-msg" placeholder="Mensagem (opcional)" maxlength="80">
-    <div class="row" style="margin-top:12px"><button class="btn" onclick="ligaEnviarPropostaFluxo()">📨 Enviar proposta</button><button class="btn ghost" onclick="ligaNovaProposta('${P.ligaId}')">Voltar</button></div>`);
+    <input id="propMsg" class="prop-msg" placeholder="Mensagem (opcional)" maxlength="80" ${P.ehIA?'style="display:none"':''}>
+    <div class="row" style="margin-top:12px"><button class="btn" onclick="ligaEnviarPropostaFluxo()">${P.ehIA?'🤖 Propor à IA':'📨 Enviar proposta'}</button><button class="btn ghost" onclick="ligaNovaProposta('${P.ligaId}')">Voltar</button></div>`);
 }
 function ligaTogglePlayer(tipo,id){
   const arr=tipo==='ofer'?window._prop.oferecidos:window._prop.pedidos;
@@ -5966,8 +5987,16 @@ async function ligaEnviarPropostaFluxo(){
   const meu=S.times[S.meuTime];
   if(P.dinheiroOfer>(meu.caixa||0)){ toast&&toast('Você não tem esse caixa para oferecer'); return; }
   const msg=el('propMsg')?el('propMsg').value.trim():'';
-  const r=await ligaEnviarProposta(P.ligaId, S.meuTime, P.paraUser, P.paraTime, P.oferecidos, P.pedidos, msg,
-    {dinheiroOfer:P.dinheiroOfer, dinheiroPed:P.dinheiroPed, picksOfer:P.picksOfer, picksPed:P.picksPed});
+  const extra={dinheiroOfer:P.dinheiroOfer, dinheiroPed:P.dinheiroPed, picksOfer:P.picksOfer, picksPed:P.picksPed};
+  if(P.ehIA){
+    el('mBody').innerHTML='<p class="hint">🤖 A '+esc(S.times[P.paraTime].nick)+' está avaliando sua proposta…</p>';
+    const r=await ligaTrocaIA(P.ligaId, P.paraTime, P.oferecidos, P.pedidos, extra);
+    if(r.erro){ toast&&toast(r.erro); ligaRenderMontar(); return; }
+    if(r.aceita){ toast&&toast('🤝 A '+(r.time||'IA')+' aceitou a troca!'); ligaRecarregarMundo(P.ligaId, ()=>{ ligaNegociacoes(P.ligaId); }); }
+    else { toast&&toast(r.motivo||'A IA recusou a proposta.'); ligaRenderMontar(); }
+    return;
+  }
+  const r=await ligaEnviarProposta(P.ligaId, S.meuTime, P.paraUser, P.paraTime, P.oferecidos, P.pedidos, msg, extra);
   if(r.erro){ toast&&toast(r.erro); return; }
   toast&&toast('Proposta enviada! 📨');
   ligaNegociacoes(P.ligaId);
