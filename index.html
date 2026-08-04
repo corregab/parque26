@@ -264,6 +264,15 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .jog-opt{background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer}
 .jog-opt.on{border-color:var(--amber);background:rgba(232,163,61,.16);color:var(--amber);font-weight:600}
 .prop-msg{width:100%;margin-top:10px;background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:8px;padding:9px}
+.prop-lado{border:1px solid #2a2119;border-radius:10px;padding:9px 11px;margin-bottom:8px}
+.prop-lado.ofer{background:rgba(217,138,106,.06);border-color:rgba(217,138,106,.3)}
+.prop-lado.ped{background:rgba(122,199,122,.06);border-color:rgba(122,199,122,.3)}
+.prop-lado-tit{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.prop-lado.ofer .prop-lado-tit{color:#d98a6a}
+.prop-lado.ped .prop-lado-tit{color:#7ac77a}
+.prop-sub{font-size:11px;color:var(--mute);margin:7px 0 3px}
+.prop-din{margin-top:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.prop-din input{width:120px;background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:6px;padding:5px 7px;font-family:var(--mono);font-size:12px}
 .teamgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .teamsel{background:var(--panel);border:1px solid var(--line);color:var(--bone);padding:9px;cursor:pointer;text-align:left;transition:.15s;font-family:var(--ui)}
 .teamsel:hover{border-color:var(--wood);background:var(--panel2);transform:translateX(2px)}
@@ -5259,6 +5268,11 @@ function gerarEstadoLiga(){
   };
   est.cal=gerarCalendario(est.times);
   est.times.forEach(t=>{ if(typeof autoMinutos==='function') t.minutos=autoMinutos(t); });
+  // inicializa os picks de draft do mundo da liga
+  if(typeof inicializarPicks==='function'){
+    const bkp=(typeof S!=='undefined')?S:null;
+    S=est; try{ inicializarPicks(); } finally { S=bkp; }
+  }
   return est;
 }
 
@@ -5454,12 +5468,15 @@ function classificacaoLiga(estado, conf){
 }
 
 /* ---------- PROPOSTAS / NEGOCIAÇÕES (online) ---------- */
-async function ligaEnviarProposta(ligaId, deTime, paraUser, paraTime, oferecidos, pedidos, mensagem){
+async function ligaEnviarProposta(ligaId, deTime, paraUser, paraTime, oferecidos, pedidos, mensagem, extra){
   if(!ligaPronta()) return {erro:'Sem conexão.'};
+  extra=extra||{};
   const {error}=await CLOUD.client.from('liga_propostas').insert({
     liga_id:ligaId, de_user:CLOUD.user.id, de_time:deTime,
     para_user:paraUser, para_time:paraTime,
-    oferecidos, pedidos, mensagem:mensagem||null, status:'pendente'
+    oferecidos, pedidos, mensagem:mensagem||null, status:'pendente',
+    dinheiro_ofer:extra.dinheiroOfer||0, dinheiro_ped:extra.dinheiroPed||0,
+    picks_oferecidos:extra.picksOfer||[], picks_pedidos:extra.picksPed||[]
   });
   return error?{erro:error.message}:{ok:true};
 }
@@ -5853,13 +5870,21 @@ async function ligaNegociacoes(ligaId){
   const membros=await ligaMembros(ligaId);
   const info={}; membros.forEach(m=>info[m.user_id]={tec:m.tecnico,time:m.time_nome});
   const jn=(timeId,pid)=>{ const t=S.times[timeId]; const p=t&&t.elenco.find(x=>x.id===pid); return p?esc(p.nome.split(' ').slice(-1)[0])+' '+p.ovr:'?'; };
+  const pkNome=(pid)=>{ const pk=(S.picks||[]).find(x=>x.id===pid); return pk&&typeof nomePick==='function'?esc(nomePick(pk)):'pick'; };
+  const fmtLado=(timeId,jogIds,pickIds,dinheiro)=>{
+    const parts=[];
+    (jogIds||[]).forEach(id=>parts.push(jn(timeId,id)));
+    (pickIds||[]).forEach(id=>parts.push('🎟️ '+pkNome(id)));
+    if(dinheiro>0) parts.push('💰 '+M$(dinheiro));
+    return parts.join(', ')||'—';
+  };
   let html=`<h3 class="sub">📥 Recebidas</h3>`;
   if(!recebidas.length) html+='<p class="hint">Nenhuma proposta pendente.</p>';
   recebidas.forEach(p=>{
     html+=`<div class="prop-card">
       <div class="prop-de">${esc(info[p.de_user]?info[p.de_user].time:'Time')} propõe:</div>
-      <div class="prop-linha"><span class="da">você dá</span> ${p.pedidos.map(id=>jn(p.para_time,id)).join(', ')||'—'}</div>
-      <div class="prop-linha"><span class="recebe">você recebe</span> ${p.oferecidos.map(id=>jn(p.de_time,id)).join(', ')||'—'}</div>
+      <div class="prop-linha"><span class="da">você dá</span> ${fmtLado(p.para_time,p.pedidos,p.picks_pedidos,p.dinheiro_ped)}</div>
+      <div class="prop-linha"><span class="recebe">você recebe</span> ${fmtLado(p.de_time,p.oferecidos,p.picks_oferecidos,p.dinheiro_ofer)}</div>
       ${p.mensagem?`<div class="hint">"${esc(p.mensagem)}"</div>`:''}
       <div class="row" style="margin-top:6px"><button class="btn mini" onclick="ligaAceitarFluxo('${p.id}','${ligaId}')">✓ Aceitar</button><button class="btn ghost mini" onclick="ligaRecusarFluxo('${p.id}','${ligaId}')">Recusar</button></div>
     </div>`;
@@ -5869,8 +5894,8 @@ async function ligaNegociacoes(ligaId){
   enviadas.forEach(p=>{
     html+=`<div class="prop-card">
       <div class="prop-de">Para ${esc(info[p.para_user]?info[p.para_user].time:'Time')} — aguardando resposta</div>
-      <div class="prop-linha"><span class="da">você oferece</span> ${p.oferecidos.map(id=>jn(p.de_time,id)).join(', ')||'—'}</div>
-      <div class="prop-linha"><span class="recebe">você pede</span> ${p.pedidos.map(id=>jn(p.para_time,id)).join(', ')||'—'}</div>
+      <div class="prop-linha"><span class="da">você oferece</span> ${fmtLado(p.de_time,p.oferecidos,p.picks_oferecidos,p.dinheiro_ofer)}</div>
+      <div class="prop-linha"><span class="recebe">você pede</span> ${fmtLado(p.para_time,p.pedidos,p.picks_pedidos,p.dinheiro_ped)}</div>
       <div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="ligaCancelarFluxo('${p.id}','${ligaId}')">Cancelar</button></div>
     </div>`;
   });
@@ -5888,16 +5913,31 @@ async function ligaNovaProposta(ligaId){
     : `<p class="hint">Ainda não há outros jogadores humanos na liga. Convide amigos!</p><div class="row" style="margin-top:10px"><button class="btn ghost" onclick="ligaNegociacoes('${ligaId}')">Voltar</button></div>`);
 }
 function ligaMontarProposta(ligaId, paraTime, paraUser){
-  window._prop={ligaId, paraTime, paraUser, oferecidos:[], pedidos:[]};
+  window._prop={ligaId, paraTime, paraUser, oferecidos:[], pedidos:[], picksOfer:[], picksPed:[], dinheiroOfer:0, dinheiroPed:0};
   ligaRenderMontar();
 }
 function ligaRenderMontar(){
   const P=window._prop, meu=S.times[S.meuTime], alvo=S.times[P.paraTime];
-  const lista=(t,sel,tipo)=>t.elenco.slice().sort((a,b)=>b.ovr-a.ovr).map(p=>
+  const listaJog=(t,sel,tipo)=>t.elenco.slice().sort((a,b)=>b.ovr-a.ovr).map(p=>
     `<button class="jog-opt ${sel.includes(p.id)?'on':''}" onclick="ligaTogglePlayer('${tipo}',${p.id})">${bd(p.pos)} ${esc(p.nome.split(' ').slice(-1)[0])} <b>${p.ovr}</b></button>`).join('');
+  const listaPicks=(timeId,sel,tipo)=>{
+    const pk=(typeof picksDe==='function')?picksDe(timeId):[];
+    if(!pk.length) return '<span class="hint">sem picks</span>';
+    return pk.sort((a,b)=>a.ano-b.ano||a.rodada-b.rodada).map(p=>
+      `<button class="jog-opt ${sel.includes(p.id)?'on':''}" onclick="ligaTogglePick('${tipo}','${p.id}')">${esc(nomePick(p))}</button>`).join('');
+  };
+  const caixaMeu=meu.caixa||0, caixaAlvo=alvo.caixa||0;
   abrirModal('Proposta → '+esc(alvo.nick), `
-    <p class="hint">Você oferece (do seu ${esc(meu.nick)}):</p><div class="jog-grid">${lista(meu,P.oferecidos,'ofer')}</div>
-    <p class="hint" style="margin-top:10px">Você pede (do ${esc(alvo.nick)}):</p><div class="jog-grid">${lista(alvo,P.pedidos,'ped')}</div>
+    <div class="prop-lado ofer"><div class="prop-lado-tit">▲ Você oferece (${esc(meu.nick)})</div>
+      <div class="jog-grid">${listaJog(meu,P.oferecidos,'ofer')}</div>
+      <div class="prop-sub">Picks:</div><div class="jog-grid">${listaPicks(S.meuTime,P.picksOfer,'ofer')}</div>
+      <div class="prop-din">💰 Verba que você paga: <input type="number" min="0" step="1000000" id="dinOfer" value="${P.dinheiroOfer}" oninput="ligaSetDin('ofer',this.value)"> <span class="hint">(caixa: ${$(caixaMeu)})</span></div>
+    </div>
+    <div class="prop-lado ped"><div class="prop-lado-tit">▼ Você pede (${esc(alvo.nick)})</div>
+      <div class="jog-grid">${listaJog(alvo,P.pedidos,'ped')}</div>
+      <div class="prop-sub">Picks:</div><div class="jog-grid">${listaPicks(P.paraTime,P.picksPed,'ped')}</div>
+      <div class="prop-din">💰 Verba que você pede: <input type="number" min="0" step="1000000" id="dinPed" value="${P.dinheiroPed}" oninput="ligaSetDin('ped',this.value)"> <span class="hint">(caixa dele: ${$(caixaAlvo)})</span></div>
+    </div>
     <input id="propMsg" class="prop-msg" placeholder="Mensagem (opcional)" maxlength="80">
     <div class="row" style="margin-top:12px"><button class="btn" onclick="ligaEnviarPropostaFluxo()">📨 Enviar proposta</button><button class="btn ghost" onclick="ligaNovaProposta('${P.ligaId}')">Voltar</button></div>`);
 }
@@ -5906,11 +5946,28 @@ function ligaTogglePlayer(tipo,id){
   const i=arr.indexOf(id); if(i>=0)arr.splice(i,1); else arr.push(id);
   ligaRenderMontar();
 }
+function ligaTogglePick(tipo,id){
+  const arr=tipo==='ofer'?window._prop.picksOfer:window._prop.picksPed;
+  const i=arr.indexOf(id); if(i>=0)arr.splice(i,1); else arr.push(id);
+  ligaRenderMontar();
+}
+function ligaSetDin(tipo,v){
+  const n=Math.max(0,Math.round(+v||0));
+  if(tipo==='ofer')window._prop.dinheiroOfer=n; else window._prop.dinheiroPed=n;
+}
 async function ligaEnviarPropostaFluxo(){
   const P=window._prop;
-  if(!P.oferecidos.length && !P.pedidos.length){ toast&&toast('Escolha pelo menos um jogador'); return; }
+  // lê os inputs de dinheiro no momento do envio
+  if(el('dinOfer')) P.dinheiroOfer=Math.max(0,Math.round(+el('dinOfer').value||0));
+  if(el('dinPed')) P.dinheiroPed=Math.max(0,Math.round(+el('dinPed').value||0));
+  const vazio=!P.oferecidos.length && !P.pedidos.length && !P.picksOfer.length && !P.picksPed.length && !P.dinheiroOfer && !P.dinheiroPed;
+  if(vazio){ toast&&toast('Coloque ao menos um jogador, pick ou verba'); return; }
+  // não deixa oferecer mais caixa do que tem
+  const meu=S.times[S.meuTime];
+  if(P.dinheiroOfer>(meu.caixa||0)){ toast&&toast('Você não tem esse caixa para oferecer'); return; }
   const msg=el('propMsg')?el('propMsg').value.trim():'';
-  const r=await ligaEnviarProposta(P.ligaId, S.meuTime, P.paraUser, P.paraTime, P.oferecidos, P.pedidos, msg);
+  const r=await ligaEnviarProposta(P.ligaId, S.meuTime, P.paraUser, P.paraTime, P.oferecidos, P.pedidos, msg,
+    {dinheiroOfer:P.dinheiroOfer, dinheiroPed:P.dinheiroPed, picksOfer:P.picksOfer, picksPed:P.picksPed});
   if(r.erro){ toast&&toast(r.erro); return; }
   toast&&toast('Proposta enviada! 📨');
   ligaNegociacoes(P.ligaId);
