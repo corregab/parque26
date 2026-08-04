@@ -255,6 +255,15 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .liga-tab .dono{font-size:10px}
 .liga-badge{background:linear-gradient(135deg,rgba(30,58,138,.4),rgba(59,91,217,.25));border:1px solid #3b5bd9!important}
 .liga-proxima{margin-top:8px;font-size:12px;color:#9ec3ff;background:rgba(59,91,217,.15);border-radius:7px;padding:6px 9px}
+.prop-card{background:#12100d;border:1px solid #2a2119;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.prop-de{font-size:12px;color:var(--amber);font-weight:600;margin-bottom:4px}
+.prop-linha{font-size:13px;padding:2px 0}
+.prop-linha .da{display:inline-block;min-width:82px;color:#d98a6a;font-size:11px;text-transform:uppercase;font-weight:600}
+.prop-linha .recebe{display:inline-block;min-width:82px;color:#7ac77a;font-size:11px;text-transform:uppercase;font-weight:600}
+.jog-grid{display:flex;flex-wrap:wrap;gap:5px;max-height:24vh;overflow-y:auto}
+.jog-opt{background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer}
+.jog-opt.on{border-color:var(--amber);background:rgba(232,163,61,.16);color:var(--amber);font-weight:600}
+.prop-msg{width:100%;margin-top:10px;background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:8px;padding:9px}
 .teamgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .teamsel{background:var(--panel);border:1px solid var(--line);color:var(--bone);padding:9px;cursor:pointer;text-align:left;transition:.15s;font-family:var(--ui)}
 .teamsel:hover{border-color:var(--wood);background:var(--panel2);transform:translateX(2px)}
@@ -2612,7 +2621,7 @@ function vInicio(){
     ${S.online?`<div class="card liga-badge">
       <div class="row" style="justify-content:space-between;align-items:center">
         <div><b>🌐 ${esc(S.ligaNome||'Liga')}</b> <span class="hint">· código ${esc(S.ligaCodigo||'')}</span></div>
-        <div class="row" style="gap:6px">${S.ehHost?`<button class="btn mini" onclick="ligaAvancarDia()">▶ Avançar rodada</button>`:''}<button class="btn ghost mini" onclick="ligaSairDoJogo()">Sair da liga</button></div>
+        <div class="row" style="gap:6px">${S.ehHost?`<button class="btn mini" onclick="ligaAvancarDia()">▶ Avançar rodada</button>`:''}<button class="btn ghost mini" onclick="ligaNegociacoes()">🤝 Negociações</button><button class="btn ghost mini" onclick="ligaSairDoJogo()">Sair da liga</button></div>
       </div>
       <p class="hint" style="margin-top:6px">${S.ehHost?'Você é o host: pode forçar "Avançar rodada" quando quiser.':'O campeonato avança sozinho no horário.'} Ajuste seu time — sua tática vale na próxima rodada.</p>
       ${S.ligaProxima&&S.ligaAuto?`<div class="liga-proxima">⏰ Próxima rodada automática: <b>${fmtProxima(S.ligaProxima)}</b></div>`:''}
@@ -2863,6 +2872,14 @@ function vTabela(){
 var TROCA={meus:[],deles:[],alvo:null,meusPicks:[],delesPicks:[]};
 function vMercado(){
   const t=S.times[S.meuTime];
+  if(S.online){
+    return `<h2 class="sec">Mercado — modo liga</h2>
+      <div class="card">
+        <p>No modo online, você não troca jogadores direto: <b>envia uma proposta</b> para outro time e ele aceita ou recusa.</p>
+        <p class="hint" style="margin-top:8px">Monte trocas oferecendo e pedindo jogadores. Quando o outro treinador aceitar, a troca acontece no mundo compartilhado.</p>
+        <div class="row" style="margin-top:12px"><button class="btn" onclick="ligaNegociacoes()">🤝 Abrir negociações</button><button class="btn ghost" onclick="ligaNovaProposta(S.ligaId)">➕ Nova proposta</button></div>
+      </div>`;
+  }
   const sub=S.mercadoSub||'buscar';
   const tabBtn=(k,nome)=>`<button class="btn ${sub===k?'':'ghost'} mini" onclick="S.mercadoSub='${k}';render()">${nome}</button>`;
   let corpo='';
@@ -5435,6 +5452,55 @@ function classificacaoLiga(estado, conf){
     .map(t=>({t, pct:(t.v+t.d)?t.v/(t.v+t.d):0, sg:(t.pf||0)-(t.pc||0)}))
     .sort((a,b)=> b.pct-a.pct || b.sg-a.sg || (b.t.pf||0)-(a.t.pf||0));
 }
+
+/* ---------- PROPOSTAS / NEGOCIAÇÕES (online) ---------- */
+async function ligaEnviarProposta(ligaId, deTime, paraUser, paraTime, oferecidos, pedidos, mensagem){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {error}=await CLOUD.client.from('liga_propostas').insert({
+    liga_id:ligaId, de_user:CLOUD.user.id, de_time:deTime,
+    para_user:paraUser, para_time:paraTime,
+    oferecidos, pedidos, mensagem:mensagem||null, status:'pendente'
+  });
+  return error?{erro:error.message}:{ok:true};
+}
+async function ligaListarPropostas(ligaId){
+  if(!ligaPronta()) return {recebidas:[], enviadas:[]};
+  const uid=CLOUD.user.id;
+  const {data}=await CLOUD.client.from('liga_propostas').select('*')
+    .eq('liga_id',ligaId).in('status',['pendente']).order('criada_em',{ascending:false});
+  const todas=data||[];
+  return {
+    recebidas: todas.filter(p=>p.para_user===uid),
+    enviadas:  todas.filter(p=>p.de_user===uid)
+  };
+}
+async function ligaContarPropostas(ligaId){
+  if(!ligaPronta()) return 0;
+  const {count}=await CLOUD.client.from('liga_propostas').select('*',{count:'exact',head:true})
+    .eq('liga_id',ligaId).eq('para_user',CLOUD.user.id).eq('status','pendente');
+  return count||0;
+}
+async function ligaRecusarProposta(id){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {error}=await CLOUD.client.from('liga_propostas').update({status:'recusada'}).eq('id',id);
+  return error?{erro:error.message}:{ok:true};
+}
+async function ligaCancelarProposta(id){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {error}=await CLOUD.client.from('liga_propostas').update({status:'cancelada'}).eq('id',id);
+  return error?{erro:error.message}:{ok:true};
+}
+async function ligaAceitarProposta(id){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {data,error}=await CLOUD.client.functions.invoke('aplicar-troca',{ body:{ proposta_id:id } });
+  if(error){
+    let msg='Não foi possível aplicar a troca.';
+    try{ const ctx=await error.context.json(); if(ctx&&ctx.erro)msg=ctx.erro; }catch(e){}
+    return {erro:msg};
+  }
+  if(data&&data.erro) return {erro:data.erro};
+  return {ok:true};
+}
 /* ============================================================
    UI LIGAS ONLINE — lobby multiplayer
    ============================================================ */
@@ -5712,13 +5778,17 @@ function ligaOuvirMundo(ligaId){
       const row=await ligaCarregarEstado(ligaId);
       if(row&&row.estado){
         const meuTime=S.meuTime, tec=S.tecnico, cam=S.camisa, obj=S.objetivo, ct=S.carreiraTec;
-        const ligaId2=S.ligaId, cod=S.ligaCodigo, nome=S.ligaNome, host=S.ehHost;
+        const ligaId2=S.ligaId, cod=S.ligaCodigo, nome=S.ligaNome, host=S.ehHost, px=S.ligaProxima, au=S.ligaAuto, iv=S.ligaIntervalo;
         S=row.estado; S.meuTime=meuTime; S.online=true; S.tecnico=tec; S.camisa=cam; S.objetivo=obj; S.carreiraTec=ct;
-        S.ligaId=ligaId2; S.ligaCodigo=cod; S.ligaNome=nome; S.ehHost=host;
+        S.ligaId=ligaId2; S.ligaCodigo=cod; S.ligaNome=nome; S.ehHost=host; S.ligaProxima=px; S.ligaAuto=au; S.ligaIntervalo=iv;
         if(typeof render==='function') render();
         toast&&toast('🌐 Mundo da liga atualizado');
       }
-    }).subscribe();
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'liga_propostas',filter:'liga_id=eq.'+ligaId},(payload)=>{
+      const p=payload.new; if(p && p.para_user===CLOUD.user.id && p.status==='pendente') toast&&toast('📨 Nova proposta de troca recebida!');
+    })
+    .subscribe();
 }
 
 // salva a config do meu time (tática/camisa) no servidor
@@ -5761,6 +5831,102 @@ function fmtProxima(iso){
   let q = h>0 ? ('em '+h+'h'+(m?' '+m+'min':'')) : ('em '+m+'min');
   try{ q+=' · '+d.toLocaleString('pt-BR',{weekday:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){}
   return q;
+}
+
+/* ---------- UI NEGOCIAÇÕES (online) ---------- */
+function ligaRecarregarMundo(ligaId, cb){
+  ligaCarregarEstado(ligaId).then(row=>{
+    if(row&&row.estado&&S&&S.online&&S.ligaId===ligaId){
+      const keep={meuTime:S.meuTime,tec:S.tecnico,cam:S.camisa,obj:S.objetivo,ct:S.carreiraTec,li:S.ligaId,cod:S.ligaCodigo,nm:S.ligaNome,hs:S.ehHost,px:S.ligaProxima,au:S.ligaAuto,iv:S.ligaIntervalo};
+      S=row.estado; S.meuTime=keep.meuTime;S.online=true;S.tecnico=keep.tec;S.camisa=keep.cam;S.objetivo=keep.obj;S.carreiraTec=keep.ct;
+      S.ligaId=keep.li;S.ligaCodigo=keep.cod;S.ligaNome=keep.nm;S.ehHost=keep.hs;S.ligaProxima=keep.px;S.ligaAuto=keep.au;S.ligaIntervalo=keep.iv;
+      if(typeof render==='function')render();
+    }
+    if(cb)cb();
+  });
+}
+
+async function ligaNegociacoes(ligaId){
+  ligaId=ligaId||(S&&S.ligaId);
+  abrirModal('🤝 Negociações','<p class="hint">Carregando…</p>');
+  const {recebidas, enviadas}=await ligaListarPropostas(ligaId);
+  const membros=await ligaMembros(ligaId);
+  const info={}; membros.forEach(m=>info[m.user_id]={tec:m.tecnico,time:m.time_nome});
+  const jn=(timeId,pid)=>{ const t=S.times[timeId]; const p=t&&t.elenco.find(x=>x.id===pid); return p?esc(p.nome.split(' ').slice(-1)[0])+' '+p.ovr:'?'; };
+  let html=`<h3 class="sub">📥 Recebidas</h3>`;
+  if(!recebidas.length) html+='<p class="hint">Nenhuma proposta pendente.</p>';
+  recebidas.forEach(p=>{
+    html+=`<div class="prop-card">
+      <div class="prop-de">${esc(info[p.de_user]?info[p.de_user].time:'Time')} propõe:</div>
+      <div class="prop-linha"><span class="da">você dá</span> ${p.pedidos.map(id=>jn(p.para_time,id)).join(', ')||'—'}</div>
+      <div class="prop-linha"><span class="recebe">você recebe</span> ${p.oferecidos.map(id=>jn(p.de_time,id)).join(', ')||'—'}</div>
+      ${p.mensagem?`<div class="hint">"${esc(p.mensagem)}"</div>`:''}
+      <div class="row" style="margin-top:6px"><button class="btn mini" onclick="ligaAceitarFluxo('${p.id}','${ligaId}')">✓ Aceitar</button><button class="btn ghost mini" onclick="ligaRecusarFluxo('${p.id}','${ligaId}')">Recusar</button></div>
+    </div>`;
+  });
+  html+=`<h3 class="sub" style="margin-top:14px">📤 Enviadas</h3>`;
+  if(!enviadas.length) html+='<p class="hint">Nenhuma proposta enviada.</p>';
+  enviadas.forEach(p=>{
+    html+=`<div class="prop-card">
+      <div class="prop-de">Para ${esc(info[p.para_user]?info[p.para_user].time:'Time')} — aguardando resposta</div>
+      <div class="prop-linha"><span class="da">você oferece</span> ${p.oferecidos.map(id=>jn(p.de_time,id)).join(', ')||'—'}</div>
+      <div class="prop-linha"><span class="recebe">você pede</span> ${p.pedidos.map(id=>jn(p.para_time,id)).join(', ')||'—'}</div>
+      <div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="ligaCancelarFluxo('${p.id}','${ligaId}')">Cancelar</button></div>
+    </div>`;
+  });
+  html+=`<div class="row" style="margin-top:14px"><button class="btn" onclick="ligaNovaProposta('${ligaId}')">➕ Nova proposta</button><button class="btn ghost" onclick="closeModal()">Fechar</button></div>`;
+  el('mBody').innerHTML=html;
+}
+
+async function ligaNovaProposta(ligaId){
+  const membros=await ligaMembros(ligaId);
+  const outros=membros.filter(m=>m.user_id!==CLOUD.user.id && m.time_id!=null);
+  abrirModal('Nova proposta', outros.length?
+    `<p class="hint">Com qual time você quer negociar?</p>`+
+    outros.map(m=>`<button class="btn ghost" style="width:100%;margin-bottom:6px;text-align:left" onclick="ligaMontarProposta('${ligaId}',${m.time_id},'${m.user_id}')"><b>${esc(m.time_nome)}</b> — ${esc(m.tecnico)}</button>`).join('')+
+    `<div class="row" style="margin-top:8px"><button class="btn ghost" onclick="ligaNegociacoes('${ligaId}')">Voltar</button></div>`
+    : `<p class="hint">Ainda não há outros jogadores humanos na liga. Convide amigos!</p><div class="row" style="margin-top:10px"><button class="btn ghost" onclick="ligaNegociacoes('${ligaId}')">Voltar</button></div>`);
+}
+function ligaMontarProposta(ligaId, paraTime, paraUser){
+  window._prop={ligaId, paraTime, paraUser, oferecidos:[], pedidos:[]};
+  ligaRenderMontar();
+}
+function ligaRenderMontar(){
+  const P=window._prop, meu=S.times[S.meuTime], alvo=S.times[P.paraTime];
+  const lista=(t,sel,tipo)=>t.elenco.slice().sort((a,b)=>b.ovr-a.ovr).map(p=>
+    `<button class="jog-opt ${sel.includes(p.id)?'on':''}" onclick="ligaTogglePlayer('${tipo}',${p.id})">${bd(p.pos)} ${esc(p.nome.split(' ').slice(-1)[0])} <b>${p.ovr}</b></button>`).join('');
+  abrirModal('Proposta → '+esc(alvo.nick), `
+    <p class="hint">Você oferece (do seu ${esc(meu.nick)}):</p><div class="jog-grid">${lista(meu,P.oferecidos,'ofer')}</div>
+    <p class="hint" style="margin-top:10px">Você pede (do ${esc(alvo.nick)}):</p><div class="jog-grid">${lista(alvo,P.pedidos,'ped')}</div>
+    <input id="propMsg" class="prop-msg" placeholder="Mensagem (opcional)" maxlength="80">
+    <div class="row" style="margin-top:12px"><button class="btn" onclick="ligaEnviarPropostaFluxo()">📨 Enviar proposta</button><button class="btn ghost" onclick="ligaNovaProposta('${P.ligaId}')">Voltar</button></div>`);
+}
+function ligaTogglePlayer(tipo,id){
+  const arr=tipo==='ofer'?window._prop.oferecidos:window._prop.pedidos;
+  const i=arr.indexOf(id); if(i>=0)arr.splice(i,1); else arr.push(id);
+  ligaRenderMontar();
+}
+async function ligaEnviarPropostaFluxo(){
+  const P=window._prop;
+  if(!P.oferecidos.length && !P.pedidos.length){ toast&&toast('Escolha pelo menos um jogador'); return; }
+  const msg=el('propMsg')?el('propMsg').value.trim():'';
+  const r=await ligaEnviarProposta(P.ligaId, S.meuTime, P.paraUser, P.paraTime, P.oferecidos, P.pedidos, msg);
+  if(r.erro){ toast&&toast(r.erro); return; }
+  toast&&toast('Proposta enviada! 📨');
+  ligaNegociacoes(P.ligaId);
+}
+async function ligaAceitarFluxo(id, ligaId){
+  el('mBody').innerHTML='<p class="hint">Aplicando a troca no mundo da liga…</p>';
+  const r=await ligaAceitarProposta(id);
+  if(r.erro){ toast&&toast(r.erro); ligaNegociacoes(ligaId); return; }
+  toast&&toast('Troca realizada! 🤝');
+  ligaRecarregarMundo(ligaId, ()=>{ closeModal(); });
+}
+async function ligaRecusarFluxo(id, ligaId){
+  await ligaRecusarProposta(id); toast&&toast('Proposta recusada'); ligaNegociacoes(ligaId);
+}
+async function ligaCancelarFluxo(id, ligaId){
+  await ligaCancelarProposta(id); toast&&toast('Proposta cancelada'); ligaNegociacoes(ligaId);
 }
 /* ============================================================
    BOOT · SETUP · SAVE
