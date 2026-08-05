@@ -5742,29 +5742,44 @@ async function ligaLobby(ligaId){
 let LIGA_CANAL=null;
 
 function ligaIniciarFluxo(ligaId){
-  window._ligaFreq='1440';
+  window._ligaModo='diario';
   abrirModal('▶ Iniciar campeonato', `
-    <p class="hint">As rodadas rodam sozinhas no servidor, no intervalo escolhido. Quem estiver online joga sua partida ao vivo; quem não estiver, vai no automático.</p>
-    <p class="hint" style="margin-top:12px">Com que frequência as rodadas acontecem?</p>
-    <div class="postrow" id="ligaFreq">
-      <button class="postopt on" onclick="ligaSetFreq(this,'1440')">1 por dia (24h)</button>
-      <button class="postopt" onclick="ligaSetFreq(this,'720')">a cada 12h</button>
-      <button class="postopt" onclick="ligaSetFreq(this,'60')">a cada 1h</button>
-      <button class="postopt" onclick="ligaSetFreq(this,'10')">🧪 teste: 10 min</button>
+    <p class="hint">Os jogos rolam sozinhos no servidor, no horário escolhido — ninguém precisa estar online. Quem estiver com o app aberto pode comandar sua partida ao vivo; quem não, vai no automático.</p>
+    <p class="hint" style="margin-top:12px">Quando os jogos acontecem?</p>
+    <div class="postrow" id="ligaModo">
+      <button class="postopt on" onclick="ligaSetModo('diario')">📅 Todo dia num horário fixo</button>
+      <button class="postopt" onclick="ligaSetModo('teste')">🧪 Teste: a cada 10 min</button>
     </div>
-    <p class="hint" style="margin-top:12px">A primeira rodada acontece um intervalo depois de agora. Você (host) também pode forçar "Avançar rodada" a qualquer momento.</p>
+    <div id="ligaHoraBox" style="margin-top:12px">
+      <p class="hint">Horário diário dos jogos (no seu fuso):</p>
+      <input type="time" id="ligaHora" value="20:00" class="prop-msg" style="max-width:150px">
+      <p class="hint" style="margin-top:4px">Todo dia nesse horário a rodada é processada automaticamente.</p>
+    </div>
     <div class="row" style="margin-top:14px">
       <button class="btn" onclick="ligaIniciarConfirma('${ligaId}')">Iniciar campeonato</button>
       <button class="btn ghost" onclick="ligaLobby('${ligaId}')">Voltar</button>
     </div>`);
 }
-function ligaSetFreq(b,f){ window._ligaFreq=f; [...b.parentNode.children].forEach(x=>x.classList.remove('on')); b.classList.add('on'); }
+function ligaSetModo(m){
+  window._ligaModo=m;
+  document.querySelectorAll('#ligaModo .postopt').forEach(b=>b.classList.toggle('on', b.getAttribute('onclick').includes("'"+m+"'")));
+  const box=el('ligaHoraBox'); if(box) box.style.display=(m==='diario')?'block':'none';
+}
 async function ligaIniciarConfirma(ligaId){
-  const min=parseInt(window._ligaFreq||'1440',10);
-  const proxima=new Date(Date.now()+min*60*1000).toISOString();
-  const r=await ligaIniciar(ligaId, proxima, min, true);
+  let intervaloMin, proxima, quando;
+  if(window._ligaModo==='teste'){
+    intervaloMin=10; proxima=new Date(Date.now()+10*60*1000); quando='em 10 minutos';
+  } else {
+    intervaloMin=1440;
+    const hora=(el('ligaHora')&&el('ligaHora').value)||'20:00';
+    const [h,m]=hora.split(':').map(Number);
+    const d=new Date(); d.setHours(h||20, m||0, 0, 0);
+    if(d.getTime()<=Date.now()) d.setDate(d.getDate()+1);
+    proxima=d; quando='às '+hora+(d.getDate()!==new Date().getDate()?' (amanhã)':' (hoje)');
+  }
+  const r=await ligaIniciar(ligaId, proxima.toISOString(), intervaloMin, true);
   if(r.erro){ toast&&toast(r.erro); return; }
-  toast&&toast('Campeonato iniciado! 🏀 Primeira rodada em '+(min>=60?(min/60)+'h':min+' min'));
+  toast&&toast('Campeonato iniciado! 🏀 Primeira rodada '+quando);
   ligaLobby(ligaId);
 }
 async function ligaProcessarFluxo(ligaId){
