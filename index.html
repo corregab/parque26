@@ -273,6 +273,18 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .prop-sub{font-size:11px;color:var(--mute);margin:7px 0 3px}
 .prop-din{margin-top:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .prop-din input{width:120px;background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:6px;padding:5px 7px;font-family:var(--mono);font-size:12px}
+.prev-adv{background:#14100c;border:1px solid #2a2119;border-radius:12px;padding:14px}
+.prev-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.prev-nome{font:800 22px 'Barlow Condensed',sans-serif;color:var(--bone);text-transform:uppercase}
+.prev-mgr{font-size:12px;color:var(--amber);font-weight:700;background:rgba(232,163,61,.12);padding:4px 10px;border-radius:20px}
+.prev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:10px;margin-bottom:10px}
+.prev-grid>div{display:flex;flex-direction:column;gap:1px}
+.prev-grid .hint{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+.prev-grid b{font-size:16px;color:var(--bone)}
+.prev-forma{font-size:12px;margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.seqp{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;border-radius:4px;font-size:11px;font-weight:800;color:#0c0a09}
+.seqp.v{background:#7ac77a}.seqp.d{background:#d98a6a}
+.prev-horario{font-size:13px;color:#9ec3ff;background:rgba(59,91,217,.14);border-radius:8px;padding:8px 10px;font-weight:600;text-align:center}
 .teamgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .teamsel{background:var(--panel);border:1px solid var(--line);color:var(--bone);padding:9px;cursor:pointer;text-align:left;transition:.15s;font-family:var(--ui)}
 .teamsel:hover{border-color:var(--wood);background:var(--panel2);transform:translateX(2px)}
@@ -2558,7 +2570,9 @@ const ABAS=[['inicio','Escritório'],['elenco','Elenco'],['taticas','Táticas'],
             ['tabela','Classificação'],['mercado','Mercado'],['treino','Treino'],['financas','Finanças'],['marketing','Marketing'],['stats','Estatísticas'],['carreira','Carreira'],['premios','Prêmios'],['editor','Editar liga']];
 
 function montarTabs(){
-  el('tabs').innerHTML=ABAS.map(([k,n])=>`<button data-t="${k}" class="${ABA===k?'on':''}">${n}</button>`).join('');
+  let abas=ABAS;
+  if(S && S.online) abas=abas.filter(([k])=>k!=='editor');   // sem editor no mundo compartilhado
+  el('tabs').innerHTML=abas.map(([k,n])=>`<button data-t="${k}" class="${ABA===k?'on':''}">${n}</button>`).join('');
   el('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{ABA=b.dataset.t;montarTabs();render();});
 }
 function hud(){
@@ -2572,6 +2586,7 @@ function hud(){
     <div class="hud ${cx>=0?'pos':'neg'}"><span>Caixa</span><b>${$(cx)}</b></div>`;
 }
 function render(){
+  if(S && S.online && ABA==='editor') ABA='inicio';   // editor não existe no modo online
   hud();
   const f={inicio:vInicio,elenco:vElenco,taticas:vTaticas,calendario:vCal,tabela:vTabela,
            mercado:vMercado,treino:vTreino,financas:vFin,marketing:vMarketing,stats:vStats,carreira:vCarreira,premios:vPremios,editor:vEditor}[ABA];
@@ -2591,16 +2606,14 @@ function vInicio(){
       const casa=px.j.c===S.meuTime, adv=S.times[casa?px.j.f:px.j.c];
       bloco=`<div class="card accent">
         <h3 class="sub">Próximo jogo · rodada ${px.rodada+1}</h3>
-        <div class="row" style="justify-content:space-between;align-items:flex-end">
+        ${S.online
+          ? htmlBotoesJogar()
+          : `<div class="row" style="justify-content:space-between;align-items:flex-end">
           <div><div class="big">${casa?'vs':'@'} ${esc(adv.nick)}</div>
           <div class="hint">${esc(adv.cidade)} · ${adv.v}-${adv.d} · força ${forcaTime(adv)} · ${casa?'Em casa':'Fora de casa'}</div></div>
-          ${S.online
-            ? (S.jogueiRodada===S.rodada
-                ? `<div class="hint" style="text-align:right">✅ Você já jogou esta rodada.<br>Aguardando o host fechar.</div>`
-                : `<div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogarOnlineRapido()">⏩ Simular minha partida</button></div>`)
-            : `<div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular rápido</button></div>`}
-          ${S.online?'':`<div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="jogarVarias(5)">Simular 5 rodadas</button></div>`}
-        </div></div>`;
+          <div><div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular rápido</button></div>
+          <div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="jogarVarias(5)">Simular 5 rodadas</button></div></div>
+        </div>`}</div>`;
     } else {
       // seu time já jogou os 82 jogos, mas a temporada ainda não fechou no calendário
       const jogos=t.v+t.d;
@@ -3217,13 +3230,34 @@ function jogarOnlineRapido(){
     </div>
     <div class="row" style="justify-content:center"><button class="btn" onclick="closeModal()">Fechar</button></div>`);
 }
-// botões de jogar conforme modo (online joga só a própria partida)
+// no online, em vez de botões de jogar, mostra a prévia do próximo adversário
 function htmlBotoesJogar(){
   if(S.online){
-    if(S.jogueiRodada===S.rodada) return '<div class="hint" style="text-align:center;padding:6px">✅ Você já jogou. Aguardando fechar a rodada.</div>';
-    return '<div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogarOnlineRapido()">⏩ Simular minha partida</button></div>';
+    const px=jogoDoUsuarioAgora();
+    if(!px) return '<div class="hint" style="text-align:center;padding:8px">Sem jogo definido nesta fase ainda.</div>';
+    const casa=px.A.id===S.meuTime, adv=casa?px.B:px.A;
+    return htmlPreviaOnline(adv, casa, px.serie);
   }
   return '<div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular</button></div>';
+}
+function htmlPreviaOnline(adv, casa, serie){
+  let pos='—';
+  try{ const cl=(typeof classificacao==='function')?classificacao(adv.conf):[]; const i=cl.findIndex(t=>t.id===adv.id); if(i>=0)pos=(i+1)+'º '+(adv.conf==='L'?'Leste':'Oeste'); }catch(e){}
+  const seq=(adv.seq||[]).slice(0,5);
+  const forma = seq.length? seq.map(r=>`<span class="seqp ${r==='V'?'v':'d'}">${r}</span>`).join('') : '<span class="hint">sem jogos ainda</span>';
+  const mgr = (S.ligaManagers&&S.ligaManagers[adv.id]) ? '👤 Téc. '+esc(S.ligaManagers[adv.id]) : '🤖 Comandado pela IA';
+  const horario = S.ligaProxima ? fmtProxima(S.ligaProxima) : 'a definir';
+  return `<div class="prev-adv">
+    <div class="prev-top"><div class="prev-nome">${casa?'vs':'@'} ${esc(adv.cidade)} ${esc(adv.nick)}</div><div class="prev-mgr">${mgr}</div></div>
+    <div class="prev-grid">
+      <div><span class="hint">Posição</span><b>${pos}</b></div>
+      <div><span class="hint">Campanha</span><b>${adv.v}-${adv.d}</b></div>
+      <div><span class="hint">Força</span><b>${forcaTime(adv)}</b></div>
+      ${serie?`<div><span class="hint">Série</span><b>${serie}</b></div>`:''}
+    </div>
+    <div class="prev-forma"><span class="hint">Últimos jogos:</span> ${forma}</div>
+    <div class="prev-horario">⏰ ${casa?'Em casa':'Fora'} · partida ${horario}</div>
+  </div>`;
 }
 function jogar(){
   const r = S.fase==='playin'? jogarPlayIn() : S.fase==='playoffs'? jogarRodadaPO() : avancarRodada();
@@ -5870,6 +5904,7 @@ async function ligaJogar(ligaId){
   est.ligaProxima=liga?liga.proxima_rodada_em:null;
   est.ligaAuto=liga?liga.auto:false;
   est.ligaIntervalo=liga?liga.intervalo_min:1440;
+  est.ligaManagers={}; membros.forEach(m=>{ if(m.time_id!=null) est.ligaManagers[m.time_id]=m.tecnico||'Treinador'; });
   closeModal();
   ligaEntrarNoJogo(est, meu.time_id, meu.tecnico, meu.config);
   // ouve mudanças do mundo (outra pessoa jogou / rodada avançou)
@@ -5887,9 +5922,9 @@ function ligaOuvirMundo(ligaId){
       const row=await ligaCarregarEstado(ligaId);
       if(row&&row.estado){
         const meuTime=S.meuTime, tec=S.tecnico, cam=S.camisa, obj=S.objetivo, ct=S.carreiraTec;
-        const ligaId2=S.ligaId, cod=S.ligaCodigo, nome=S.ligaNome, host=S.ehHost, px=S.ligaProxima, au=S.ligaAuto, iv=S.ligaIntervalo;
+        const ligaId2=S.ligaId, cod=S.ligaCodigo, nome=S.ligaNome, host=S.ehHost, px=S.ligaProxima, au=S.ligaAuto, iv=S.ligaIntervalo, mg=S.ligaManagers;
         S=row.estado; S.meuTime=meuTime; S.online=true; S.tecnico=tec; S.camisa=cam; S.objetivo=obj; S.carreiraTec=ct;
-        S.ligaId=ligaId2; S.ligaCodigo=cod; S.ligaNome=nome; S.ehHost=host; S.ligaProxima=px; S.ligaAuto=au; S.ligaIntervalo=iv;
+        S.ligaId=ligaId2; S.ligaCodigo=cod; S.ligaNome=nome; S.ehHost=host; S.ligaProxima=px; S.ligaAuto=au; S.ligaIntervalo=iv; S.ligaManagers=mg;
         if(typeof render==='function') render();
         toast&&toast('🌐 Mundo da liga atualizado');
       }
@@ -5917,8 +5952,8 @@ async function ligaAvancarDia(){
   // recarrega o mundo atualizado
   const row=await ligaCarregarEstado(S.ligaId);
   if(row&&row.estado){
-    const meuTime=S.meuTime,tec=S.tecnico,cam=S.camisa,obj=S.objetivo,ct=S.carreiraTec,li=S.ligaId,cod=S.ligaCodigo,nm=S.ligaNome,hs=S.ehHost;
-    S=row.estado;S.meuTime=meuTime;S.online=true;S.tecnico=tec;S.camisa=cam;S.objetivo=obj;S.carreiraTec=ct;S.ligaId=li;S.ligaCodigo=cod;S.ligaNome=nm;S.ehHost=hs;
+    const meuTime=S.meuTime,tec=S.tecnico,cam=S.camisa,obj=S.objetivo,ct=S.carreiraTec,li=S.ligaId,cod=S.ligaCodigo,nm=S.ligaNome,hs=S.ehHost,mg=S.ligaManagers,px=S.ligaProxima,au=S.ligaAuto,iv=S.ligaIntervalo;
+    S=row.estado;S.meuTime=meuTime;S.online=true;S.tecnico=tec;S.camisa=cam;S.objetivo=obj;S.carreiraTec=ct;S.ligaId=li;S.ligaCodigo=cod;S.ligaNome=nm;S.ehHost=hs;S.ligaManagers=mg;S.ligaProxima=px;S.ligaAuto=au;S.ligaIntervalo=iv;
     render();
   }
   toast&&toast(r.fase!=='regular'?'Temporada regular encerrada!':'Rodada '+r.rodada+' processada!');
@@ -5946,9 +5981,9 @@ function fmtProxima(iso){
 function ligaRecarregarMundo(ligaId, cb){
   ligaCarregarEstado(ligaId).then(row=>{
     if(row&&row.estado&&S&&S.online&&S.ligaId===ligaId){
-      const keep={meuTime:S.meuTime,tec:S.tecnico,cam:S.camisa,obj:S.objetivo,ct:S.carreiraTec,li:S.ligaId,cod:S.ligaCodigo,nm:S.ligaNome,hs:S.ehHost,px:S.ligaProxima,au:S.ligaAuto,iv:S.ligaIntervalo};
+      const keep={meuTime:S.meuTime,tec:S.tecnico,cam:S.camisa,obj:S.objetivo,ct:S.carreiraTec,li:S.ligaId,cod:S.ligaCodigo,nm:S.ligaNome,hs:S.ehHost,px:S.ligaProxima,au:S.ligaAuto,iv:S.ligaIntervalo,mg:S.ligaManagers};
       S=row.estado; S.meuTime=keep.meuTime;S.online=true;S.tecnico=keep.tec;S.camisa=keep.cam;S.objetivo=keep.obj;S.carreiraTec=keep.ct;
-      S.ligaId=keep.li;S.ligaCodigo=keep.cod;S.ligaNome=keep.nm;S.ehHost=keep.hs;S.ligaProxima=keep.px;S.ligaAuto=keep.au;S.ligaIntervalo=keep.iv;
+      S.ligaId=keep.li;S.ligaCodigo=keep.cod;S.ligaNome=keep.nm;S.ehHost=keep.hs;S.ligaProxima=keep.px;S.ligaAuto=keep.au;S.ligaIntervalo=keep.iv;S.ligaManagers=keep.mg;
       if(typeof render==='function')render();
     }
     if(cb)cb();
