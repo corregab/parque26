@@ -1662,7 +1662,9 @@ function montarPlayoffsComPlayIn(){
   S.po={fase:0,series:[...par(L),...par(O)],campeao:null};
   S.fase='playoffs';
   const meuIn=S.po.series.some(s=>[s.a,s.b].includes(S.meuTime));
-  noticia('🏆 Playoffs definidos! '+(meuIn?S.times[S.meuTime].nick+' classificado.':S.times[S.meuTime].nick+' não avançou.'),'p');
+  if(S.meuTime!=null && S.times[S.meuTime])
+    noticia('🏆 Playoffs definidos! '+(meuIn?S.times[S.meuTime].nick+' classificado.':S.times[S.meuTime].nick+' não avançou.'),'p');
+  else noticia('🏆 Playoffs definidos!','p');
 }
 
 /* ---------- PLAYOFFS ---------- */
@@ -2612,10 +2614,10 @@ function vInicio(){
     }
   } else if(S.fase==='playin'){
     bloco=`<div class="card accent"><h3 class="sub">🎫 Play-In Tournament</h3>
-      ${playinHTML()}<div class="row" style="margin-top:12px"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular</button></div></div>`;
+      ${playinHTML()}<div style="margin-top:12px">${htmlBotoesJogar()}</div></div>`;
   } else if(S.fase==='playoffs'){
     bloco=`<div class="card accent"><h3 class="sub">Playoffs · ${['Quartas de final','Semifinais','Finais de conferência','GRANDE FINAL'][S.po.fase]}</h3>
-      ${chaveHTML()}<div class="row" style="margin-top:12px"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular</button></div></div>`;
+      ${chaveHTML()}<div style="margin-top:12px">${htmlBotoesJogar()}</div></div>`;
   } else if(S.fase==='offseason'){
     const c=S.po&&S.po.campeao!=null?S.times[S.po.campeao]:null;
     bloco=`<div class="card accent center" style="padding:26px">
@@ -3201,12 +3203,12 @@ function fecharTemporada(){
 function jogarOnlineRapido(){
   if(!S.online||!S.ligaId) return;
   if(S.jogueiRodada===S.rodada){ toast&&toast('Você já jogou esta rodada'); return; }
-  const px=proximoJogo(); if(!px){ toast&&toast('Sem jogo nesta rodada'); return; }
-  const j=px.j, A=S.times[j.c], B=S.times[j.f];
+  const px=jogoDoUsuarioAgora(); if(!px){ toast&&toast('Você não tem jogo agora'); return; }
+  const A=px.A, B=px.B;
   const res=simularJogo(A,B,{log:false});
   S.jogueiRodada=S.rodada;
   if(typeof ligaGravarResultado==='function') ligaGravarResultado(S.ligaId, S.rodada, A.id, B.id, res.ptsA, res.ptsB);
-  const meuA=j.c===S.meuTime, eu=meuA?res.ptsA:res.ptsB, ele=meuA?res.ptsB:res.ptsA;
+  const meuA=A.id===S.meuTime, eu=meuA?res.ptsA:res.ptsB, ele=meuA?res.ptsB:res.ptsA;
   render();
   abrirModal(eu>ele?'🏆 Vitória!':'Derrota',`
     <div style="text-align:center;padding:10px 0">
@@ -3214,6 +3216,14 @@ function jogarOnlineRapido(){
       <p class="hint">Resultado enviado! Vale quando o host fechar a rodada.</p>
     </div>
     <div class="row" style="justify-content:center"><button class="btn" onclick="closeModal()">Fechar</button></div>`);
+}
+// botões de jogar conforme modo (online joga só a própria partida)
+function htmlBotoesJogar(){
+  if(S.online){
+    if(S.jogueiRodada===S.rodada) return '<div class="hint" style="text-align:center;padding:6px">✅ Você já jogou. Aguardando fechar a rodada.</div>';
+    return '<div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogarOnlineRapido()">⏩ Simular minha partida</button></div>';
+  }
+  return '<div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular</button></div>';
 }
 function jogar(){
   const r = S.fase==='playin'? jogarPlayIn() : S.fase==='playoffs'? jogarRodadaPO() : avancarRodada();
@@ -5390,11 +5400,64 @@ function simularRodadaLiga(estado, configs, preJogados){
       }));
       if(typeof atualizarMoral==='function') atualizarMoral();
       S.rodada++;
-      if(S.rodada>=S.cal.length){ S.fase='fim_regular'; }
+      if(S.rodada>=S.cal.length){ if(typeof iniciarPlayIn==='function') iniciarPlayIn(); }
+    } else if(S.fase==='playin'){
+      ligaPlayInRodada(pre); S.rodada++;
+    } else if(S.fase==='playoffs'){
+      ligaPORodada(pre); S.rodada++;
     }
     const novo=S;
     return {resultados, estado:novo, rodada:novo.rodada, fase:novo.fase};
   } finally { S=bkp; }
+}
+
+// uma rodada do play-in no mundo compartilhado (pre = placares jogados ao vivo, por time da casa)
+function ligaPlayInRodada(pre){
+  pre=pre||{};
+  const jogo=(A,B)=>{ if(pre[A.id]&&pre[A.id].pf!=null) return [pre[A.id].pc,pre[A.id].pf];
+    const res=simularJogo(A,B,{log:false}); gravarJogo(res); return [res.ptsA,res.ptsB]; };
+  ['L','O'].forEach(cf=>{
+    const b=S.playin[cf];
+    if(b.etapa===0){
+      [b.j78,b.j910].forEach(j=>{ const A=S.times[j.a],B=S.times[j.b]; const [pa,pb]=jogo(A,B);
+        j.res=[pa,pb]; j.venc=pa>pb?j.a:j.b; j.perd=pa>pb?j.b:j.a; });
+      b.seed7=b.j78.venc;
+      const perd910=S.times[b.j910.perd]; perd910.hist[perd910.hist.length-1].fase='Play-In (10º)';
+      b.jfinal={a:b.j78.perd,b:b.j910.venc,res:null}; b.etapa=1;
+    } else if(b.etapa===1){
+      const j=b.jfinal; const A=S.times[j.a],B=S.times[j.b]; const [pa,pb]=jogo(A,B);
+      j.res=[pa,pb]; j.venc=pa>pb?j.a:j.b; j.perd=pa>pb?j.b:j.a;
+      b.seed8=j.venc;
+      const elim=S.times[j.perd]; elim.hist[elim.hist.length-1].fase='Play-In (9º)'; b.etapa=2;
+    }
+  });
+  S.times.forEach(t=>t.elenco.forEach(p=>{if(p.lesao>0)p.lesao--;p.forma=clamp(p.forma+R(1,4),0,100);}));
+  if(S.playin.L.etapa>=2 && S.playin.O.etapa>=2 && typeof montarPlayoffsComPlayIn==='function') montarPlayoffsComPlayIn();
+}
+
+// uma rodada dos playoffs no mundo compartilhado
+function ligaPORodada(pre){
+  pre=pre||{};
+  const ativas=S.po.series.filter(s=>!s.fim);
+  ativas.forEach(s=>{
+    const g=s.va+s.vb;
+    const casaA=[0,1,4,6].includes(g);
+    const A=S.times[casaA?s.a:s.b], B=S.times[casaA?s.b:s.a];
+    let pa,pb;
+    if(pre[A.id] && pre[A.id].pf!=null){ pa=pre[A.id].pc; pb=pre[A.id].pf; }
+    else { const res=simularJogo(A,B,{log:false}); gravarJogo(res); pa=res.ptsA; pb=res.ptsB; }
+    const venceuA=pa>pb;
+    if(venceuA)s.va++; else s.vb++;
+    s.jogos.push({c:A.ab,f:B.ab,p:[pa,pb]});
+    if(s.va===4||s.vb===4){
+      s.fim=true; s.vencedor=s.va===4?s.a:s.b;
+      const perd=S.times[s.va===4?s.b:s.a];
+      S.times[s.vencedor].caixa+=[6,10,16,0][S.po.fase]*1e6;
+      perd.hist[perd.hist.length-1].fase=['Quartas','Semis','Final Conf.','Vice-campeão'][S.po.fase];
+    }
+  });
+  S.times.forEach(t=>t.elenco.forEach(p=>{if(p.lesao>0)p.lesao--;p.forma=clamp(p.forma+R(1,4),0,100);}));
+  if(S.po.series.every(s=>s.fim) && typeof proximaFasePO==='function') proximaFasePO();
 }
 
 async function ligaIniciar(ligaId, proximaEm, intervaloMin, auto){
@@ -5442,7 +5505,7 @@ async function ligaProcessarRodada(ligaId){
   if(!ligaPronta()) return {erro:'Sem conexão.'};
   const estadoRow=await ligaCarregarEstado(ligaId);
   if(!estadoRow||!estadoRow.estado) return {erro:'Estado da liga não encontrado.'};
-  if(estadoRow.estado.fase!=='regular') return {erro:'A temporada regular já terminou (playoffs online em breve).'};
+  if(estadoRow.estado.fase==='offseason'||estadoRow.estado.campeao||(estadoRow.estado.po&&estadoRow.estado.po.campeao)) return {erro:'O campeonato já foi decidido! 🏆'};
   const membros=await ligaMembros(ligaId);
   const configs={}; membros.forEach(m=>{ if(m.config&&m.time_id!=null) configs[m.time_id]=m.config; });
   const rodadaAtual=estadoRow.estado.rodada;
