@@ -5731,6 +5731,14 @@ async function ligaLobby(ligaId){
       html+=`<div class="liga-meu">Seu time: <b>${esc(meu.time_nome)}</b></div>
         <div class="row" style="margin-top:10px"><button class="btn" onclick="ligaJogar('${ligaId}')">▶ Jogar minha carreira na liga</button></div>
         <p class="hint" style="margin-top:6px">Abre o jogo completo (elenco, tática, treino, mercado, marketing) com seu time no mundo compartilhado.</p>`;
+    } else if(est && est.times){
+      html+=`<div class="liga-meu">Você ainda não controla um time aqui. Pegue um time livre e entre no campeonato em andamento! 🏀</div>
+        <h3 class="sub" style="margin-top:12px">Escolha um time livre</h3><div class="teamgrid liga-teams">`;
+      est.times.slice().sort((a,b)=>forcaTime(b)-forcaTime(a)).forEach(t=>{ if(usados.has(t.id))return;
+        html+=`<button onclick="ligaEscolher('${ligaId}',${t.id})" style="border-left-color:${t.cor||'var(--line)'}">
+          <div class="cty">${esc(t.cidade)} · ${t.conf==='L'?'Leste':'Oeste'}</div><div class="nk">${esc(t.nick)}</div>
+          <div class="fr"><span>${t.v}-${t.d} · força ${forcaTime(t)}</span></div></button>`; });
+      html+=`</div>`;
     }
     // ações
     html+=`<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px">`;
@@ -5854,7 +5862,10 @@ async function ligaEscolher(ligaId, timeId){
   const r=await ligaEntrarComTime(ligaId, timeId, tecnico, nome);
   if(r.erro){ toast&&toast(r.erro); ligaLobby(ligaId); return; }
   toast&&toast('Você entrou com '+nome+'!');
-  ligaLobby(ligaId);
+  // se o campeonato já começou, entra direto no jogo; senão volta ao lobby de espera
+  const {data:liga}=await CLOUD.client.from('ligas').select('status').eq('id',ligaId).single();
+  if(liga && liga.status!=='lobby' && typeof ligaJogar==='function') ligaJogar(ligaId);
+  else ligaLobby(ligaId);
 }
 async function ligaSairFluxo(ligaId){
   if(!confirm('Sair desta liga? Seu time ficará livre para outro jogador.')) return;
@@ -5895,7 +5906,8 @@ async function ligaJogar(ligaId){
   const membros=await ligaMembros(ligaId);
   const {data:liga}=await CLOUD.client.from('ligas').select('*').eq('id',ligaId).single();
   const meu=membros.find(m=>m.user_id===CLOUD.user.id);
-  if(!estadoRow||!estadoRow.estado||!meu){ toast&&toast('Entre na liga e escolha um time primeiro.'); return; }
+  if(!meu){ toast&&toast('Você ainda não controla um time nesta liga — escolha um time primeiro.'); ligaLobby(ligaId); return; }
+  if(!estadoRow||!estadoRow.estado){ toast&&toast('Não consegui carregar o mundo da liga. Tente novamente em instantes.'); ligaLobby(ligaId); return; }
   const est=estadoRow.estado;
   est.ligaId=ligaId;
   est.ligaCodigo=liga?liga.codigo:'';
