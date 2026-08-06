@@ -402,6 +402,14 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .admin-badge.lobby{background:rgba(232,163,61,.18);color:var(--amber)}
 .admin-badge.encerrada{background:rgba(154,141,128,.18);color:var(--mute)}
 .admin-membros{font-size:12px;color:var(--bone);margin-top:5px}
+.tr-card{background:#14100c;border:1px solid #2a2119;border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.tr-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.tr-top b{font-size:15px;color:var(--bone)}
+.tr-prog{font-size:11px;color:var(--amber);background:rgba(232,163,61,.12);padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+.tr-bar{height:9px;background:#241d19;border-radius:6px;overflow:hidden}
+.tr-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--wood-lo),var(--amber));transition:width .3s}
+.tr-info{font-size:12px;color:var(--mute);margin-top:5px}
+.tr-conc{background:rgba(122,199,122,.08);border:1px solid rgba(122,199,122,.25);border-radius:8px;padding:8px 11px;margin-bottom:6px;font-size:13px;color:var(--bone)}
 .cloudalt{font-size:12px;color:#9a8a76;text-align:center}
 .cloudalt a{color:var(--amber);cursor:pointer;text-decoration:underline}
 .camisa-wrap{display:flex;justify-content:center;padding:6px;min-height:210px;align-items:center}
@@ -3775,6 +3783,7 @@ function aplicarTreino(pid, progKey){
    UI DA ABA TREINO
    ============================================================ */
 function vTreino(){
+  if(S.online && typeof vTreinoOnline==='function') return vTreinoOnline();
   const t=S.times[S.meuTime];
   if(S.treinosRest===undefined)S.treinosRest=TREINOS_POR_TEMP;
   if(!S.treinos)S.treinos={};
@@ -5747,6 +5756,45 @@ async function ligaTrocaIA(ligaId, paraTime, oferecidos, pedidos, extra){
   if(data&&data.erro) return {erro:data.erro};
   return data;
 }
+
+/* ---------- TREINO CONTÍNUO (online) ---------- */
+const TREINO_SLOTS=3;              // treinos simultâneos por técnico
+const TREINO_CUSTO_RODADA=1500000; // R$ por rodada, ao acelerar
+const PROGRAMAS_ONLINE={
+  arremesso:{nome:'Arremesso', desc:'Bola de 3, arremesso médio e lance livre'},
+  finalizacao:{nome:'Finalização', desc:'Finalização, arremesso médio e atletismo'},
+  criacao:{nome:'Criação', desc:'Passe, drible e QI de jogo'},
+  defesa:{nome:'Defesa', desc:'Defesa de perímetro, interior e rebote'},
+  fisico:{nome:'Físico', desc:'Atletismo, resistência e defesa interior'},
+  potencial:{nome:'Desenvolvimento', desc:'Eleva o potencial (teto) de jovens'}
+};
+async function ligaTreinoIniciar(ligaId, timeId, jogadorId, jogadorNome, programa, rodadas){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {error}=await CLOUD.client.from('liga_treinos').insert({
+    liga_id:ligaId, user_id:CLOUD.user.id, time_id:timeId,
+    jogador_id:jogadorId, jogador_nome:jogadorNome, programa, rodadas_total:rodadas
+  });
+  return error?{erro:error.message}:{ok:true};
+}
+async function ligaTreinoListar(ligaId){
+  if(!ligaPronta()) return {ativos:[], concluidos:[]};
+  const {data}=await CLOUD.client.from('liga_treinos').select('*')
+    .eq('liga_id',ligaId).eq('user_id',CLOUD.user.id).order('criado_em',{ascending:false});
+  const todos=data||[];
+  return { ativos: todos.filter(t=>t.status==='ativo'), concluidos: todos.filter(t=>t.status==='concluido').slice(0,6) };
+}
+async function ligaTreinoCancelar(id){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {error}=await CLOUD.client.from('liga_treinos').delete().eq('id',id);
+  return error?{erro:error.message}:{ok:true};
+}
+async function ligaTreinoAcelerar(id){
+  if(!ligaPronta()) return {erro:'Sem conexão.'};
+  const {data,error}=await CLOUD.client.functions.invoke('treino-acelerar',{ body:{ treino_id:id } });
+  if(error){ let m='Erro ao acelerar.'; try{const c=await error.context.json(); if(c&&c.erro)m=c.erro;}catch(e){} return {erro:m}; }
+  if(data&&data.erro) return {erro:data.erro};
+  return data;
+}
 /* ============================================================
    UI LIGAS ONLINE — lobby multiplayer
    ============================================================ */
@@ -6062,6 +6110,9 @@ function ligaOuvirMundo(ligaId){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'liga_propostas',filter:'liga_id=eq.'+ligaId},(payload)=>{
       const p=payload.new; if(p && p.para_user===CLOUD.user.id && p.status==='pendente') toast&&toast('📨 Nova proposta de troca recebida!');
     })
+    .on('postgres_changes',{event:'*',schema:'public',table:'liga_treinos',filter:'liga_id=eq.'+ligaId},()=>{
+      if(typeof ligaTreinoRefresh==='function') ligaTreinoRefresh();
+    })
     .subscribe();
 }
 
@@ -6256,6 +6307,100 @@ async function ligaRecusarFluxo(id, ligaId){
 }
 async function ligaCancelarFluxo(id, ligaId){
   await ligaCancelarProposta(id); toast&&toast('Proposta cancelada'); ligaNegociacoes(ligaId);
+}
+
+/* ---------- UI TREINO CONTÍNUO (online) ---------- */
+function vTreinoOnline(){
+  const t=S.times[S.meuTime];
+  if(!window._treinosCache){ window._treinosCache={ativos:[],concluidos:[],loading:true}; ligaTreinoRefresh(); }
+  const c=window._treinosCache;
+  const ativos=c.ativos||[];
+  const usados=new Set(ativos.map(x=>x.jogador_id));
+  const podeNovo=ativos.length<TREINO_SLOTS;
+
+  let ativosHtml = ativos.length ? '' : (c.loading?'<p class="hint">Carregando…</p>':'<p class="hint">Nenhum treino em andamento. Coloque um jogador para treinar! 🏋</p>');
+  ativos.forEach(tr=>{
+    const pct=Math.round(tr.rodadas_feitas/tr.rodadas_total*100);
+    const rest=Math.max(0,tr.rodadas_total-tr.rodadas_feitas);
+    const custo=rest*TREINO_CUSTO_RODADA;
+    const prog=PROGRAMAS_ONLINE[tr.programa];
+    ativosHtml+=`<div class="tr-card">
+      <div class="tr-top"><b>${esc(tr.jogador_nome||'Jogador')}</b><span class="tr-prog">${prog?prog.nome:tr.programa}</span></div>
+      <div class="tr-bar"><i style="width:${pct}%"></i></div>
+      <div class="tr-info">Rodada ${tr.rodadas_feitas}/${tr.rodadas_total} · faltam ${rest}</div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn mini" onclick="ligaTreinoAcelerarFluxo('${tr.id}')">⚡ Concluir agora (${M$(custo)})</button>
+        <button class="btn ghost mini" onclick="ligaTreinoCancelarFluxo('${tr.id}')">Cancelar</button>
+      </div></div>`;
+  });
+
+  let concHtml='';
+  (c.concluidos||[]).forEach(tr=>{
+    const r=tr.resultado||{}; let txt;
+    if(r.cancelado) txt='treino perdido (jogador saiu do elenco)';
+    else if(r.tipo==='pot') txt = r.pot>0?('potencial +'+r.pot+' 📈'):'potencial não subiu desta vez';
+    else txt = (r.ovr>0)?('overall +'+r.ovr+' 💪'):((r.at>0)?('atributos +'+r.at):'ganho mínimo');
+    concHtml+=`<div class="tr-conc"><b>${esc(tr.jogador_nome||'')}</b> — ${esc(PROGRAMAS_ONLINE[tr.programa]?PROGRAMAS_ONLINE[tr.programa].nome:tr.programa)}: ${txt}</div>`;
+  });
+
+  let formHtml;
+  if(podeNovo){
+    const disp=t.elenco.filter(p=>!usados.has(p.id)).sort((a,b)=>b.ovr-a.ovr);
+    const sel=window._treinoSel||(disp[0]&&disp[0].id);
+    formHtml=`<div class="card" style="margin-top:12px"><h3 class="sub">➕ Novo treino</h3>
+      <label class="hint">Jogador</label>
+      <select id="trJog" onchange="window._treinoSel=+this.value">
+        ${disp.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${esc(p.nome)} · ${p.pos} · ${p.ovr}ovr · ${p.idade}a · pot ${p.pot}</option>`).join('')}
+      </select>
+      <label class="hint" style="margin-top:8px;display:block">Programa de treino</label>
+      <select id="trProg">${Object.keys(PROGRAMAS_ONLINE).map(k=>`<option value="${k}">${PROGRAMAS_ONLINE[k].nome} — ${PROGRAMAS_ONLINE[k].desc}</option>`).join('')}</select>
+      <label class="hint" style="margin-top:8px;display:block">Duração</label>
+      <select id="trDur"><option value="5">5 rodadas</option><option value="10" selected>10 rodadas</option><option value="20">20 rodadas (ganho máximo)</option></select>
+      <button class="btn" style="width:100%;margin-top:10px" onclick="ligaTreinoIniciarFluxo()">Iniciar treino</button>
+    </div>`;
+  } else {
+    formHtml=`<p class="hint" style="margin-top:12px">Você já tem ${TREINO_SLOTS} treinos em andamento (o máximo). Conclua ou cancele um para treinar outro jogador.</p>`;
+  }
+
+  return `<h2 class="sec">Centro de treinamento — liga</h2>
+    <div class="card"><p class="hint">Coloque jogadores para treinar por várias rodadas. O progresso corre sozinho a cada rodada da liga — <b>jovens com margem até o potencial ganham muito mais</b>. Dá para pagar para concluir na hora. Até ${TREINO_SLOTS} treinos ao mesmo tempo.</p></div>
+    <h3 class="admin-h">🏋 Em andamento (${ativos.length}/${TREINO_SLOTS})</h3>
+    ${ativosHtml}
+    ${concHtml?`<h3 class="admin-h">✅ Concluídos recentes</h3>${concHtml}`:''}
+    ${formHtml}`;
+}
+async function ligaTreinoRefresh(){
+  if(!S||!S.online||!S.ligaId) return;
+  const r=await ligaTreinoListar(S.ligaId);
+  window._treinosCache={ativos:r.ativos, concluidos:r.concluidos, loading:false};
+  if(typeof ABA!=='undefined' && ABA==='treino' && typeof render==='function') render();
+}
+async function ligaTreinoIniciarFluxo(){
+  const jid=+((el('trJog')&&el('trJog').value)||window._treinoSel||0);
+  const prog=(el('trProg')&&el('trProg').value)||'arremesso';
+  const dur=+((el('trDur')&&el('trDur').value)||10);
+  const t=S.times[S.meuTime]; const p=t.elenco.find(x=>x.id===jid);
+  if(!p){ toast&&toast('Escolha um jogador'); return; }
+  const r=await ligaTreinoIniciar(S.ligaId, S.meuTime, jid, p.nome, prog, dur);
+  if(r.erro){ toast&&toast(r.erro); return; }
+  toast&&toast('🏋 '+p.nome.split(' ').pop()+' começou a treinar '+PROGRAMAS_ONLINE[prog].nome.toLowerCase());
+  window._treinoSel=null; ligaTreinoRefresh();
+}
+async function ligaTreinoAcelerarFluxo(id){
+  toast&&toast('Processando…');
+  const r=await ligaTreinoAcelerar(id);
+  if(r.erro){ toast&&toast(r.erro); return; }
+  const res=r.resultado||{};
+  let txt='Treino concluído!';
+  if(res.tipo==='pot') txt = res.pot>0?('Potencial +'+res.pot+'! 📈'):'Concluído (potencial não subiu)';
+  else if(res.ovr>0) txt='Overall +'+res.ovr+'! 💪';
+  toast&&toast('⚡ '+txt+' (−'+M$(r.custo)+')');
+  ligaRecarregarMundo(S.ligaId); ligaTreinoRefresh();
+}
+async function ligaTreinoCancelarFluxo(id){
+  const r=await ligaTreinoCancelar(id);
+  if(r.erro){ toast&&toast(r.erro); return; }
+  toast&&toast('Treino cancelado'); ligaTreinoRefresh();
 }
 /* ============================================================
    BOOT · SETUP · SAVE
