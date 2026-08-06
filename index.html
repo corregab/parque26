@@ -384,6 +384,24 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .cloudmsg{font-size:12px;color:#9a8a76;min-height:16px}
 .cloudmsg.erro{color:#d9534f}
 .cloudmsg.ok{color:#7ac77a}
+.admin-stats{display:flex;gap:10px;margin:10px 0}
+.admin-stats>div{flex:1;background:#1b1512;border:1px solid #332b26;border-radius:10px;padding:10px;text-align:center}
+.admin-stats b{display:block;font:800 26px 'Barlow Condensed',sans-serif;color:var(--amber)}
+.admin-stats span{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.5px}
+.admin-h{font-size:13px;color:var(--wood);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px}
+.admin-tbl{border:1px solid #332b26;border-radius:10px;overflow:hidden;font-size:12px}
+.admin-tr{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:6px;padding:8px 10px;border-bottom:1px solid #241d19}
+.admin-tr:last-child{border-bottom:none}
+.admin-tr.admin-head{background:#1b1512;color:var(--mute);text-transform:uppercase;font-size:10px;letter-spacing:.5px}
+.admin-tr .em{color:var(--bone);word-break:break-all}
+.admin-liga{background:#14100c;border:1px solid #2a2119;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.admin-liga-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px}
+.admin-cod{font-family:var(--mono);font-size:11px;color:var(--amber);background:rgba(232,163,61,.12);padding:1px 6px;border-radius:5px}
+.admin-badge{font-size:10px;text-transform:uppercase;padding:2px 7px;border-radius:20px;font-weight:700}
+.admin-badge.ativa{background:rgba(122,199,122,.18);color:#7ac77a}
+.admin-badge.lobby{background:rgba(232,163,61,.18);color:var(--amber)}
+.admin-badge.encerrada{background:rgba(154,141,128,.18);color:var(--mute)}
+.admin-membros{font-size:12px;color:var(--bone);margin-top:5px}
 .cloudalt{font-size:12px;color:#9a8a76;text-align:center}
 .cloudalt a{color:var(--amber);cursor:pointer;text-decoration:underline}
 .camisa-wrap{display:flex;justify-content:center;padding:6px;min-height:210px;align-items:center}
@@ -5217,18 +5235,50 @@ function cloudAplicarSave(dados){
 /* ============================================================
    UI DA NUVEM — login/cadastro e status de sincronização
    ============================================================ */
+const ADMIN_ID='2f3385b8-7b3a-47bf-8782-d626b9d38655';
+function ehAdmin(){ return cloudLogado() && CLOUD.user && CLOUD.user.id===ADMIN_ID; }
 function cloudBotaoHTML(){
+  const admin = ehAdmin() ? `<button class="btn ghost mini" onclick="adminPainel()" id="adminBtn" style="border-color:#c8792e;color:#e8a33d">🛠 Admin</button>` : '';
   if(cloudLogado()){
-    return `<button class="btn ghost mini" onclick="cloudPainelConta()" id="cloudBtn">☁ ${esc(cloudEmail().split('@')[0])}</button>`;
+    return admin+`<button class="btn ghost mini" onclick="cloudPainelConta()" id="cloudBtn">☁ ${esc(cloudEmail().split('@')[0])}</button>`;
   }
   return `<button class="btn ghost mini" onclick="cloudPainelLogin()" id="cloudBtn">☁ Entrar na nuvem</button>`;
 }
+
+async function adminPainel(){
+  if(!ehAdmin()){ toast&&toast('Acesso restrito.'); return; }
+  cloudModal('<h3 class="sub">🛠 Painel do admin</h3><p class="hint">Carregando dados…</p>');
+  let d;
+  try{
+    const r=await CLOUD.client.functions.invoke('admin-painel',{ body:{} });
+    if(r.error){ let m='Erro ao carregar.'; try{const c=await r.error.context.json(); if(c&&c.erro)m=c.erro;}catch(e){} cloudModal('<h3 class="sub">🛠 Admin</h3><p class="cloudmsg erro">'+esc(m)+'</p>'); return; }
+    d=r.data;
+  }catch(e){ cloudModal('<h3 class="sub">🛠 Admin</h3><p class="cloudmsg erro">Falha de conexão.</p>'); return; }
+  if(!d||d.erro){ cloudModal('<h3 class="sub">🛠 Admin</h3><p class="cloudmsg erro">'+esc((d&&d.erro)||'Sem dados')+'</p>'); return; }
+
+  const fmtData=iso=>{ if(!iso)return '—'; try{ return new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return iso; } };
+  let html=`<h3 class="sub">🛠 Painel do admin</h3>
+    <div class="admin-stats"><div><b>${d.total_usuarios}</b><span>contas</span></div><div><b>${d.total_ligas}</b><span>ligas</span></div></div>
+    <h4 class="admin-h">👥 Jogadores (${d.usuarios.length})</h4>
+    <div class="admin-tbl">
+      <div class="admin-tr admin-head"><span>E-mail</span><span>Último login</span><span>Criado</span></div>`;
+  d.usuarios.forEach(u=>{ html+=`<div class="admin-tr"><span class="em">${esc(u.email||'—')}</span><span>${fmtData(u.ultimo_login)}</span><span>${fmtData(u.criado)}</span></div>`; });
+  html+=`</div><h4 class="admin-h">🌐 Ligas (${d.ligas.length})</h4>`;
+  if(!d.ligas.length) html+='<p class="hint">Nenhuma liga ainda.</p>';
+  d.ligas.forEach(l=>{
+    const membros = l.membros.length ? l.membros.map(m=>esc(m.tecnico)+' <span class="hint">('+esc(m.time_nome||'?')+')</span>').join(', ') : '<span class="hint">nenhum jogador</span>';
+    html+=`<div class="admin-liga"><div class="admin-liga-top"><b>${esc(l.nome||l.codigo)}</b> <span class="admin-cod">${esc(l.codigo)}</span> <span class="admin-badge ${l.status}">${esc(l.status)}</span></div>
+      <div class="hint">Rodada ${l.rodada} · ${esc(l.fase)} · ${l.membros.length} humano(s)</div>
+      <div class="admin-membros">${membros}</div></div>`;
+  });
+  html+=`<div class="row" style="margin-top:12px"><button class="btn" onclick="adminPainel()">🔄 Atualizar</button><button class="btn ghost" onclick="cloudFechar()">Fechar</button></div>`;
+  cloudModal(html);
+}
+
 function cloudAtualizarUI(msg){
-  const b=document.getElementById('cloudBtn');
-  if(b){
-    if(cloudLogado()) b.innerHTML='☁ '+esc(cloudEmail().split('@')[0]);
-    else b.innerHTML='☁ Entrar na nuvem';
-  }
+  const slot=document.getElementById('cloudSlot');
+  if(slot){ slot.innerHTML=cloudBotaoHTML(); }
+  else { const b=document.getElementById('cloudBtn'); if(b){ b.innerHTML = cloudLogado()? '☁ '+esc(cloudEmail().split('@')[0]) : '☁ Entrar na nuvem'; } }
   if(msg && typeof flashSalvo==='function'){ const f=document.getElementById('saveflash'); if(f){f.textContent=msg;f.style.opacity='1';clearTimeout(f._t);f._t=setTimeout(()=>f.style.opacity='0',1300);} }
 }
 
