@@ -6055,8 +6055,13 @@ function ligaEntrarNoJogo(estado, meuTimeId, tecnico, config){
   S.tecnico=tecnico||'Treinador';
   if(typeof SLOT!=='undefined') SLOT=null;   // liga online não usa slot local
   if(config){
-    if(config.tatica) Object.assign(S.times[meuTimeId].tatica, config.tatica);
+    const meu=S.times[meuTimeId];
+    if(config.tatica) Object.assign(meu.tatica, config.tatica);
+    if(config.minutos) meu.minutos=config.minutos;
+    if(config.titulares && config.titulares.length) meu.titulares=config.titulares;
     if(config.camisa) S.camisa=config.camisa;
+    if(config.objetivo) S.objetivo=config.objetivo;
+    if(config.carreiraTec) S.carreiraTec=config.carreiraTec;
   }
   if(S.avisos==null)S.avisos=0;
   if(!S.carreiraTec && typeof initCarreira==='function') initCarreira();
@@ -6101,8 +6106,13 @@ function ligaOuvirMundo(ligaId){
       if(row&&row.estado){
         const meuTime=S.meuTime, tec=S.tecnico, cam=S.camisa, obj=S.objetivo, ct=S.carreiraTec;
         const ligaId2=S.ligaId, cod=S.ligaCodigo, nome=S.ligaNome, host=S.ehHost, px=S.ligaProxima, au=S.ligaAuto, iv=S.ligaIntervalo, mg=S.ligaManagers;
+        // preserva os ajustes pessoais do meu time (o servidor não os conhece)
+        const meuT=S.times[meuTime];
+        const tat=meuT?{...meuT.tatica}:null, min=meuT?meuT.minutos:null, tit=meuT?meuT.titulares:null;
         S=row.estado; S.meuTime=meuTime; S.online=true; S.tecnico=tec; S.camisa=cam; S.objetivo=obj; S.carreiraTec=ct;
         S.ligaId=ligaId2; S.ligaCodigo=cod; S.ligaNome=nome; S.ehHost=host; S.ligaProxima=px; S.ligaAuto=au; S.ligaIntervalo=iv; S.ligaManagers=mg;
+        const novoMeu=S.times[meuTime];
+        if(novoMeu){ if(tat)Object.assign(novoMeu.tatica,tat); if(min)novoMeu.minutos=min; if(tit&&tit.length)novoMeu.titulares=tit; }
         if(typeof render==='function') render();
         toast&&toast('🌐 Mundo da liga atualizado');
       }
@@ -6120,7 +6130,14 @@ function ligaOuvirMundo(ligaId){
 async function ligaSincronizarMeuTime(){
   if(!S||!S.online||!S.ligaId||!ligaPronta()) return;
   const t=S.times[S.meuTime];
-  const config={ tatica:t.tatica, camisa:S.camisa };
+  const config={
+    tatica: t.tatica,
+    minutos: t.minutos,
+    titulares: t.titulares,
+    camisa: S.camisa,        // inclui patrocinios, cores, número
+    objetivo: S.objetivo,
+    carreiraTec: S.carreiraTec
+  };
   await ligaSalvarConfig(S.ligaId, config);
 }
 
@@ -6163,8 +6180,10 @@ function ligaRecarregarMundo(ligaId, cb){
   ligaCarregarEstado(ligaId).then(row=>{
     if(row&&row.estado&&S&&S.online&&S.ligaId===ligaId){
       const keep={meuTime:S.meuTime,tec:S.tecnico,cam:S.camisa,obj:S.objetivo,ct:S.carreiraTec,li:S.ligaId,cod:S.ligaCodigo,nm:S.ligaNome,hs:S.ehHost,px:S.ligaProxima,au:S.ligaAuto,iv:S.ligaIntervalo,mg:S.ligaManagers};
+      const meuT=S.times[S.meuTime]; const tat=meuT?{...meuT.tatica}:null, min=meuT?meuT.minutos:null, tit=meuT?meuT.titulares:null;
       S=row.estado; S.meuTime=keep.meuTime;S.online=true;S.tecnico=keep.tec;S.camisa=keep.cam;S.objetivo=keep.obj;S.carreiraTec=keep.ct;
       S.ligaId=keep.li;S.ligaCodigo=keep.cod;S.ligaNome=keep.nm;S.ehHost=keep.hs;S.ligaProxima=keep.px;S.ligaAuto=keep.au;S.ligaIntervalo=keep.iv;S.ligaManagers=keep.mg;
+      const nm2=S.times[keep.meuTime]; if(nm2){ if(tat)Object.assign(nm2.tatica,tat); if(min)nm2.minutos=min; if(tit&&tit.length)nm2.titulares=tit; }
       if(typeof render==='function')render();
     }
     if(cb)cb();
@@ -6402,6 +6421,13 @@ async function ligaTreinoCancelarFluxo(id){
   if(r.erro){ toast&&toast(r.erro); return; }
   toast&&toast('Treino cancelado'); ligaTreinoRefresh();
 }
+
+// garante o salvamento dos dados pessoais ao fechar/minimizar o app (PWA)
+if(typeof window!=='undefined'){
+  const salvarLigaAoSair=()=>{ try{ if(S&&S.online&&S.ligaId&&typeof ligaSincronizarMeuTime==='function') ligaSincronizarMeuTime(); }catch(e){} };
+  window.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') salvarLigaAoSair(); });
+  window.addEventListener('pagehide', salvarLigaAoSair);
+}
 /* ============================================================
    BOOT · SETUP · SAVE
    ============================================================ */
@@ -6479,6 +6505,12 @@ function apagarCarreira(s){
 function salvar(){
   clearTimeout(salvarTimer);
   salvarTimer=setTimeout(async()=>{
+    // MODO LIGA ONLINE: persiste os dados pessoais (tática, rotação, camisa, patrocínios) na config da liga
+    if(S && S.online && S.ligaId){
+      if(typeof ligaSincronizarMeuTime==='function') ligaSincronizarMeuTime();
+      if(typeof flashSalvo==='function') flashSalvo();
+      return;
+    }
     if(!S||!SLOT)return;
     try{ S.savedAt=Date.now(); localStorage.setItem(slotKey(SLOT), JSON.stringify({...S, pid:PID})); atualizarIdx(SLOT,S); if(typeof flashSalvo==='function')flashSalvo(); if(typeof cloudAgendarSync==='function')cloudAgendarSync(); }catch(e){console.warn('save falhou',e);}
   },1200);
