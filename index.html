@@ -383,6 +383,7 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .cloudform input:focus{border-color:var(--wood);outline:none}
 .cloudmsg{font-size:12px;color:#9a8a76;min-height:16px}
 .cloudmsg.erro{color:#d9534f}
+.cloudmsg.ok{color:#7ac77a}
 .cloudalt{font-size:12px;color:#9a8a76;text-align:center}
 .cloudalt a{color:var(--amber);cursor:pointer;text-decoration:underline}
 .camisa-wrap{display:flex;justify-content:center;padding:6px;min-height:210px;align-items:center}
@@ -5014,6 +5015,12 @@ function cloudInit(){
     if(typeof window!=='undefined' && window.supabase && window.supabase.createClient){
       CLOUD.client=window.supabase.createClient(CLOUD_URL,CLOUD_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
       CLOUD.ok=true;
+      CLOUD.client.auth.onAuthStateChange((event, session)=>{
+        if(event==='PASSWORD_RECOVERY'){
+          if(session) CLOUD.user=session.user;
+          if(typeof cloudPainelNovaSenha==='function') cloudPainelNovaSenha();
+        }
+      });
       CLOUD.client.auth.getSession().then(async ({data})=>{
         if(!data||!data.session) return;
         CLOUD.user=data.session.user; cloudAtualizarUI();
@@ -5054,6 +5061,19 @@ async function cloudEntrar(email,senha){
   const {data,error}=await CLOUD.client.auth.signInWithPassword({email,password:senha});
   if(error) return {erro:cloudMsgErro(error)};
   CLOUD.user=data.user;
+  return {ok:true};
+}
+async function cloudEnviarReset(email){
+  if(!CLOUD.ok) return {erro:'Nuvem indisponível. Verifique sua conexão.'};
+  const {error}=await CLOUD.client.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+  if(error) return {erro:cloudMsgErro(error)};
+  return {ok:true};
+}
+async function cloudDefinirSenha(novaSenha){
+  if(!CLOUD.ok) return {erro:'Nuvem indisponível.'};
+  const {data,error}=await CLOUD.client.auth.updateUser({ password: novaSenha });
+  if(error) return {erro:cloudMsgErro(error)};
+  if(data&&data.user) CLOUD.user=data.user;
   return {ok:true};
 }
 async function cloudSair(){
@@ -5236,8 +5256,56 @@ function cloudPainelLogin(modo){
           ? `Não tem conta? <a onclick="cloudPainelLogin('criar')">Criar agora</a>`
           : `Já tem conta? <a onclick="cloudPainelLogin('entrar')">Entrar</a>`}
       </div>
+      ${ent?`<div class="cloudalt"><a onclick="cloudEsqueciSenha()">Esqueci minha senha</a></div>`:''}
       <button class="btn ghost mini" onclick="cloudFechar()">Agora não</button>
     </div>`);
+}
+
+function cloudEsqueciSenha(){
+  cloudModal(`
+    <h3 class="sub">🔑 Recuperar senha</h3>
+    <p class="hint">Digite seu e-mail. Vamos enviar um link para você criar uma nova senha.</p>
+    <div class="cloudform">
+      <input type="email" id="cloudEmailReset" placeholder="seu@email.com" autocomplete="email">
+      <div id="cloudMsgReset" class="cloudmsg"></div>
+      <button class="btn" id="cloudResetGo" onclick="cloudEnviarResetFluxo()">Enviar link de recuperação</button>
+      <div class="cloudalt"><a onclick="cloudPainelLogin('entrar')">← Voltar ao login</a></div>
+    </div>`);
+}
+async function cloudEnviarResetFluxo(){
+  const email=(document.getElementById('cloudEmailReset').value||'').trim();
+  const msg=document.getElementById('cloudMsgReset'), btn=document.getElementById('cloudResetGo');
+  if(!email){ msg.textContent='Digite seu e-mail.'; msg.className='cloudmsg erro'; return; }
+  btn.disabled=true; msg.className='cloudmsg'; msg.textContent='Enviando…';
+  const r=await cloudEnviarReset(email);
+  btn.disabled=false;
+  if(r.erro){ msg.textContent=r.erro; msg.className='cloudmsg erro'; return; }
+  msg.innerHTML='✅ Link enviado! Confira seu e-mail (e a caixa de spam). Ao clicar no link, você volta aqui para criar a nova senha.';
+  msg.className='cloudmsg ok';
+}
+function cloudPainelNovaSenha(){
+  cloudModal(`
+    <h3 class="sub">🔑 Criar nova senha</h3>
+    <p class="hint">Escolha sua nova senha do PARQUÊ '26.</p>
+    <div class="cloudform">
+      <input type="password" id="cloudNovaSenha" placeholder="nova senha (mín. 6 caracteres)" autocomplete="new-password">
+      <div id="cloudMsgNova" class="cloudmsg"></div>
+      <button class="btn" id="cloudNovaGo" onclick="cloudDefinirSenhaFluxo()">Salvar nova senha</button>
+    </div>`);
+}
+async function cloudDefinirSenhaFluxo(){
+  const senha=document.getElementById('cloudNovaSenha').value||'';
+  const msg=document.getElementById('cloudMsgNova'), btn=document.getElementById('cloudNovaGo');
+  if(senha.length<6){ msg.textContent='A senha precisa de ao menos 6 caracteres.'; msg.className='cloudmsg erro'; return; }
+  btn.disabled=true; msg.className='cloudmsg'; msg.textContent='Salvando…';
+  const r=await cloudDefinirSenha(senha);
+  btn.disabled=false;
+  if(r.erro){ msg.textContent=r.erro; msg.className='cloudmsg erro'; return; }
+  msg.textContent='✅ Senha atualizada!'; msg.className='cloudmsg ok';
+  if(typeof cloudSyncAoEntrar==='function') await cloudSyncAoEntrar();
+  if(typeof cloudRealtime==='function') cloudRealtime();
+  if(typeof cloudAtualizarUI==='function') cloudAtualizarUI();
+  setTimeout(()=>{ cloudFechar(); if(typeof renderHub==='function') renderHub(); if(typeof toast==='function') toast('☁ Senha atualizada e conectado!'); }, 900);
 }
 
 async function cloudSubmeter(modo){
