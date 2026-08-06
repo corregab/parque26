@@ -5257,12 +5257,12 @@ async function adminPainel(){
   if(!d||d.erro){ cloudModal('<h3 class="sub">🛠 Admin</h3><p class="cloudmsg erro">'+esc((d&&d.erro)||'Sem dados')+'</p>'); return; }
 
   const fmtData=iso=>{ if(!iso)return '—'; try{ return new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return iso; } };
-  let html=`<h3 class="sub">🛠 Painel do admin</h3>
+  let html=`<h3 class="sub">🛠 Painel do admin <span class="hint" style="font-weight:400">· atualizado ${new Date().toLocaleTimeString('pt-BR')}</span></h3>
     <div class="admin-stats"><div><b>${d.total_usuarios}</b><span>contas</span></div><div><b>${d.total_ligas}</b><span>ligas</span></div></div>
     <h4 class="admin-h">👥 Jogadores (${d.usuarios.length})</h4>
     <div class="admin-tbl">
-      <div class="admin-tr admin-head"><span>E-mail</span><span>Último login</span><span>Criado</span></div>`;
-  d.usuarios.forEach(u=>{ html+=`<div class="admin-tr"><span class="em">${esc(u.email||'—')}</span><span>${fmtData(u.ultimo_login)}</span><span>${fmtData(u.criado)}</span></div>`; });
+      <div class="admin-tr admin-head"><span>E-mail</span><span>Última atividade</span><span>Último login</span></div>`;
+  d.usuarios.forEach(u=>{ html+=`<div class="admin-tr"><span class="em">${esc(u.email||'—')}${u.carreiras?' <span class="hint">· '+u.carreiras+'c</span>':''}</span><span>${fmtData(u.ultima_atividade)}</span><span>${fmtData(u.ultimo_login)}</span></div>`; });
   html+=`</div><h4 class="admin-h">🌐 Ligas (${d.ligas.length})</h4>`;
   if(!d.ligas.length) html+='<p class="hint">Nenhuma liga ainda.</p>';
   d.ligas.forEach(l=>{
