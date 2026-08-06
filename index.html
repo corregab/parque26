@@ -410,6 +410,13 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .tr-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--wood-lo),var(--amber));transition:width .3s}
 .tr-info{font-size:12px;color:var(--mute);margin-top:5px}
 .tr-conc{background:rgba(122,199,122,.08);border:1px solid rgba(122,199,122,.25);border-radius:8px;padding:8px 11px;margin-bottom:6px;font-size:13px;color:var(--bone)}
+.mov-card{background:#14100c;border:1px solid #2a2119;border-radius:10px;padding:10px 13px;margin-bottom:8px}
+.mov-top{font-size:14px;color:var(--bone);margin-bottom:6px}
+.mov-top b{color:var(--amber)}
+.mov-data{font-size:11px;color:var(--mute);margin-right:6px}
+.mov-linha{font-size:13px;padding:2px 0;color:var(--bone)}
+.mov-t{display:inline-block;min-width:88px;font-size:11px;text-transform:uppercase;font-weight:600;letter-spacing:.3px}
+.mov-t.da{color:#d98a6a}.mov-t.recebe{color:#7ac77a}
 .cloudalt{font-size:12px;color:#9a8a76;text-align:center}
 .cloudalt a{color:var(--amber);cursor:pointer;text-decoration:underline}
 .camisa-wrap{display:flex;justify-content:center;padding:6px;min-height:210px;align-items:center}
@@ -2594,11 +2601,12 @@ const el=id=>document.getElementById(id);
 const bd=p=>`<span class="badge b-${p.toLowerCase()}">${p}</span>`;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ABAS=[['inicio','Escritório'],['elenco','Elenco'],['taticas','Táticas'],['calendario','Calendário'],
-            ['tabela','Classificação'],['mercado','Mercado'],['treino','Treino'],['financas','Finanças'],['marketing','Marketing'],['stats','Estatísticas'],['carreira','Carreira'],['premios','Prêmios'],['editor','Editar liga']];
+            ['tabela','Classificação'],['mercado','Mercado'],['treino','Treino'],['financas','Finanças'],['marketing','Marketing'],['stats','Estatísticas'],['jogadores','Jogadores'],['transferencias','Transferências'],['carreira','Carreira'],['premios','Prêmios'],['editor','Editar liga']];
 
 function montarTabs(){
   let abas=ABAS;
   if(S && S.online) abas=abas.filter(([k])=>k!=='editor');   // sem editor no mundo compartilhado
+  else abas=abas.filter(([k])=>k!=='jogadores' && k!=='transferencias');   // só na liga online
   el('tabs').innerHTML=abas.map(([k,n])=>`<button data-t="${k}" class="${ABA===k?'on':''}">${n}</button>`).join('');
   el('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{ABA=b.dataset.t;montarTabs();render();});
 }
@@ -2616,7 +2624,8 @@ function render(){
   if(S && S.online && ABA==='editor') ABA='inicio';   // editor não existe no modo online
   hud();
   const f={inicio:vInicio,elenco:vElenco,taticas:vTaticas,calendario:vCal,tabela:vTabela,
-           mercado:vMercado,treino:vTreino,financas:vFin,marketing:vMarketing,stats:vStats,carreira:vCarreira,premios:vPremios,editor:vEditor}[ABA];
+           mercado:vMercado,treino:vTreino,financas:vFin,marketing:vMarketing,stats:vStats,carreira:vCarreira,premios:vPremios,editor:vEditor,
+           jogadores:(typeof vJogadores==='function'?vJogadores:vStats),transferencias:(typeof vTransferencias==='function'?vTransferencias:vStats)}[ABA];
   el('view').innerHTML=f();
   if(f.pos)f.pos();
   salvar();
@@ -5795,6 +5804,14 @@ async function ligaTreinoAcelerar(id){
   if(data&&data.erro) return {erro:data.erro};
   return data;
 }
+
+// histórico de trocas concluídas da liga (todas)
+async function ligaMovimentacoes(ligaId){
+  if(!ligaPronta()) return [];
+  const {data}=await CLOUD.client.from('liga_propostas').select('*')
+    .eq('liga_id',ligaId).eq('status','aceita').order('criada_em',{ascending:false}).limit(50);
+  return data||[];
+}
 /* ============================================================
    UI LIGAS ONLINE — lobby multiplayer
    ============================================================ */
@@ -6120,6 +6137,9 @@ function ligaOuvirMundo(ligaId){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'liga_propostas',filter:'liga_id=eq.'+ligaId},(payload)=>{
       const p=payload.new; if(p && p.para_user===CLOUD.user.id && p.status==='pendente') toast&&toast('📨 Nova proposta de troca recebida!');
     })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'liga_propostas',filter:'liga_id=eq.'+ligaId},(payload)=>{
+      const p=payload.new; if(p && p.status==='aceita'){ window._movCache=null; if(typeof ABA!=='undefined'&&ABA==='transferencias'&&typeof ligaMovRefresh==='function') ligaMovRefresh(); }
+    })
     .on('postgres_changes',{event:'*',schema:'public',table:'liga_treinos',filter:'liga_id=eq.'+ligaId},()=>{
       if(typeof ligaTreinoRefresh==='function') ligaTreinoRefresh();
     })
@@ -6427,6 +6447,67 @@ if(typeof window!=='undefined'){
   const salvarLigaAoSair=()=>{ try{ if(S&&S.online&&S.ligaId&&typeof ligaSincronizarMeuTime==='function') ligaSincronizarMeuTime(); }catch(e){} };
   window.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') salvarLigaAoSair(); });
   window.addEventListener('pagehide', salvarLigaAoSair);
+}
+
+/* ---------- ABA JOGADORES (online) ---------- */
+function vJogadores(){
+  const ord=window._jogOrd||'ovr';
+  const fPos=window._jogPos||'';
+  const media=(p,c)=>(p.stats&&p.stats.j)?p.stats[c]/p.stats.j:0;
+  let todos=[];
+  S.times.forEach(t=>(t.elenco||[]).forEach(p=>todos.push({p,t})));
+  if(fPos) todos=todos.filter(x=>x.p.pos===fPos);
+  const chave=x=> ord==='pot'?x.p.pot : ord==='pts'?media(x.p,'pts') : ord==='reb'?media(x.p,'reb') : ord==='ast'?media(x.p,'ast') : x.p.ovr;
+  todos.sort((a,b)=>chave(b)-chave(a));
+  const top=todos.slice(0,150);
+  const b=(k,l)=>`<button class="btn ${ord===k?'':'ghost'} mini" onclick="window._jogOrd='${k}';render()">${l}</button>`;
+  const pb=(k,l)=>`<button class="btn ${fPos===k?'':'ghost'} mini" onclick="window._jogPos='${k}';render()">${l}</button>`;
+  const rows=top.map((x,i)=>{
+    const p=x.p, t=x.t, tem=p.stats&&p.stats.j>0;
+    return `<tr class="clickable ${t.id===S.meuTime?'me':''}" onclick="fichaJogador(${p.id},${t.id})">
+      <td class="muted" style="width:26px">${i+1}</td><td class="name">${esc(p.nome)}</td><td class="muted">${t.ab}</td>
+      <td>${bd(p.pos)}</td><td>${p.idade}</td><td><span class="ovr">${p.ovr}</span></td><td class="muted">${p.pot}</td>
+      <td>${tem?round(media(p,'pts'),1):'—'}</td><td>${tem?round(media(p,'reb'),1):'—'}</td><td>${tem?round(media(p,'ast'),1):'—'}</td></tr>`;
+  }).join('');
+  return `<h2 class="sec">Jogadores da liga</h2>
+    <div class="card">
+      <div class="row" style="gap:6px;flex-wrap:wrap"><span class="hint">Ordenar por:</span>${b('ovr','Overall')}${b('pot','Potencial')}${b('pts','Pontos')}${b('reb','Rebotes')}${b('ast','Assist.')}</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px"><span class="hint">Posição:</span>${pb('','Todas')}${pb('PG','PG')}${pb('SG','SG')}${pb('SF','SF')}${pb('PF','PF')}${pb('C','C')}</div>
+    </div>
+    <div class="card tbl-wrap" style="margin-top:12px"><table>
+      <thead><tr><th>#</th><th>Jogador</th><th>Time</th><th>Pos</th><th>Id</th><th>Ovr</th><th>Pot</th><th>PPG</th><th>RPG</th><th>APG</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <p class="hint" style="margin-top:8px">${todos.length} jogadores${fPos?' · '+fPos:''}. As médias por jogo acumulam conforme a temporada avança.</p>
+    </div>`;
+}
+
+/* ---------- ABA TRANSFERÊNCIAS (online) ---------- */
+function vTransferencias(){
+  if(!window._movCache){ window._movCache={lista:[],loading:true}; ligaMovRefresh(); }
+  const c=window._movCache;
+  const nomeJog=(pid)=>{ for(const t of S.times){ const p=(t.elenco||[]).find(x=>x.id===pid); if(p)return esc(p.nome.split(' ').slice(-1)[0])+' '+p.ovr; } return 'jogador'; };
+  const nomePk=(pid)=>{ const pk=(S.picks||[]).find(x=>x.id===pid); return (pk&&typeof nomePick==='function')?esc(nomePick(pk)):'pick'; };
+  const lado=(jids,pids,din)=>{ const a=[]; (jids||[]).forEach(id=>a.push(nomeJog(id))); (pids||[]).forEach(id=>a.push('🎟️ '+nomePk(id))); if(din>0)a.push('💰 '+M$(din)); return a.join(', ')||'—'; };
+  const fmtD=iso=>{ try{return new Date(iso).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});}catch(e){return '';} };
+  let html='<h2 class="sec">Transferências da liga</h2>';
+  if(c.loading) html+='<div class="card"><p class="hint">Carregando…</p></div>';
+  else if(!c.lista.length) html+='<div class="card"><p class="hint">Nenhuma troca realizada ainda. Vá ao Mercado e negocie! 🤝</p></div>';
+  else c.lista.forEach(m=>{
+    const tA=S.times[m.de_time], tB=S.times[m.para_time];
+    const ia = m.de_ia ? '🤖 ' : (m.mensagem==='(troca com a IA)'?'🤖 ':'👤 ');
+    html+=`<div class="mov-card">
+      <div class="mov-top"><span class="mov-data">${fmtD(m.criada_em)}</span> ${ia}<b>${esc(tA?tA.nick:'?')}</b> ⇄ <b>${esc(tB?tB.nick:'?')}</b></div>
+      <div class="mov-linha"><span class="mov-t da">${esc(tA?tA.ab:'')} deu</span> ${lado(m.oferecidos,m.picks_oferecidos,m.dinheiro_ofer)}</div>
+      <div class="mov-linha"><span class="mov-t recebe">${esc(tB?tB.ab:'')} deu</span> ${lado(m.pedidos,m.picks_pedidos,m.dinheiro_ped)}</div>
+    </div>`;
+  });
+  return html;
+}
+async function ligaMovRefresh(){
+  if(!S||!S.online||!S.ligaId) return;
+  const lista=await ligaMovimentacoes(S.ligaId);
+  window._movCache={lista, loading:false};
+  if(typeof ABA!=='undefined' && ABA==='transferencias' && typeof render==='function') render();
 }
 /* ============================================================
    BOOT · SETUP · SAVE
