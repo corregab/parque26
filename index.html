@@ -5424,6 +5424,92 @@ async function cloudSubmeter(modo){
   if(typeof toast==='function') toast('☁ Conectado — carreiras sincronizadas');
 }
 
+
+/* ============================================================
+   NOTIFICAÇÕES (Web Push)
+   ============================================================ */
+const VAPID_PUBLIC = 'BCch7kh9DBgqVVkQXLtSEWxVm9HjLcTYcB82EIcxF40axFSeKVMbsFFjir9rI6iC5CEuZ7RrhamtNUppDKEMPEM';
+function notifSuportado(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function urlBase64ToUint8Array(b64){
+  const pad='='.repeat((4 - b64.length % 4) % 4);
+  const base64=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64); const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+async function notifJaAtiva(){
+  if(!notifSuportado() || Notification.permission!=='granted') return false;
+  try{ const reg=await navigator.serviceWorker.ready; return !!(await reg.pushManager.getSubscription()); }catch(e){ return false; }
+}
+async function notifAtivar(){
+  if(!notifSuportado()){ toast&&toast('Este aparelho/navegador não suporta notificações'); return; }
+  if(!cloudLogado()){ toast&&toast('Entre na nuvem primeiro para ativar'); return; }
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){ toast&&toast('Permissão negada. Você pode reativar nas configurações do navegador.'); notifPainel(); return; }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC) });
+    const j=sub.toJSON();
+    const {error}=await CLOUD.client.from('push_subs').upsert({ endpoint:sub.endpoint, user_id:CLOUD.user.id, p256dh:j.keys.p256dh, auth:j.keys.auth, user_agent:navigator.userAgent }, {onConflict:'endpoint'});
+    if(error){ toast&&toast('Erro ao registrar: '+error.message); return; }
+    toast&&toast('🔔 Notificações ativadas!');
+    notifPainel();
+  }catch(e){ toast&&toast('Não deu para ativar: '+(e.message||e)); }
+}
+async function notifDesativar(){
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(sub){ try{ if(cloudLogado()) await CLOUD.client.from('push_subs').delete().eq('endpoint',sub.endpoint); }catch(e){} await sub.unsubscribe(); }
+    toast&&toast('Notificações desativadas neste aparelho');
+    notifPainel();
+  }catch(e){ toast&&toast('Erro ao desativar'); }
+}
+async function notifTeste(){
+  if(!cloudLogado()){ toast&&toast('Entre na nuvem primeiro'); return; }
+  toast&&toast('Enviando teste…');
+  try{
+    const {data,error}=await CLOUD.client.functions.invoke('push-enviar',{ body:{ teste:true } });
+    if(error){ let m='Erro ao enviar'; try{const c=await error.context.json(); if(c&&c.erro)m=c.erro;}catch(_){}; toast&&toast(m); return; }
+    if(data&&data.erro){ toast&&toast(data.erro); return; }
+    const n=data&&data.enviados!=null?data.enviados:'?';
+    toast&&toast(n>0?('✅ Enviado para '+n+' aparelho(s)! Deve chegar já.'):'Nenhum aparelho ativo. Ative as notificações primeiro.');
+  }catch(e){ toast&&toast('Falha ao enviar o teste'); }
+}
+async function notifPainel(){
+  const suporta=notifSuportado();
+  const iOSnaoInstalado = /iphone|ipad|ipod/i.test(navigator.userAgent) && !(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) && !window.navigator.standalone;
+  cloudModal('<h3 class="sub">🔔 Notificações</h3><p class="hint">Carregando…</p>');
+  const ativa=await notifJaAtiva();
+  let corpo;
+  if(!suporta){
+    corpo='<p class="cloudmsg">Este navegador não suporta notificações push.</p>';
+  } else if(iOSnaoInstalado){
+    corpo='<p class="cloudmsg">No iPhone/iPad, as notificações só funcionam com o jogo <b>instalado na tela de início</b>.</p><p class="hint">Toque no botão de compartilhar do Safari e escolha <b>“Adicionar à Tela de Início”</b>. Depois abra o PARQUÊ por ali e volte aqui para ativar.</p>';
+  } else if(!cloudLogado()){
+    corpo='<p class="cloudmsg">Entre na nuvem para ativar as notificações (elas ficam ligadas à sua conta).</p>';
+  } else if(ativa){
+    corpo=`<p>✅ Notificações <b>ativadas</b> neste aparelho.</p>
+      <p class="hint">Você recebe avisos de rodada processada, propostas de troca e treinos concluídos — mesmo com o jogo fechado.</p>
+      <div class="cloudform" style="margin-top:12px">
+        <button class="btn" onclick="notifTeste()">📨 Enviar notificação de teste</button>
+        <button class="btn ghost mini" onclick="notifDesativar()">Desativar neste aparelho</button>
+        <button class="btn ghost mini" onclick="cloudFechar()">Fechar</button>
+      </div>`;
+  } else {
+    corpo=`<p>Ative para receber avisos do jogo mesmo com ele fechado:</p>
+      <ul class="hint" style="margin:8px 0 0 18px;line-height:1.7">
+        <li>⏰ Rodada processada</li><li>🤝 Proposta de troca recebida</li><li>🏋️ Treino concluído</li>
+      </ul>
+      <div class="cloudform" style="margin-top:14px">
+        <button class="btn" onclick="notifAtivar()">🔔 Ativar notificações</button>
+        <button class="btn ghost mini" onclick="cloudFechar()">Agora não</button>
+      </div>`;
+  }
+  cloudModal('<h3 class="sub">🔔 Notificações</h3>'+corpo);
+}
+
 function cloudPainelConta(){
   cloudModal(`
     <h3 class="sub">☁ Conta conectada</h3>
@@ -5431,6 +5517,7 @@ function cloudPainelConta(){
     <p class="hint">Suas carreiras sincronizam sozinhas e em tempo real. Em outro aparelho, entre com esse e-mail para vê-las e continuar de onde parou.</p>
     <div class="cloudform" style="margin-top:12px">
       <button class="btn" onclick="cloudSincronizarAgora()">🔄 Sincronizar agora</button>
+      <button class="btn" onclick="notifPainel()">🔔 Notificações</button>
       <button class="btn ghost mini" onclick="cloudSair();cloudFechar();mostrarHub&&mostrarHub();toast&&toast('Você saiu da nuvem')">Sair da conta</button>
       <button class="btn ghost mini" onclick="cloudFechar()">Fechar</button>
     </div>`);

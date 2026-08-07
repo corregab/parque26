@@ -1,5 +1,5 @@
 /* Service Worker do PARQUÊ '26 — cache offline */
-const CACHE = 'parque26-v2';
+const CACHE = 'parque26-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -52,4 +52,36 @@ self.addEventListener('fetch', (e) => {
       }).catch(() => hit))
     );
   }
+});
+
+/* ---------- WEB PUSH: notificações ---------- */
+// recebe o push mesmo com o app fechado e mostra a notificação
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: 'PARQUÊ \'26', body: e.data ? e.data.text() : '' }; }
+  const title = d.title || 'PARQUÊ \'26';
+  const opts = {
+    body: d.body || '',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    tag: d.tag || undefined,           // agrupa notificações do mesmo tipo
+    renotify: !!d.tag,
+    data: { url: d.url || './' },
+    vibrate: [80, 40, 80]
+  };
+  e.waitUntil(self.registration.showNotification(title, opts));
+});
+
+// ao tocar na notificação, foca o app (ou abre) e vai pra url indicada
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const alvo = (e.notification.data && e.notification.data.url) || './';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cls) => {
+      for (const c of cls) {
+        if (c.url.includes(self.location.origin)) { c.focus(); return; }
+      }
+      return self.clients.openWindow(alvo);
+    })
+  );
 });
