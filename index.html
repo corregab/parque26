@@ -5677,18 +5677,10 @@ async function ligaLimparResultados(ligaId, rodada){
 
 async function ligaProcessarRodada(ligaId){
   if(!ligaPronta()) return {erro:'Sem conexão.'};
-  const estadoRow=await ligaCarregarEstado(ligaId);
-  if(!estadoRow||!estadoRow.estado) return {erro:'Estado da liga não encontrado.'};
-  if(estadoRow.estado.fase==='offseason'||estadoRow.estado.campeao||(estadoRow.estado.po&&estadoRow.estado.po.campeao)) return {erro:'O campeonato já foi decidido! 🏆'};
-  const membros=await ligaMembros(ligaId);
-  const configs={}; membros.forEach(m=>{ if(m.config&&m.time_id!=null) configs[m.time_id]=m.config; });
-  const rodadaAtual=estadoRow.estado.rodada;
-  const preJogados=await ligaResultadosDaRodada(ligaId, rodadaAtual);
-  const r=simularRodadaLiga(estadoRow.estado, configs, preJogados);
-  const pub=await ligaPublicarEstado(ligaId, r.estado, r.rodada, r.fase);
-  if(pub.erro) return {erro:pub.erro};
-  await ligaLimparResultados(ligaId, rodadaAtual);
-  return {ok:true, resultados:r.resultados, rodada:r.rodada, fase:r.fase};
+  const {data,error}=await CLOUD.client.functions.invoke('forcar-rodada',{ body:{ liga_id:ligaId } });
+  if(error){ let m='Erro ao processar a rodada.'; try{const c=await error.context.json(); if(c&&c.erro)m=c.erro;}catch(e){} return {erro:m}; }
+  if(data&&data.erro) return {erro:data.erro};
+  return {ok:true, rodada:data.rodada, fase:data.fase};
 }
 
 async function ligaSalvarConfig(ligaId, config){
@@ -6178,6 +6170,7 @@ async function ligaAvancarDia(){
     S=row.estado;S.meuTime=meuTime;S.online=true;S.tecnico=tec;S.camisa=cam;S.objetivo=obj;S.carreiraTec=ct;S.ligaId=li;S.ligaCodigo=cod;S.ligaNome=nm;S.ehHost=hs;S.ligaManagers=mg;S.ligaProxima=px;S.ligaAuto=au;S.ligaIntervalo=iv;
     render();
   }
+  if(typeof ligaTreinoRefresh==='function') ligaTreinoRefresh();
   toast&&toast(r.fase!=='regular'?'Temporada regular encerrada!':'Rodada '+r.rodada+' processada!');
 }
 
