@@ -1,5 +1,5 @@
 /* Service Worker do PARQUÊ '26 — cache offline */
-const CACHE = 'parque26-v5';
+const CACHE = 'parque26-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -85,4 +85,10 @@ self.addEventListener('notificationclick', (e) => {
       return self.clients.openWindow(alvo);
     })
   );
+});
+
+// diagnóstico e atualização forçada (comunicação com a página)
+self.addEventListener('message', (e) => {
+  if (e.data === 'versao' && e.source) { e.source.postMessage({ tipo: 'versao', versao: CACHE }); }
+  if (e.data === 'skipWaiting') { self.skipWaiting(); }
 });

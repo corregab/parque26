@@ -5441,6 +5441,29 @@ async function notifJaAtiva(){
   if(!notifSuportado() || Notification.permission!=='granted') return false;
   try{ const reg=await navigator.serviceWorker.ready; return !!(await reg.pushManager.getSubscription()); }catch(e){ return false; }
 }
+async function notifVersaoSW(){
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    if(!reg || !reg.active) return null;
+    return await new Promise((resolve)=>{
+      const timer=setTimeout(()=>resolve('?'),1200);
+      function h(ev){ if(ev.data && ev.data.tipo==='versao'){ clearTimeout(timer); navigator.serviceWorker.removeEventListener('message',h); resolve(ev.data.versao); } }
+      navigator.serviceWorker.addEventListener('message',h);
+      reg.active.postMessage('versao');
+    });
+  }catch(e){ return null; }
+}
+async function notifForcarUpdate(){
+  toast&&toast('Buscando atualização do app…');
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    if(reg){
+      await reg.update();
+      if(reg.waiting) reg.waiting.postMessage('skipWaiting');
+      setTimeout(()=>location.reload(), 1600);
+    } else { location.reload(); }
+  }catch(e){ location.reload(); }
+}
 async function notifAtivar(){
   if(!notifSuportado()){ toast&&toast('Este aparelho/navegador não suporta notificações'); return; }
   if(!cloudLogado()){ toast&&toast('Entre na nuvem primeiro para ativar'); return; }
@@ -5494,10 +5517,18 @@ async function notifPainel(){
   } else if(!cloudLogado()){
     corpo='<p class="cloudmsg">Entre na nuvem para ativar as notificações (elas ficam ligadas à sua conta).</p>';
   } else if(ativa){
+    const ver=await notifVersaoSW();
+    const okVer = ver && ver.replace('parque26-','')>='v6';
+    const diag=`<div class="hint" style="margin-top:10px;padding:8px 10px;background:#14100c;border:1px solid #2a2119;border-radius:8px;font-size:12px">
+        Permissão: <b style="color:#7ac77a">concedida</b> · Motor (SW): <b style="color:${okVer?'#7ac77a':'#e8a33d'}">${ver||'—'}</b>${okVer?'':' <span style="color:#e8a33d">(desatualizado)</span>'}
+      </div>`;
+    const avisoVer = okVer ? '' : '<p class="cloudmsg" style="margin-top:10px">⚠️ O motor de notificações está desatualizado neste aparelho — por isso os avisos podem não aparecer. Toque em <b>Atualizar o app</b> abaixo.</p>';
     corpo=`<p>✅ Notificações <b>ativadas</b> neste aparelho.</p>
       <p class="hint">Você recebe avisos de rodada processada, propostas de troca e treinos concluídos — mesmo com o jogo fechado.</p>
+      ${diag}${avisoVer}
       <div class="cloudform" style="margin-top:12px">
         <button class="btn" onclick="notifTeste()">📨 Enviar notificação de teste</button>
+        <button class="btn${okVer?' ghost':''}" onclick="notifForcarUpdate()">🔄 Atualizar o app agora</button>
         <button class="btn ghost mini" onclick="notifDesativar()">Desativar neste aparelho</button>
         <button class="btn ghost mini" onclick="cloudFechar()">Fechar</button>
       </div>`;
