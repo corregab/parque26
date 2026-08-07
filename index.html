@@ -446,6 +446,27 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .oferta-card{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#12100d;border:1px solid #2a2119;border-radius:10px;padding:10px 12px;margin-bottom:8px}
 .oferta-marca{font-size:14px;font-weight:700}
 .oferta-val{font-family:var(--mono);font-size:12px;color:var(--wood);margin-top:2px}
+
+.clickable{cursor:pointer;transition:background .15s}
+.clickable:hover{background:rgba(232,163,61,.10)}
+.kv.clk{cursor:pointer;border-radius:8px;padding:6px 8px;margin:0 -8px;transition:background .15s}
+.kv.clk:hover{background:rgba(232,163,61,.12)}
+.bx-placar{display:flex;align-items:center;justify-content:center;gap:14px;font:700 22px 'Barlow Condensed',sans-serif;color:var(--mute);margin-bottom:2px}
+.bx-placar b{font-size:30px;color:var(--bone)}
+.bx-placar .bx-w b{color:var(--amber)}
+.bx-x{color:var(--wood-lo);font-size:16px}
+.bx-time{margin-bottom:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.bx-time.bx-venc{border-color:var(--wood-lo)}
+.bx-head{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;background:#1b1512}
+.bx-head b{color:var(--bone);font-size:15px}
+.bx-pts{font:800 22px 'Barlow Condensed',sans-serif;color:var(--amber)}
+.bx-tbl{width:100%;font-size:12px;border-collapse:collapse}
+.bx-tbl th{background:#14100c;color:var(--mute);font-size:10px;text-transform:uppercase;padding:5px 4px;text-align:center;letter-spacing:.3px}
+.bx-tbl th:first-child{text-align:left;padding-left:11px}
+.bx-tbl td{padding:5px 4px;text-align:center;border-top:1px solid #241d19}
+.bx-tbl td.name{text-align:left;padding-left:11px;color:var(--bone)}
+.bx-tbl td.muted{color:var(--mute)}
+
 </style>
 </head>
 <body>
@@ -2904,16 +2925,19 @@ function vCal(){
     let r='—',cls='';
     if(j.res){const eu=casa?j.res[0]:j.res[1],ele=casa?j.res[1]:j.res[0];
       r=(eu>ele?'V':'D')+' '+eu+'-'+ele;cls=eu>ele?'w':'l';}
-    return `<tr class="${i===S.rodada?'me':''}"><td>${i+1}</td><td class="name">${casa?'vs':'@'} ${esc(adv.cidade)} ${esc(adv.nick)}</td>
+    const clk=(S.online&&j.res)?`onclick="verBoxscore(${i},${j.c})"`:'';
+    return `<tr class="${i===S.rodada?'me':''}${(S.online&&j.res)?' clickable':''}" ${clk}><td>${i+1}</td><td class="name">${casa?'vs':'@'} ${esc(adv.cidade)} ${esc(adv.nick)}</td>
       <td>${adv.v}-${adv.d}</td><td>${forcaTime(adv)}</td><td>${j.res?`<span class="pill ${cls}">${r}</span>`:'<span class="muted">a jogar</span>'}</td></tr>`;
   }).join('');
   return `<h2 class="sec">Calendário</h2>
+  ${S.online?'<p class="hint" style="margin:-4px 0 12px">📊 Toque em um jogo já disputado para ver o boxscore completo.</p>':''}
   <div class="split"><div class="card tbl-wrap"><table><thead><tr><th>#</th><th>Adversário</th><th>Camp.</th><th>Força</th><th>Resultado</th></tr></thead><tbody>${rows}</tbody></table></div>
   <div><div class="card"><h3 class="sub">Resultados da rodada ${Math.max(1,S.rodada)}</h3>
-    ${(S.cal[Math.max(0,S.rodada-1)]||[]).map(j=>{
+    ${(()=>{const rr=Math.max(0,S.rodada-1);return (S.cal[rr]||[]).map(j=>{
       const A=S.times[j.c],B=S.times[j.f];
       if(!j.res)return `<div class="kv"><span>${A.ab} x ${B.ab}</span><b class="muted">—</b></div>`;
-      return `<div class="kv"><span>${A.ab} x ${B.ab}</span><b>${j.res[0]}-${j.res[1]}</b></div>`;}).join('')}
+      const clk=S.online?`onclick="verBoxscore(${rr},${j.c})" style="cursor:pointer"`:'';
+      return `<div class="kv${S.online?' clk':''}" ${clk}><span>${A.ab} x ${B.ab}</span><b>${j.res[0]}-${j.res[1]}</b></div>`;}).join('');})()}
   </div></div></div>`;
 }
 
@@ -6940,6 +6964,44 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   });
 }
+
+/* ---------- BOXSCORE POR JOGO (online) ---------- */
+async function verBoxscore(rodada, timeCasa){
+  if(!S || !S.online || !S.ligaId || !ligaPronta()){ return; }
+  abrirModal('\ud83d\udcca Boxscore', '<p class="hint">Carregando\u2026</p>');
+  let bs=null;
+  try{
+    const {data}=await CLOUD.client.from('liga_boxscores').select('*')
+      .eq('liga_id',S.ligaId).eq('rodada',rodada).eq('time_casa',timeCasa).maybeSingle();
+    bs=data;
+  }catch(e){}
+  if(!bs || !bs.box){
+    el('mBody').innerHTML='<p class="cloudmsg">Boxscore n\u00e3o dispon\u00edvel para este jogo.</p><p class="hint">Ficam guardados os jogos das \u00faltimas ~8 rodadas. Jogos anteriores \u00e0 chegada dessa novidade n\u00e3o t\u00eam boxscore.</p>';
+    return;
+  }
+  el('mBody').innerHTML=htmlBoxscore(bs);
+}
+function htmlBoxscore(bs){
+  const box=bs.box;
+  const linha=p=>`<tr><td class="name">${esc(p.n)}</td><td class="muted">${p.ps}</td><td>${p.min}</td><td><b>${p.pts}</b></td><td>${p.reb}</td><td>${p.ast}</td><td>${p.stl}</td><td>${p.blk}</td><td>${p.t3}</td></tr>`;
+  const lider=(arr,campo)=>{ let m=null; (arr||[]).forEach(p=>{ if(!m||p[campo]>m[campo])m=p; }); return m; };
+  const tabela=(lado,venceu)=>{
+    const js=[...(lado.j||[])].sort((a,b)=>b.pts-a.pts);
+    return `<div class="bx-time ${venceu?'bx-venc':''}">
+      <div class="bx-head"><b>${esc(lado.cid||'')} ${esc(lado.nk||lado.ab)}</b><span class="bx-pts">${lado.pts}</span></div>
+      <div class="tbl-wrap"><table class="bx-tbl"><thead><tr><th>Jogador</th><th>P</th><th>Min</th><th>Pts</th><th>Reb</th><th>Ast</th><th>Rou</th><th>Blq</th><th>3P</th></tr></thead>
+      <tbody>${js.map(linha).join('')}</tbody></table></div></div>`;
+  };
+  const casaVenc=box.casa.pts>box.fora.pts;
+  const faseTxt = bs.fase==='playoffs'?'Playoffs':bs.fase==='playin'?'Play-In':'Temporada regular';
+  const dq=lider(box.casa.pts>box.fora.pts?box.casa.j:box.fora.j,'pts');
+  return `<div class="bx-placar"><span class="${casaVenc?'bx-w':''}">${esc(box.casa.ab)} <b>${box.casa.pts}</b></span><span class="bx-x">\u00d7</span><span class="${!casaVenc?'bx-w':''}"><b>${box.fora.pts}</b> ${esc(box.fora.ab)}</span></div>
+    <p class="hint" style="text-align:center;margin:-2px 0 14px">${faseTxt} \u00b7 rodada ${bs.rodada+1}${dq?' \u00b7 destaque: '+esc(dq.n)+' ('+dq.pts+' pts)':''}</p>
+    ${tabela(box.casa, casaVenc)}
+    ${tabela(box.fora, !casaVenc)}`;
+}
+
+
 </script>
 </body>
 </html>
