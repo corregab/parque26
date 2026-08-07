@@ -5447,10 +5447,14 @@ async function notifAtivar(){
   try{
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){ toast&&toast('Permissão negada. Você pode reativar nas configurações do navegador.'); notifPainel(); return; }
-    const reg=await navigator.serviceWorker.ready;
+    let reg=await navigator.serviceWorker.getRegistration();
+    if(!reg) reg=await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    reg=(await navigator.serviceWorker.getRegistration())||reg;
     let sub=await reg.pushManager.getSubscription();
     if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC) });
     const j=sub.toJSON();
+    if(!j.keys||!j.keys.p256dh||!j.keys.auth){ toast&&toast('Falha ao gerar a inscrição. Tente novamente.'); return; }
     const {error}=await CLOUD.client.from('push_subs').upsert({ endpoint:sub.endpoint, user_id:CLOUD.user.id, p256dh:j.keys.p256dh, auth:j.keys.auth, user_agent:navigator.userAgent }, {onConflict:'endpoint'});
     if(error){ toast&&toast('Erro ao registrar: '+error.message); return; }
     toast&&toast('🔔 Notificações ativadas!');
@@ -7045,10 +7049,25 @@ async function iniciarApp(){
 }
 iniciarApp();
 
-/* ---------- PWA: registra o service worker (offline + instalável) ---------- */
+/* ---------- PWA: registra o service worker + auto-atualização ---------- */
 if('serviceWorker' in navigator){
+  let recarregando=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(recarregando)return; recarregando=true; location.reload();
+  });
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      reg.update();
+      // checa por atualização sempre que o app volta ao foco
+      document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') reg.update(); });
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        if(nw) nw.addEventListener('statechange',()=>{
+          // novo SW pronto e já havia um controlando → ativa e o controllerchange recarrega
+          if(nw.state==='installed' && navigator.serviceWorker.controller){ nw.postMessage&&null; }
+        });
+      });
+    }).catch(()=>{});
   });
 }
 
