@@ -226,6 +226,10 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .carreira-card .cc-cont{background:linear-gradient(135deg,var(--amber),var(--wood));color:#150f0a;border:none;font-weight:700;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;white-space:nowrap}
 .carreira-card .cc-del{background:transparent;border:1px solid #4a3428;color:#c77;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:11px}
 .carreira-card .cc-del:hover{border-color:#d9534f;color:#d9534f}
+.liga-card{border-color:#3b5bd9!important;background:linear-gradient(160deg,rgba(59,91,217,.14),var(--panel))!important}
+.liga-card .cc-time{color:#cddbff}
+.liga-card .cc-cont{background:linear-gradient(135deg,#3b5bd9,#1e3a8a)!important;color:#eaf0ff!important}
+.liga-card .cc-tec{color:#9ec3ff}
 .carreira-nova{display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;border:1.5px dashed #4a3d33;border-radius:14px;padding:16px;cursor:pointer;color:var(--amber);font-weight:600;font-size:14px;transition:.15s;width:100%}
 .carreira-nova:hover{border-color:var(--wood);background:rgba(200,121,46,.08)}
 .hub-cloud-hint{font-size:12px;color:var(--mute);margin:8px auto 0;max-width:460px}
@@ -5816,7 +5820,7 @@ async function ligaMovimentacoes(ligaId){
    UI LIGAS ONLINE — lobby multiplayer
    ============================================================ */
 function ligaBotaoHub(){
-  return `<button class="liga-hub-btn" onclick="ligaTelaHub()">🌐 Ligas Online — jogar com amigos</button>`;
+  return `<button class="liga-hub-btn" onclick="ligaTelaHub()">🌐 Entrar ou criar liga online</button>`;
 }
 
 async function ligaTelaHub(){
@@ -5834,7 +5838,7 @@ async function ligaTelaHub(){
       html+=`<div class="liga-row">
         <div class="liga-main"><b>${esc(l.nome||'Liga')}</b>
           <span class="hint">código ${l.codigo} · ${esc(l.meuTimeNome||'—')}</span></div>
-        <button class="btn mini" onclick="ligaLobby('${l.id}')">Abrir</button>
+        <button class="btn mini" onclick="ligaAbrir('${l.id}')">Abrir</button>
       </div>`;
     });
   }
@@ -6509,6 +6513,51 @@ async function ligaMovRefresh(){
   window._movCache={lista, loading:false};
   if(typeof ABA!=='undefined' && ABA==='transferencias' && typeof render==='function') render();
 }
+
+/* ---------- LIGAS ONLINE NO HUB (como carreiras) ---------- */
+async function renderHubLigas(){
+  const cont=document.getElementById('hubLigas');
+  if(!cont) return;
+  if(typeof cloudLogado!=='function' || !cloudLogado()){ cont.innerHTML=''; return; }
+  let minhas=[];
+  try{ minhas=await ligaMinhas(); }catch(e){ cont.innerHTML=''; return; }
+  if(!minhas.length){ cont.innerHTML=''; return; }
+  let html='';
+  minhas.forEach(l=>{
+    const st = l.status==='lobby' ? 'Aguardando início' : (l.status==='encerrada' ? 'Encerrada' : ('Rodada '+(l.rodada||0)));
+    const time = l.meuTimeNome || 'Escolher time';
+    html+=`<div class="carreira-card liga-card">
+      <div class="cc-main">
+        <div class="cc-time">🌐 ${esc(l.meuTimeNome||l.nome||'Liga')}</div>
+        <div class="cc-meta">Liga online · ${esc(l.nome||'')} · ${st}</div>
+        <div class="cc-tec">código ${esc(l.codigo||'')}</div>
+      </div>
+      <div class="cc-btns">
+        <button class="cc-cont" onclick="ligaAbrir('${l.id}')">Continuar</button>
+        <button class="cc-del" onclick="ligaSairDoHub('${l.id}')">Sair</button>
+      </div>
+    </div>`;
+  });
+  cont.innerHTML=html;
+}
+// entra direto no jogo se já é membro de liga iniciada; senão abre o lobby (escolher time / esperar)
+async function ligaAbrir(ligaId){
+  if(!ligaPronta()){ toast&&toast('Sem conexão com a nuvem'); return; }
+  let liga=null, membros=[];
+  try{
+    const r=await CLOUD.client.from('ligas').select('status').eq('id',ligaId).maybeSingle();
+    liga=r.data; membros=await ligaMembros(ligaId);
+  }catch(e){}
+  const souMembro=membros.some(m=>m.user_id===CLOUD.user.id && m.time_id!=null);
+  if(souMembro && liga && liga.status!=='lobby' && typeof ligaJogar==='function'){ ligaJogar(ligaId); }
+  else if(typeof ligaLobby==='function'){ ligaLobby(ligaId); }
+}
+async function ligaSairDoHub(ligaId){
+  if(!confirm('Sair desta liga? Seu time volta a ser controlado pela IA e você perde os ajustes pessoais dela.')) return;
+  try{ if(typeof ligaSair==='function') await ligaSair(ligaId); }catch(e){}
+  toast&&toast('Você saiu da liga');
+  renderHubLigas();
+}
 /* ============================================================
    BOOT · SETUP · SAVE
    ============================================================ */
@@ -6860,8 +6909,10 @@ function renderHub(){
   if(idx.length<3){
     html+=`<button class="carreira-nova" onclick="novaCarreira()">＋ Nova carreira</button>`;
   }
+  html+=`<div id="hubLigas"></div>`;
   html+=`${typeof ligaBotaoHub==='function'?ligaBotaoHub():''}`;
   const cont=el('hubList'); if(cont) cont.innerHTML=html;
+  if(typeof renderHubLigas==='function') renderHubLigas();
 }
 function mostrarHub(){
   S=null; SLOT=null;
