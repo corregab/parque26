@@ -1,11 +1,12 @@
 /* Service Worker do PARQUÊ '26 — cache offline */
-const CACHE = 'parque26-v4';
+const CACHE = 'parque26-v5';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
+  './notif-badge.png',
   './apple-touch-icon.png'
 ];
 
@@ -63,7 +64,7 @@ self.addEventListener('push', (e) => {
   const opts = {
     body: d.body || '',
     icon: './icon-192.png',
-    badge: './icon-192.png',
+    badge: './notif-badge.png',
     tag: d.tag || undefined,           // agrupa notificações do mesmo tipo
     renotify: !!d.tag,
     data: { url: d.url || './' },
