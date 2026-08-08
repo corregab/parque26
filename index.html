@@ -467,6 +467,23 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .bx-tbl td.name{text-align:left;padding-left:11px;color:var(--bone)}
 .bx-tbl td.muted{color:var(--mute)}
 
+
+.esp{padding:0;overflow:hidden}
+.esp-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:linear-gradient(90deg,#1b1512,#241d19);border-bottom:2px solid var(--wood)}
+.esp-logo{font:800 16px 'Barlow Condensed',sans-serif;letter-spacing:1px;color:var(--bone);text-transform:uppercase}
+.esp-logo b{color:var(--amber)}
+.esp-live{font:700 10px 'IBM Plex Mono',monospace;color:var(--amber);background:rgba(232,163,61,.14);padding:3px 8px;border-radius:20px;letter-spacing:.5px}
+.esp-tag{display:inline-block;font:700 9px 'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase;color:#0c0a09;padding:2px 8px;border-radius:4px;margin-bottom:6px}
+.esp-tag.mini{margin-bottom:0;font-size:8px;padding:2px 6px}
+.esp-dest{padding:14px;border-left:4px solid var(--amber);background:#14100c}
+.esp-dest h3{font:800 20px 'Barlow Condensed',sans-serif;line-height:1.15;color:var(--bone);margin:2px 0 6px}
+.esp-dest p{font-size:13px;color:var(--mute);line-height:1.5;margin:0}
+.esp-item{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-top:1px solid #241d19}
+.esp-item .esp-tag{align-self:flex-start;margin-top:2px;white-space:nowrap}
+.esp-body{display:flex;flex-direction:column;gap:2px}
+.esp-body b{font-size:14px;color:var(--bone);line-height:1.25;font-weight:700}
+.esp-sub{font-size:12px;color:var(--mute);line-height:1.4}
+
 </style>
 </head>
 <body>
@@ -2657,6 +2674,150 @@ function render(){
 }
 
 /* ---------- ESCRITÓRIO ---------- */
+
+/* ============================================================
+   PARQUÊ SPORTS — feed de notícias estilo ESPN (gerado dos dados)
+   ============================================================ */
+function _seedRand(seed){ let s=(seed>>>0)||1; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
+function gerarNoticias(){
+  if(!S||!S.times||!S.times.length) return [];
+  const meu=S.times[S.meuTime];
+  const rnd=_seedRand((S.rodada||0)*1000+(S.meuTime||0)+((S.temporada||0)*37));
+  const pick=a=>a[Math.floor(rnd()*a.length)];
+  const sob=n=>n?n.split(' ').slice(-1)[0]:'';
+  const craque=t=>[...((t&&t.elenco)||[])].sort((a,b)=>b.ovr-a.ovr)[0];
+  const nt=[];
+  const rj=Math.max(0,(S.rodada||0)-1);
+  const jogos=((S.cal&&S.cal[rj])||[]).filter(j=>j.res);
+
+  // 1) MEU ÚLTIMO JOGO
+  const mj=jogos.find(j=>j.c===S.meuTime||j.f===S.meuTime);
+  if(mj&&meu){
+    const casa=mj.c===S.meuTime, adv=S.times[casa?mj.f:mj.c];
+    const eu=casa?mj.res[0]:mj.res[1], ele=casa?mj.res[1]:mj.res[0];
+    const venci=eu>ele, dif=Math.abs(eu-ele), cr=craque(meu);
+    if(venci){
+      nt.push({tag:'RESULTADO',cor:'#7ac77a', peso:9, manch: dif>=20?pick([
+        `${meu.nick} atropelam o ${adv.nick} e mandam recado à liga`,
+        `Sem dó: ${meu.nick} humilham o ${adv.nick} por ${eu}-${ele}`,
+        `Passeio: ${meu.nick} não tomam conhecimento do ${adv.nick}`]):pick([
+        `${meu.nick} vencem o ${adv.nick} por ${eu}-${ele}`,
+        `${meu.nick} superam o ${adv.nick} e seguem firmes`,
+        `Dever cumprido: ${meu.nick} batem o ${adv.nick}`]),
+        txt:`${cr?sob(cr.nome)+' foi o nome do jogo. ':''}${meu.cidade} venceu por ${eu} a ${ele}${dif>=20?' numa atuação de gala.':'.'}`});
+    } else {
+      nt.push({tag:'RESULTADO',cor:'#d9534f', peso:9, manch: dif>=20?pick([
+        `Vexame: ${meu.nick} são atropelados pelo ${adv.nick}`,
+        `Que fase! ${meu.nick} levam ${ele}-${eu} do ${adv.nick}`,
+        `Noite de apagar: ${meu.nick} apanham do ${adv.nick}`]):pick([
+        `${meu.nick} tropeçam diante do ${adv.nick}`,
+        `${meu.nick} perdem para o ${adv.nick} por ${ele}-${eu}`,
+        `${adv.nick} levam a melhor sobre os ${meu.nick}`]),
+        txt:`${meu.cidade} caiu por ${eu} a ${ele}.${dif>=20?' A torcida deixou a arena revoltada.':''}`});
+    }
+  }
+
+  // 2) ZEBRA DA RODADA
+  let zeb=null,mx=0;
+  jogos.forEach(j=>{
+    const A=S.times[j.c],B=S.times[j.f],fA=forcaTime(A),fB=forcaTime(B),cV=j.res[0]>j.res[1];
+    const venc=cV?A:B, perd=cV?B:A, fV=cV?fA:fB, fP=cV?fB:fA, up=fP-fV;
+    if(up>mx){ mx=up; zeb={venc,perd,res:cV?[j.res[0],j.res[1]]:[j.res[1],j.res[0]]}; }
+  });
+  if(zeb&&mx>=4) nt.push({tag:'ZEBRA',cor:'#e8a33d', peso:7, manch:pick([
+    `ZEBRA! ${zeb.venc.nick} derrubam os favoritos ${zeb.perd.nick}`,
+    `Ninguém viu essa: ${zeb.venc.nick} surpreendem o ${zeb.perd.nick}`,
+    `Bomba: ${zeb.venc.nick} atropelam o poderoso ${zeb.perd.nick}`]),
+    txt:`Contra todas as previsões, ${zeb.venc.cidade} venceu por ${zeb.res[0]} a ${zeb.res[1]} e agitou a rodada.`});
+
+  // 3) GOLEADA / MELHOR JOGO
+  let gol=null,mdif=0;
+  jogos.forEach(j=>{ const d=Math.abs(j.res[0]-j.res[1]); if(d>mdif){mdif=d; const cV=j.res[0]>j.res[1]; gol={v:S.times[cV?j.c:j.f],p:S.times[cV?j.f:j.c],pv:Math.max(j.res[0],j.res[1]),pp:Math.min(j.res[0],j.res[1])};} });
+  if(gol&&mdif>=25) nt.push({tag:'DESTAQUE',cor:'#c8792e', peso:5, manch:pick([
+    `Massacre: ${gol.v.nick} aplicam ${mdif} de diferença no ${gol.p.nick}`,
+    `${gol.v.nick} dão show e goleiam o ${gol.p.nick}`]),
+    txt:`Placar de ${gol.pv} a ${gol.pp}. Um recado da equipe para o resto da liga.`});
+
+  // 4) TRANSFERÊNCIA (online)
+  if(S.online&&window._movCache&&window._movCache.lista&&window._movCache.lista.length){
+    const m=window._movCache.lista[0], tA=S.times[m.de_time], tB=S.times[m.para_time];
+    if(tA&&tB) nt.push({tag:'MERCADO',cor:'#3b9bd9', peso:8, manch:pick([
+      `BOMBA no mercado: ${tA.nick} e ${tB.nick} fecham troca`,
+      `Negócio fechado! ${tA.nick} acertam com o ${tB.nick}`,
+      `Mercado pega fogo: ${tA.nick} e ${tB.nick} mexem no elenco`]),
+      txt:`As duas equipes se acertaram numa movimentação que promete mudar o rumo da temporada.`});
+  }
+
+  // 5) PATROCÍNIO / NEGÓCIOS
+  if(meu&&S.camisa&&S.camisa.patrocinios){
+    const pats=Object.values(S.camisa.patrocinios).filter(p=>p&&p.valor);
+    if(pats.length){ const total=pats.reduce((s,p)=>s+p.valor,0); const big=[...pats].sort((a,b)=>b.valor-a.valor)[0];
+      nt.push({tag:'NEGÓCIOS',cor:'#c8792e', peso:4, manch:pick([
+        `${meu.nick} fecham com a ${big.marca} e reforçam o caixa`,
+        `Dinheiro no bolso: ${meu.nick} lucram com patrocinadores`,
+        `A ${big.marca} aposta alto nos ${meu.nick}`]),
+        txt:`Com os contratos atuais, ${meu.cidade} fatura cerca de ${M$(total)} por temporada em patrocínio.`});
+    }
+  }
+
+  // 6) TORCIDA (sequência)
+  if(meu&&meu.seq&&meu.seq.length>=3){
+    const u3=meu.seq.slice(0,3), vit=u3.filter(x=>x==='V').length;
+    if(vit===3) nt.push({tag:'TORCIDA',cor:'#9b59b6', peso:6, manch:pick([
+      `Torcida em festa: "esse ano é nosso!"`,`Euforia toma conta da nação ${meu.nick}`]),
+      txt:pick([`"Três vitórias seguidas, o time tá voando!", comemora a arquibancada.`,`Nas redes, a torcida já sonha com o título após a sequência.`])});
+    else if(vit===0) nt.push({tag:'TORCIDA',cor:'#d9534f', peso:6, manch:pick([
+      `Clima pesado: torcida cobra o ${meu.nick}`,`Pressão total após três derrotas seguidas`]),
+      txt:pick([`"Assim não dá, cadê a raça?", reclamam os torcedores.`,`As redes sociais explodiram em cobranças ao comando técnico.`])});
+  }
+
+  // 7) LÍDER DE ESTATÍSTICA
+  let lid=null,mp=0;
+  S.times.forEach(t=>(t.elenco||[]).forEach(p=>{ if(p.stats&&p.stats.j>=1){ const ppg=p.stats.pts/p.stats.j; if(ppg>mp){mp=ppg; lid={p,t};} } }));
+  if(lid&&mp>=15) nt.push({tag:'CESTINHA',cor:'#e8a33d', peso:5, manch:pick([
+    `${sob(lid.p.nome)} lidera a artilharia da liga`,
+    `${sob(lid.p.nome)} está pegando fogo: ${mp.toFixed(1)} por jogo`]),
+    txt:`O astro do ${lid.t.nick} é o cestinha da temporada, com média de ${mp.toFixed(1)} pontos.`});
+
+  // 8) PRÉVIA DO PRÓXIMO JOGO
+  const prox=((S.cal&&S.cal[S.rodada])||[]).find(j=>j.c===S.meuTime||j.f===S.meuTime);
+  if(prox&&meu){
+    const casa=prox.c===S.meuTime, adv=S.times[casa?prox.f:prox.c], fav=forcaTime(meu)>forcaTime(adv);
+    nt.push({tag:'PRÉVIA',cor:'#9a8d80', peso:3, manch:pick([
+      `Pela frente: ${meu.nick} ${casa?'recebem':'visitam'} o ${adv.nick}`,
+      `${meu.nick} x ${adv.nick}: o duelo da próxima rodada`]),
+      txt:`${fav?meu.cidade+' entra como favorito.':'Jogo duro à vista.'} O ${adv.nick} vem com campanha de ${adv.v}-${adv.d}.`});
+  }
+
+  // 9) CLASSIFICAÇÃO / MOMENTO
+  if(meu&&typeof classificacao==='function'){
+    const cls=classificacao(meu.conf), pos=cls.findIndex(x=>x.id===meu.id)+1;
+    if(pos===1) nt.push({tag:'LIDERANÇA',cor:'#7ac77a', peso:4, manch:`${meu.nick} assumem a ponta da Conferência ${meu.conf==='L'?'Leste':'Oeste'}`, txt:`Melhor campanha da conferência. O sonho do título ganha força.`});
+    else if(pos>=11) nt.push({tag:'ALERTA',cor:'#d9534f', peso:4, manch:`${meu.nick} afundam na tabela e miram o fundo do poço`, txt:`Fora da zona de classificação, a diretoria começa a perder a paciência.`});
+  }
+
+  // ordena por peso (com leve ruído do seed pra variar empates)
+  nt.forEach(n=>n._o=n.peso+rnd());
+  nt.sort((a,b)=>b._o-a._o);
+  return nt;
+}
+function htmlFeedNoticias(){
+  const nt=gerarNoticias();
+  if(!nt.length) return `<div class="card"><h3 class="sub">📰 PARQUÊ SPORTS</h3><p class="hint">As manchetes aparecem conforme a temporada avança. Jogue uma rodada para ver as primeiras notícias!</p></div>`;
+  const d=nt[0], resto=nt.slice(1,7);
+  return `<div class="card esp">
+    <div class="esp-head"><span class="esp-logo">📰 PARQUÊ <b>SPORTS</b></span><span class="esp-live">RODADA ${Math.max(1,S.rodada||1)}</span></div>
+    <div class="esp-dest" style="border-left-color:${d.cor}">
+      <span class="esp-tag" style="background:${d.cor}">${d.tag}</span>
+      <h3>${esc(d.manch)}</h3><p>${esc(d.txt)}</p>
+    </div>
+    ${resto.map(n=>`<div class="esp-item">
+      <span class="esp-tag mini" style="background:${n.cor}">${n.tag}</span>
+      <div class="esp-body"><b>${esc(n.manch)}</b><span class="esp-sub">${esc(n.txt)}</span></div>
+    </div>`).join('')}
+  </div>`;
+}
+
 function vInicio(){
   const t=S.times[S.meuTime];
   if(S.demitido) return telaDesemprego();
@@ -2727,8 +2888,7 @@ function vInicio(){
       ${placarMini(S.ultimoJogo)}
       <div class="row" style="margin-top:10px"><button class="btn ghost mini" onclick="verJogo()">Ver súmula completa</button></div></div>`:''}
   </div><div>
-    <div class="card"><h3 class="sub">Central de notícias</h3>
-      <ul class="news">${S.noticias.slice(0,16).map(n=>`<li>${esc(n.txt)}</li>`).join('')||'<li>Sem novidades.</li>'}</ul></div>
+    ${htmlFeedNoticias()}
   </div></div>`;
 }
 const kpi=(t,v,s)=>`<div class="card"><h3 class="sub">${t}</h3><div class="big">${v}</div><div class="hint">${s}</div></div>`;
