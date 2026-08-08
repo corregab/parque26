@@ -508,6 +508,7 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .ident-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .ident-tag{font-size:11px;background:rgba(232,163,61,.14);color:var(--amber);padding:3px 9px;border-radius:20px;font-weight:600}
 
+.prev-tat{font-size:12px;color:var(--amber);background:rgba(232,163,61,.10);border-radius:6px;padding:4px 9px;margin-top:6px;display:inline-block;line-height:1.35}
 </style>
 </head>
 <body>
@@ -1631,6 +1632,52 @@ function classificacao(conf){
   return S.times.filter(t=>!conf||t.conf===conf)
     .sort((a,b)=> pctV(b)-pctV(a) || (b.pf-b.pc)-(a.pf-a.pc) || b.pf-a.pf);
 }
+
+/* ---------- IA TÁTICA: adversários jogam conforme o elenco ---------- */
+function taticaIA(t){
+  const base={ritmo:1,foco:1,pressao:1,defesa:0,jogada:'balanceado',instr:{}};
+  const e=[...((t&&t.elenco)||[])].filter(p=>!p.lesao).sort((a,b)=>b.ovr-a.ovr).slice(0,9);
+  if(e.length<3) return base;
+  const med=f=>e.reduce((s,p)=>s+f(p),0)/e.length;
+  const arr3=med(p=>(p.at&&p.at.arr3)||50);
+  const inter=med(p=>(((p.at&&p.at.fin)||50)+((p.at&&p.at.defI)||50)+((p.at&&p.at.reb)||50))/3);
+  const atl=med(p=>(p.at&&p.at.atl)||50), passe=med(p=>(p.at&&p.at.passe)||50);
+  const defP=med(p=>(p.at&&p.at.defP)||50);
+  const bigs=e.filter(p=>p.pos==='C'||p.pos==='PF').length;
+  const top=e[0], seg=e[1];
+  const astro = top&&seg&&(top.ovr-seg.ovr)>=4 && top.ovr>=84;
+  const tat={ritmo:1,foco:1,pressao:1,defesa:0,jogada:'balanceado',instr:{}};
+  if(arr3-inter>=4) tat.foco=2; else if(inter-arr3>=4) tat.foco=0;
+  if(atl>=76) tat.ritmo=2; else if(inter>=77 && atl<72) tat.ritmo=0;
+  if(bigs>=3 && atl<74){ tat.defesa=1; tat.instr.reboundCrash=true; }
+  else if(atl>=77 && defP>=74){ tat.defesa=2; tat.instr.transicao=true; }
+  if(defP>=77) tat.pressao=2; else if(defP<66) tat.pressao=0;
+  if(atl>=78) tat.instr.transicao=true;
+  if(passe>=77) tat.instr.protegerBola=true;
+  if(astro) tat.jogada='iso';
+  else if(bigs>=3 && inter>=76) tat.jogada='poste';
+  else if(arr3>=77) tat.jogada='perimetro';
+  else if(passe>=75) tat.jogada='pnr';
+  return tat;
+}
+function resumoTaticaCurto(tat){
+  if(!tat) return '\u2014';
+  const p=[]; const jg=JOGADAS[tat.jogada];
+  if(jg && tat.jogada!=='balanceado') p.push(jg.emoji+' '+jg.nome);
+  else p.push(['bola no garrafão','ataque equilibrado','chuva de 3'][tat.foco!=null?tat.foco:1]);
+  if((tat.defesa||0)===1) p.push('defesa em zona');
+  else if((tat.defesa||0)===2) p.push('pressão total');
+  const i=tat.instr||{};
+  if(i.transicao) p.push('corre em transição');
+  if(i.doubleTeam) p.push('dobra no craque');
+  if(i.reboundCrash) p.push('domina as tabelas');
+  return p.join(' \u00b7 ');
+}
+function atribuirTaticasIA(){
+  if(!S||!S.times)return;
+  S.times.forEach(t=>{ if(t.id!==S.meuTime) t.tatica=Object.assign(t.tatica||{}, taticaIA(t)); });
+}
+
 function proximoJogo(){
   for(let r=S.rodada;r<S.cal.length;r++)
     for(const j of S.cal[r]) if(j.c===S.meuTime||j.f===S.meuTime) return {rodada:r,j};
@@ -2868,7 +2915,8 @@ function vInicio(){
           ? htmlBotoesJogar()
           : `<div class="row" style="justify-content:space-between;align-items:flex-end">
           <div><div class="big">${casa?'vs':'@'} ${esc(adv.nick)}</div>
-          <div class="hint">${esc(adv.cidade)} · ${adv.v}-${adv.d} · força ${forcaTime(adv)} · ${casa?'Em casa':'Fora de casa'}</div></div>
+          <div class="hint">${esc(adv.cidade)} · ${adv.v}-${adv.d} · força ${forcaTime(adv)} · ${casa?'Em casa':'Fora de casa'}</div>
+          <div class="prev-tat" style="margin-top:5px">📋 Provável do rival: ${resumoTaticaCurto(taticaIA(adv))}</div></div>
           <div><div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular rápido</button></div>
           <div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="jogarVarias(5)">Simular 5 rodadas</button></div></div>
         </div>`}</div>`;
@@ -3569,6 +3617,7 @@ function htmlPreviaOnline(adv, casa, serie){
       ${serie?`<div><span class="hint">Série</span><b>${serie}</b></div>`:''}
     </div>
     <div class="prev-forma"><span class="hint">Últimos jogos:</span> ${forma}</div>
+    <div class="prev-tat">📋 Provável: ${resumoTaticaCurto(taticaIA(adv))}</div>
     <div class="prev-horario">⏰ ${casa?'Em casa':'Fora'} · partida ${horario}</div>
   </div>`;
 }
@@ -4211,6 +4260,7 @@ function assumirTime(timeId){
   S.avaliado=false;
   S.times.forEach(t=>{t.minutos=autoMinutos(t);});
   if(typeof atualizarOlheiro==='function')atualizarOlheiro();
+  atribuirTaticasIA();
   noticia('🏀 Nova etapa: temporada '+S.temporada+' à frente do '+S.times[S.meuTime].cidade+' '+S.times[S.meuTime].nick+'.','p');
   ABA='inicio';render();
 }
@@ -7193,6 +7243,7 @@ function iniciarCarreira(){
   gerarAgentesLivresIniciais();
   S.treinosRest = TREINOS_POR_TEMP;
   S.times.forEach(t=>{t.minutos=autoMinutos(t);});
+  atribuirTaticasIA();
   definirObjetivo();
   if(typeof initCarreira==='function')initCarreira();
   S.propostas=[];
