@@ -3129,9 +3129,9 @@ const INSTR_TAT={
   reboundCrash:{nome:'Crashar o rebote',desc:'Mais segundas chances no ataque',emoji:'💪'},
   doubleTeam:{nome:'Dobrar no craque',desc:'Neutraliza o astro adversário (libera os outros)',emoji:'🎯'}
 };
-function setDefesa(v){S.times[S.meuTime].tatica.defesa=parseInt(v);render();}
-function toggleInstr(k){const t=S.times[S.meuTime].tatica;if(!t.instr)t.instr={};t.instr[k]=!t.instr[k];render();}
-function aplicarPreset(nm){const p=PRESETS_TAT[nm];if(!p)return;const t=S.times[S.meuTime];t.tatica=Object.assign({},t.tatica,JSON.parse(JSON.stringify(p.tat)));if(!t.tatica.jogada)t.tatica.jogada='balanceado';toast&&toast(p.nome.replace(/^[^ ]+ /,'')+' aplicado');render();}
+function setDefesa(v){S.times[S.meuTime].tatica.defesa=parseInt(v);render();salvar();}
+function toggleInstr(k){const t=S.times[S.meuTime].tatica;if(!t.instr)t.instr={};t.instr[k]=!t.instr[k];render();salvar();}
+function aplicarPreset(nm){const p=PRESETS_TAT[nm];if(!p)return;const t=S.times[S.meuTime];t.tatica=Object.assign({},t.tatica,JSON.parse(JSON.stringify(p.tat)));if(!t.tatica.jogada)t.tatica.jogada='balanceado';toast&&toast(p.nome.replace(/^[^ ]+ /,'')+' aplicado');render();salvar();}
 function resumoTatico(t){
   const tt=t.tatica||{}, i=tt.instr||{};
   const ritmo=['Cadenciado','Equilibrado','Acelerado'][tt.ritmo!=null?tt.ritmo:1];
@@ -3208,9 +3208,9 @@ function vTaticas(){
 }
 
 function setMin(id,v){S.times[S.meuTime].minutos[id]=clamp(parseInt(v)||0,0,42);render();}
-function setTat(k,v){S.times[S.meuTime].tatica[k]=parseInt(v);render();}
-function setJogadaPad(v){S.times[S.meuTime].tatica.jogada=v;render();}
-function setFuncaoJog(pid,v){const p=S.times[S.meuTime].elenco.find(x=>x.id===pid);if(p){p.funcao=v;render();}}
+function setTat(k,v){S.times[S.meuTime].tatica[k]=parseInt(v);render();salvar();}
+function setJogadaPad(v){S.times[S.meuTime].tatica.jogada=v;render();salvar();}
+function setFuncaoJog(pid,v){const p=S.times[S.meuTime].elenco.find(x=>x.id===pid);if(p){p.funcao=v;render();salvar();}}
 function autoRot(){S.times[S.meuTime].minutos=autoMinutos(S.times[S.meuTime]);render();}
 
 /* ---------- CALENDÁRIO ---------- */
@@ -6122,6 +6122,7 @@ async function ligaLimparResultados(ligaId, rodada){
 
 async function ligaProcessarRodada(ligaId){
   if(!ligaPronta()) return {erro:'Sem conexão.'};
+  try{ if(typeof ligaSincronizarMeuTime==='function') await ligaSincronizarMeuTime(); }catch(e){}
   const {data,error}=await CLOUD.client.functions.invoke('forcar-rodada',{ body:{ liga_id:ligaId } });
   if(error){ let m='Erro ao processar a rodada.'; try{const c=await error.context.json(); if(c&&c.erro)m=c.erro;}catch(e){} return {erro:m}; }
   if(data&&data.erro) return {erro:data.erro};
