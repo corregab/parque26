@@ -484,6 +484,30 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .esp-body b{font-size:14px;color:var(--bone);line-height:1.25;font-weight:700}
 .esp-sub{font-size:12px;color:var(--mute);line-height:1.4}
 
+
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.preset-btn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:10px;padding:9px 11px;cursor:pointer;transition:border-color .15s,background .15s}
+.preset-btn:hover{border-color:var(--amber);background:rgba(232,163,61,.1)}
+.preset-btn b{font-size:13px;color:var(--amber)}
+.preset-btn span{font-size:10.5px;color:var(--mute);line-height:1.3}
+.def-opts{display:flex;flex-direction:column;gap:6px}
+.def-opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:9px;padding:9px 11px;cursor:pointer;transition:border-color .15s,background .15s}
+.def-opt:hover{border-color:var(--wood)}
+.def-opt.on{border-color:var(--amber);background:rgba(232,163,61,.14)}
+.def-opt b{font-size:13px}.def-opt span{font-size:11px;color:var(--mute);line-height:1.3}
+.instr-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#12100d;border:1px solid #2a2119;color:var(--bone);border-radius:9px;padding:9px 11px;margin-bottom:6px;cursor:pointer;transition:border-color .15s,background .15s}
+.instr-row.on{border-color:#7ac77a;background:rgba(122,199,122,.09)}
+.instr-emoji{font-size:18px;flex-shrink:0}
+.instr-txt{display:flex;flex-direction:column;gap:1px;flex:1}
+.instr-txt b{font-size:13px}.instr-txt span{font-size:11px;color:var(--mute);line-height:1.3}
+.instr-sw{font:700 10px 'IBM Plex Mono',monospace;padding:3px 8px;border-radius:20px;background:#241d19;color:var(--mute);flex-shrink:0}
+.instr-sw.on{background:rgba(122,199,122,.2);color:#7ac77a}
+.ident{background:linear-gradient(160deg,rgba(200,121,46,.1),var(--panel))}
+.ident-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #241d19;font-size:13px}
+.ident-row span{color:var(--mute)}.ident-row b{color:var(--bone)}
+.ident-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ident-tag{font-size:11px;background:rgba(232,163,61,.14);color:var(--amber);padding:3px 9px;border-radius:20px;font-weight:600}
+
 </style>
 </head>
 <body>
@@ -904,7 +928,7 @@ function criarLiga(){
       ingresso:Math.round(78+mkt*13+(prest-70)*0.6),
       capacidade:cap, patroc:Math.round((13+mkt*5.5+(prest-70)*0.32)*1e6),
       tv:Math.round((30+mkt*3.5)*1e6),
-      tatica:{ritmo:1,foco:1,pressao:1,jogada:'balanceado'},minutos:{},titulares:[],hist:[],camp:0};
+      tatica:{ritmo:1,foco:1,pressao:1,jogada:'balanceado',defesa:0,instr:{transicao:false,protegerBola:false,reboundCrash:false,doubleTeam:false}},minutos:{},titulares:[],hist:[],camp:0};
     (ROSTERS[ab]||[]).forEach(d=>tm.elenco.push(jogadorReal(d,i)));
     tm.elenco.sort((a,b)=>b.ovr-a.ovr);
     let f=folha(tm),lim=TETO*R(.74,.97);
@@ -1109,11 +1133,13 @@ function sorteioPeso(arr,f){
   return arr[arr.length-1];
 }
 
+const RITMO_SEG=[15.8,14.2,12.6];
+function segPosse(tat){ if(!tat)return 14.2; let s=RITMO_SEG[tat.ritmo!=null?tat.ritmo:1]; const i=tat.instr||{}; if(i.transicao)s-=0.9; if(i.protegerBola)s+=1.0; return s; }
 function simularJogo(tCasa,tFora,opt={}){
   const A=prepTime(tCasa,true), B=prepTime(tFora,false);
   const log=[], quer=opt.log!==false;
-  const ritmoSeg=[15.8,14.2,12.6], padA=A.t.tatica, padB=B.t.tatica;
-  const paceBase=(ritmoSeg[padA.ritmo]+ritmoSeg[padB.ritmo])/2;
+  const padA=A.t.tatica, padB=B.t.tatica;
+  const paceBase=(segPosse(padA)+segPosse(padB))/2;
   escolherQuinteto(A);escolherQuinteto(B);
   let quarto=0, tempo=720, posse=Math.random()<.5?A:B, ultSub=720, prot=0, lesoes=[];
   const rel=t=>{const m=Math.floor(t/60),s=Math.floor(t%60);return m+':'+(s<10?'0':'')+s;};
@@ -1182,6 +1208,9 @@ function jogada(O,D,ctx){
   const casaBonus=(O.casa?0.015:0)+(O.sorte||0);
   // ---- jogada ofensiva ativa e usage por função
   const jgd = JOGADAS[tatO.jogada] || JOGADAS.balanceado;
+  const instrO=tatO.instr||{}, instrD=tatD.instr||{};
+  const defTipo=tatD.defesa||0; // 0 homem a homem, 1 zona, 2 pressão total
+  const zonaD=defTipo===1;
   // identifica o cara de maior "peso natural" (pro iso concentrar nele)
   let topId=null,topPeso=-1;
   of.forEach(p=>{const w=Math.pow(Math.max(1,p.ovr-44),1.3)*FUNCOES[funcaoDe(p)].usage; if(w>topPeso){topPeso=w;topId=p.id;}});
@@ -1192,12 +1221,16 @@ function jogada(O,D,ctx){
     if(jgd.usaBig && ['C','PF'].includes(p.pos)) peso*=jgd.usaBig;
     if(jgd.usaArm && p.pos==='PG') peso*=jgd.usaArm;
     if(jgd.usaTop && p.id===topId) peso*=jgd.usaTop;
+    if(instrD.doubleTeam && p.id===topId) peso*=0.48; // craque sob marcação dupla ataca menos
     return peso;
   })||of[0];
   if(!h) return 'troca';
   // ---- turnover
   let pTO = 0.124 + (tatD.pressao-1)*0.022 - (h.at.qi-65)*0.0009 - (h.at.drible-65)*0.0008 + (100-h.fadiga)*0.0004;
-  pTO=clamp(pTO,.055,.21);
+  if(defTipo===2) pTO += 0.030;         // pressão total força mais erros
+  if(instrO.protegerBola) pTO -= 0.024; // proteger a bola
+  if(instrO.transicao) pTO += 0.016;    // correr arrisca mais
+  pTO=clamp(pTO,.045,.24);
   if(Math.random()<pTO){
     h.b.to++;
     if(Math.random()<.6){const s=sorteioPeso(df,p=>p.at.defP+p.at.atl*0.4);s.b.stl++;
@@ -1218,17 +1251,18 @@ function jogada(O,D,ctx){
   // ---- escolha do arremesso
   const foco=tatO.foco; // 0 dentro, 1 equilíbrio, 2 perímetro
   const fnH=FUNCOES[funcaoDe(h)];
-  const w3  = Math.max(.05, 1.02+(h.at.arr3-56)*0.058 + (foco-1)*0.50 + (jgd.w3||0) + (fnH.w3||0));
-  const wRim= Math.max(.10, 1.45+(h.at.fin-62)*0.045+(h.at.atl-66)*0.020 - (foco-1)*0.32 + (jgd.wRim||0) + (fnH.wRim||0));
+  const w3  = Math.max(.05, 1.02+(h.at.arr3-56)*0.058 + (foco-1)*0.50 + (jgd.w3||0) + (fnH.w3||0) + (zonaD?0.34:0));
+  const wRim= Math.max(.10, 1.45+(h.at.fin-62)*0.045+(h.at.atl-66)*0.020 - (foco-1)*0.32 + (jgd.wRim||0) + (fnH.wRim||0) - (zonaD?0.34:0));
   const wMid= Math.max(.15, 0.85-(h.at.arr3-56)*0.012 + (jgd.wMid||0));
   const r=Math.random()*(w3+wRim+wMid);
   const tipo = r<w3?3 : r<w3+wMid?2 : 1; // 3=triple 2=media 1=garrafão
   const fad=(h.fadiga-82)*0.0009, form=(h.ref.forma-95)*0.0009+(h.ref.moral-70)*0.0004;
   const mom=(O.momBonus||0);
   let prob, pFalta;
-  if(tipo===3){ prob=.354+(h.at.arr3-70)*.0029-(defP-68)*.0020+casaBonus+fad+form+mom; prob=clamp(prob,.16,.53); pFalta=.028; }
+  if(tipo===3){ prob=.354+(h.at.arr3-70)*.0029-(defP-68)*.0020+casaBonus+fad+form+mom; if(zonaD)prob+=0.020; prob=clamp(prob,.16,.53); pFalta=.028; }
   else if(tipo===2){ prob=.428+(h.at.arr2-70)*.0029-(defP-68)*.0019+casaBonus+fad+form+mom; prob=clamp(prob,.26,.58); pFalta=.05; }
-  else { prob=.604+(h.at.fin-70)*.0032-(defI-68)*.0024+casaBonus+fad+form+mom; prob=clamp(prob,.38,.78); pFalta=.195; }
+  else { prob=.604+(h.at.fin-70)*.0032-(defI-68)*.0024+casaBonus+fad+form+mom; if(zonaD)prob-=0.030; prob=clamp(prob,.38,.78); pFalta=.195; }
+  if(instrD.doubleTeam && h.id===topId) prob-=0.075; // craque marcado converte menos
   pFalta*=(1+(tatD.pressao-1)*0.14);
   // ---- toco
   if(tipo!==3 && Math.random()< (tipo===1?.055:.022)+(defI-68)*.0016){
@@ -1284,7 +1318,9 @@ function finalLance(O,D,h,put,nome){
 }
 function rebote(O,D,put,nome,silencioso){
   const rebO=media(O.quinteto,p=>p.at.reb), rebD=media(D.quinteto,p=>p.at.reb);
-  const pOff=clamp(.265+(rebO-rebD)*.0028,.14,.42);
+  const iO=(O.t.tatica&&O.t.tatica.instr)||{};
+  let pOff=clamp(.265+(rebO-rebD)*.0028,.14,.42);
+  if(iO.reboundCrash) pOff+=0.06; // crashar as tabelas: mais 2ª chance
   if(Math.random()<pOff){
     const r=sorteioPeso(O.quinteto,p=>p.at.reb*1.4+p.at.atl*0.5);
     if(r){r.b.reb++;r.b.ro++;if(!silencioso)put('Rebote ofensivo de '+nome(r));}
@@ -1336,7 +1372,7 @@ function avIniciar(tCasa,tFora,meuTimeId){
   const A=prepTime(tCasa,true), B=prepTime(tFora,false);
   escolherQuinteto(A); escolherQuinteto(B);
   const ritmoSeg=[15.8,14.2,12.6];
-  const paceBase=(ritmoSeg[A.t.tatica.ritmo]+ritmoSeg[B.t.tatica.ritmo])/2;
+  const paceBase=(segPosse(A.t.tatica)+segPosse(B.t.tatica))/2;
   AV={
     A,B, quarto:0, tempo:720, posse:Math.random()<.5?A:B,
     ultSub:720, prot:0, paceBase, log:[], novos:[],
@@ -1484,7 +1520,7 @@ function avMudarPostura(lado, campo, valor){
   g.t.tatica[campo]=valor;
   // recalcula pace
   const ritmoSeg=[15.8,14.2,12.6];
-  AV.paceBase=(ritmoSeg[AV.A.t.tatica.ritmo]+ritmoSeg[AV.B.t.tatica.ritmo])/2;
+  AV.paceBase=(segPosse(AV.A.t.tatica)+segPosse(AV.B.t.tatica))/2;
   return true;
 }
 
@@ -3031,6 +3067,32 @@ function cortar(id){
 }
 
 /* ---------- TÁTICAS ---------- */
+
+const PRESETS_TAT={
+  equilibrio:{nome:'⚖️ Equilíbrio',desc:'Jogo padrão, sem exageros',tat:{ritmo:1,foco:1,pressao:1,defesa:0,instr:{}}},
+  showtime:{nome:'🏃 Showtime',desc:'Corre, chuta de 3 e pressiona',tat:{ritmo:2,foco:2,pressao:2,defesa:0,instr:{transicao:true}}},
+  muralha:{nome:'🧱 Muralha',desc:'Lento, zona e domínio das tabelas',tat:{ritmo:0,foco:0,pressao:1,defesa:1,instr:{reboundCrash:true,protegerBola:true}}},
+  pressaoTotal:{nome:'💥 Sufoco',desc:'Rouba a bola e corre no erro',tat:{ritmo:2,foco:1,pressao:2,defesa:2,instr:{transicao:true}}},
+  cadeado:{nome:'🔒 Cadeado no astro',desc:'Dobra a marcação na estrela rival',tat:{ritmo:1,foco:1,pressao:2,defesa:0,instr:{doubleTeam:true,protegerBola:true}}}
+};
+const INSTR_TAT={
+  transicao:{nome:'Correr em transição',desc:'+ posses e pontos rápidos, mas arrisca mais erros',emoji:'🏃'},
+  protegerBola:{nome:'Proteger a bola',desc:'Menos turnovers, porém ritmo mais cadenciado',emoji:'🛡️'},
+  reboundCrash:{nome:'Crashar o rebote',desc:'Mais segundas chances no ataque',emoji:'💪'},
+  doubleTeam:{nome:'Dobrar no craque',desc:'Neutraliza o astro adversário (libera os outros)',emoji:'🎯'}
+};
+function setDefesa(v){S.times[S.meuTime].tatica.defesa=parseInt(v);render();}
+function toggleInstr(k){const t=S.times[S.meuTime].tatica;if(!t.instr)t.instr={};t.instr[k]=!t.instr[k];render();}
+function aplicarPreset(nm){const p=PRESETS_TAT[nm];if(!p)return;const t=S.times[S.meuTime];t.tatica=Object.assign({},t.tatica,JSON.parse(JSON.stringify(p.tat)));if(!t.tatica.jogada)t.tatica.jogada='balanceado';toast&&toast(p.nome.replace(/^[^ ]+ /,'')+' aplicado');render();}
+function resumoTatico(t){
+  const tt=t.tatica||{}, i=tt.instr||{};
+  const ritmo=['Cadenciado','Equilibrado','Acelerado'][tt.ritmo!=null?tt.ritmo:1];
+  const atq=['Foco no garrafão','Ataque equilibrado','Chuva de 3 pontos'][tt.foco!=null?tt.foco:1];
+  const def=['Marcação individual','Defesa em zona','Pressão em toda a quadra'][tt.defesa||0];
+  const extras=Object.keys(INSTR_TAT).filter(k=>i[k]).map(k=>INSTR_TAT[k].nome);
+  return {ritmo,atq,def,extras};
+}
+
 function vTaticas(){
   const t=S.times[S.meuTime];
   if(!t.minutos||!Object.keys(t.minutos).length)t.minutos=autoMinutos(t);
@@ -3050,13 +3112,39 @@ function vTaticas(){
     <table><thead><tr><th>Jogador</th><th>Pos</th><th>Ovr</th><th>Forma</th><th>Min</th></tr></thead><tbody>${rows}</tbody></table>
     <p class="hint" style="margin-top:8px">O total ideal é 240 (5 jogadores × 48 min). Abaixo de 200 o sistema usa a rotação automática. Quem joga demais perde forma física e aumenta o risco de lesão.</p>
   </div><div>
-    <div class="card"><h3 class="sub">Estilo de jogo</h3>
+    <div class="card"><h3 class="sub">🎛️ Presets táticos</h3>
+      <p class="hint" style="margin-bottom:8px">Aplique uma identidade pronta e ajuste os detalhes depois.</p>
+      <div class="preset-grid">
+        ${Object.keys(PRESETS_TAT).map(k=>`<button class="preset-btn" onclick="aplicarPreset('${k}')"><b>${PRESETS_TAT[k].nome}</b><span>${PRESETS_TAT[k].desc}</span></button>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px"><h3 class="sub">⚔️ Estilo ofensivo</h3>
       <div class="kv"><span>Ritmo</span>${sel('ritmo',t.tatica.ritmo,['Lento (controle)','Equilibrado','Acelerado (transição)'])}</div>
       <div class="kv"><span>Foco ofensivo</span>${sel('foco',t.tatica.foco,['Garrafão','Equilibrado','Perímetro (3pts)'])}</div>
-      <div class="kv"><span>Pressão defensiva</span>${sel('pressao',t.tatica.pressao,['Baixa (sem faltas)','Média','Alta (roubos)'])}</div>
       <div class="kv"><span>Jogada padrão</span><select onchange="setJogadaPad(this.value)">${ORDEM_JOGADAS.map(k=>`<option value="${k}" ${(t.tatica.jogada||'balanceado')===k?'selected':''}>${JOGADAS[k].emoji} ${JOGADAS[k].nome}</option>`).join('')}</select></div>
-      <p class="hint" style="margin-top:12px">Ritmo acelerado = mais posses e mais pontos, útil com elenco profundo. Pressão alta rouba mais bolas, mas gera faltas e cansaço. A jogada padrão é o ataque inicial — dá pra trocar ao vivo durante a partida.</p>
     </div>
+    <div class="card" style="margin-top:14px"><h3 class="sub">🛡️ Esquema defensivo</h3>
+      <div class="def-opts">
+        ${[['Marcação individual','Equilibrada, sem pontos fracos'],['Defesa em zona','Protege o garrafão, cede arremessos de 3'],['Pressão total','Rouba mais bolas e força erros, mas cansa e cede transição']].map((o,idx)=>`
+          <button class="def-opt ${(t.tatica.defesa||0)===idx?'on':''}" onclick="setDefesa(${idx})"><b>${o[0]}</b><span>${o[1]}</span></button>`).join('')}
+      </div>
+      <div class="kv" style="margin-top:10px"><span>Intensidade da marcação</span>${sel('pressao',t.tatica.pressao,['Baixa (sem faltas)','Média','Alta (roubos)'])}</div>
+    </div>
+    <div class="card" style="margin-top:14px"><h3 class="sub">📋 Instruções de equipe</h3>
+      <p class="hint" style="margin-bottom:8px">Ênfases que ajustam o comportamento do time. Combine com cuidado.</p>
+      ${Object.keys(INSTR_TAT).map(k=>{const on=(t.tatica.instr||{})[k];return `
+        <button class="instr-row ${on?'on':''}" onclick="toggleInstr('${k}')">
+          <span class="instr-emoji">${INSTR_TAT[k].emoji}</span>
+          <span class="instr-txt"><b>${INSTR_TAT[k].nome}</b><span>${INSTR_TAT[k].desc}</span></span>
+          <span class="instr-sw ${on?'on':''}">${on?'ON':'OFF'}</span>
+        </button>`;}).join('')}
+    </div>
+    ${(()=>{const rt=resumoTatico(t);return `<div class="card ident" style="margin-top:14px"><h3 class="sub">🧭 Identidade do time</h3>
+      <div class="ident-row"><span>Ritmo</span><b>${rt.ritmo}</b></div>
+      <div class="ident-row"><span>Ataque</span><b>${rt.atq}</b></div>
+      <div class="ident-row"><span>Defesa</span><b>${rt.def}</b></div>
+      ${rt.extras.length?`<div class="ident-tags">${rt.extras.map(e=>`<span class="ident-tag">${esc(e)}</span>`).join('')}</div>`:'<p class="hint" style="margin-top:6px">Sem instruções extras ativas.</p>'}
+    </div>`;})()}
     <div class="card" style="margin-top:14px"><h3 class="sub">Funções no ataque</h3>
       <p class="hint" style="margin-bottom:8px">O papel de cada jogador muda quanto ele ataca e que tipo de arremesso busca.</p>
       ${[...t.elenco].filter(p=>!p.lesao).sort((a,b)=>b.ovr-a.ovr).slice(0,10).map(p=>{
@@ -3070,6 +3158,7 @@ function vTaticas(){
         .map(p=>`<div class="kv"><span>${bd(p.pos)} ${esc(p.nome)}</span><b>${t.minutos[p.id]||0}'</b></div>`).join('')}
     </div></div></div>`;
 }
+
 function setMin(id,v){S.times[S.meuTime].minutos[id]=clamp(parseInt(v)||0,0,42);render();}
 function setTat(k,v){S.times[S.meuTime].tatica[k]=parseInt(v);render();}
 function setJogadaPad(v){S.times[S.meuTime].tatica.jogada=v;render();}
