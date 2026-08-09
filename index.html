@@ -509,6 +509,47 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .ident-tag{font-size:11px;background:rgba(232,163,61,.14);color:var(--amber);padding:3px 9px;border-radius:20px;font-weight:600}
 
 .prev-tat{font-size:12px;color:var(--amber);background:rgba(232,163,61,.10);border-radius:6px;padding:4px 9px;margin-top:6px;display:inline-block;line-height:1.35}
+
+/* sub-navegação da Comissão */
+.subnav{display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap}
+.subtab{flex:1;min-width:96px;background:#14100c;border:1px solid #2a2119;color:var(--mute);border-radius:10px;padding:9px 8px;font:600 13px 'Barlow Condensed',sans-serif;letter-spacing:.3px;cursor:pointer;transition:all .15s}
+.subtab:hover{border-color:var(--wood-lo);color:var(--bone)}
+.subtab.on{background:linear-gradient(135deg,var(--wood),var(--wood-lo));color:#1a1206;border-color:var(--amber);font-weight:700}
+/* quadra (piso de parquet) */
+.quadra-card{padding:14px}
+.quadra{position:relative;width:100%;aspect-ratio:300/250;border-radius:12px;overflow:hidden;background:repeating-linear-gradient(90deg,#8a5622,#8a5622 14px,#94602a 14px,#94602a 28px);box-shadow:inset 0 0 60px rgba(0,0,0,.55)}
+.quadra-linhas{position:absolute;inset:0;width:100%;height:100%}
+.quadra-linhas rect,.quadra-linhas circle,.quadra-linhas line,.quadra-linhas path{fill:none;stroke:rgba(243,237,226,.55);stroke-width:2}
+.quadra-linhas .cesta{stroke:#e8532e;stroke-width:2.5}
+.jog-slot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:0;z-index:2}
+.jog-chip{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--amber),var(--wood));display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.55);border:2px solid var(--bone);transition:transform .12s}
+.jog-slot:hover .jog-chip{transform:scale(1.08)}
+.jog-chip.fora-pos{background:linear-gradient(135deg,#b0a496,#7d7165);border-color:#cfc6ba}
+.jog-ini{font:800 14px 'Barlow Condensed',sans-serif;color:#1a1206;line-height:1}
+.jog-ovr{font:700 9px 'IBM Plex Mono',monospace;color:#2a1e0e;line-height:1.1}
+.jog-pos{font:700 9px 'IBM Plex Mono',monospace;color:var(--amber);background:rgba(0,0,0,.6);padding:1px 7px;border-radius:8px;letter-spacing:.5px}
+.jog-nome{font-size:11px;color:var(--bone);text-shadow:0 1px 4px #000;font-weight:600;max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quadra-info{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.quadra-info span{color:var(--mute);font-size:13px}
+.ovr.big{font-size:22px}
+/* banco */
+.banco{display:flex;flex-direction:column;gap:6px}
+.banco-chip{display:flex;align-items:center;gap:8px;background:#14100c;border:1px solid #241d19;border-radius:8px;padding:7px 10px}
+.bc-pos{flex-shrink:0}
+.bc-nome{flex:1;font-size:13px;color:var(--bone)}
+.bc-ovr{font-weight:700}
+/* seletor de titular */
+.sel-lista{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto}
+.sel-jog{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#14100c;border:1px solid #2a2119;color:var(--bone);border-radius:9px;padding:9px 11px;cursor:pointer;transition:all .15s}
+.sel-jog:hover{border-color:var(--amber);background:rgba(232,163,61,.08)}
+.sel-jog.atual{border-color:var(--amber);background:rgba(232,163,61,.14)}
+.sel-pos{flex-shrink:0;opacity:.6}
+.sel-pos.match{opacity:1}
+.sel-nome{flex:1;font-size:13px}
+.sel-ovr{font-weight:700;font-size:15px}
+.mini-tag{font-size:9px;background:rgba(232,163,61,.2);color:var(--amber);padding:1px 6px;border-radius:6px;font-weight:600;vertical-align:middle}
+.mini-tag.alt{background:rgba(154,141,128,.2);color:var(--mute)}
+
 </style>
 </head>
 <body>
@@ -2725,8 +2766,8 @@ var S=null, ABA='inicio';
 const el=id=>document.getElementById(id);
 const bd=p=>`<span class="badge b-${p.toLowerCase()}">${p}</span>`;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const ABAS=[['inicio','Escritório'],['elenco','Elenco'],['taticas','Táticas'],['calendario','Calendário'],
-            ['tabela','Classificação'],['mercado','Mercado'],['treino','Treino'],['financas','Finanças'],['marketing','Marketing'],['stats','Estatísticas'],['jogadores','Jogadores'],['transferencias','Transferências'],['carreira','Carreira'],['premios','Prêmios'],['editor','Editar liga']];
+const ABAS=[['inicio','Escritório'],['elenco','Elenco'],['taticas','Comissão'],['calendario','Calendário'],
+            ['tabela','Classificação'],['mercado','Mercado'],['financas','Finanças'],['marketing','Marketing'],['stats','Estatísticas'],['jogadores','Jogadores'],['transferencias','Transferências'],['carreira','Carreira'],['premios','Prêmios'],['editor','Editar liga']];
 
 function montarTabs(){
   let abas=ABAS;
@@ -2748,7 +2789,7 @@ function hud(){
 function render(){
   if(S && S.online && ABA==='editor') ABA='inicio';   // editor não existe no modo online
   hud();
-  const f={inicio:vInicio,elenco:vElenco,taticas:vTaticas,calendario:vCal,tabela:vTabela,
+  const f={inicio:vInicio,elenco:vElenco,taticas:vComissao,calendario:vCal,tabela:vTabela,
            mercado:vMercado,treino:vTreino,financas:vFin,marketing:vMarketing,stats:vStats,carreira:vCarreira,premios:vPremios,editor:vEditor,
            jogadores:(typeof vJogadores==='function'?vJogadores:vStats),transferencias:(typeof vTransferencias==='function'?vTransferencias:vStats)}[ABA];
   el('view').innerHTML=f();
@@ -3139,6 +3180,126 @@ function resumoTatico(t){
   const def=['Marcação individual','Defesa em zona','Pressão em toda a quadra'][tt.defesa||0];
   const extras=Object.keys(INSTR_TAT).filter(k=>i[k]).map(k=>INSTR_TAT[k].nome);
   return {ritmo,atq,def,extras};
+}
+
+
+/* ============================================================
+   COMISSÃO TÉCNICA — Formação + Tática/Rotação + Treino
+   ============================================================ */
+let SUBP='formacao';
+const POS_FORM=['PG','SG','SF','PF','C'];
+const POS_NOME={PG:'Armador',SG:'Ala-armador',SF:'Ala',PF:'Ala-pivô',C:'Pivô'};
+function setSubP(k){ SUBP=k; render(); }
+function formacaoAtual(t){
+  let tit=Array.isArray(t.titulares)?[...t.titulares]:[];
+  const usados=new Set();
+  tit.forEach(id=>{ if(id!=null && t.elenco.find(p=>p.id===id && !p.lesao)) usados.add(id); });
+  POS_FORM.forEach((pos,i)=>{
+    const cur=tit[i];
+    const ok = cur!=null && t.elenco.find(p=>p.id===cur && !p.lesao);
+    if(!ok){
+      const cand=t.elenco.filter(p=>!p.lesao && !usados.has(p.id)).sort((a,b)=> ((b.pos===pos?100:0)+b.ovr) - ((a.pos===pos?100:0)+a.ovr) );
+      tit[i]= cand.length? cand[0].id : null;
+      if(tit[i]!=null) usados.add(tit[i]);
+    } else usados.add(cur);
+  });
+  return tit.slice(0,5);
+}
+function sincMinutosFormacao(t){
+  const tit=formacaoAtual(t);
+  const m={};
+  tit.forEach(id=>{ if(id!=null) m[id]=32; });
+  const reservas=t.elenco.filter(p=>!p.lesao && !tit.includes(p.id)).sort((a,b)=>b.ovr-a.ovr);
+  const tab=[20,16,14,12,8,6,4,0,0,0];
+  reservas.forEach((p,i)=> m[p.id]=tab[i]||0);
+  t.minutos=m;
+}
+function setTitular(slot,id){
+  const t=S.times[S.meuTime];
+  let tit=formacaoAtual(t);
+  const jaEm=tit.indexOf(id);
+  if(jaEm>=0 && jaEm!==slot){ tit[jaEm]=tit[slot]; } // troca de lugar
+  tit[slot]=id;
+  t.titulares=tit;
+  sincMinutosFormacao(t);
+  render(); salvar();
+}
+function autoFormacao(){
+  const t=S.times[S.meuTime];
+  t.titulares=[];
+  t.titulares=formacaoAtual(t);
+  sincMinutosFormacao(t);
+  toast&&toast('Escalação automática aplicada');
+  render(); salvar();
+}
+function abrirSeletorTitular(slot){
+  const t=S.times[S.meuTime];
+  const pos=POS_FORM[slot];
+  const tit=formacaoAtual(t);
+  const aptos=t.elenco.filter(p=>!p.lesao).sort((a,b)=> (b.pos===pos?1:0)-(a.pos===pos?1:0) || b.ovr-a.ovr );
+  const html=`<p class="hint" style="margin-bottom:10px">Escolha o titular para <b>${POS_NOME[pos]} (${pos})</b>:</p>
+  <div class="sel-lista">${aptos.map(p=>{
+    const atual=tit[slot]===p.id, escalado=tit.includes(p.id)&&!atual;
+    return `<button class="sel-jog ${atual?'atual':''}" onclick="setTitular(${slot},${p.id});closeModal();">
+      <span class="sel-pos ${p.pos===pos?'match':''}">${bd(p.pos)}</span>
+      <span class="sel-nome">${esc(p.nome)}${escalado?' <span class="mini-tag">titular</span>':''}${p.pos!==pos?' <span class="mini-tag alt">nat. '+p.pos+'</span>':''}</span>
+      <span class="sel-ovr ovr">${p.ovr}</span></button>`;
+  }).join('')}</div>`;
+  abrirModal('Escalar '+POS_NOME[pos], html);
+}
+const _QUADRA_SVG='<svg viewBox="0 0 300 250" class="quadra-linhas" preserveAspectRatio="none">'+
+  '<rect x="4" y="4" width="292" height="242" rx="8"/>'+
+  '<line x1="118" y1="16" x2="182" y2="16"/>'+
+  '<circle cx="150" cy="26" r="7" class="cesta"/>'+
+  '<rect x="112" y="16" width="76" height="86"/>'+
+  '<circle cx="150" cy="102" r="30"/>'+
+  '<path d="M40 16 L40 60 A 115 115 0 0 0 260 60 L260 16"/>'+
+  '</svg>';
+function subFormacao(){
+  const t=S.times[S.meuTime];
+  const tit=formacaoAtual(t);
+  t.titulares=tit;
+  if(!t._formInit){ sincMinutosFormacao(t); t._formInit=true; }
+  const layout=[{slot:0,x:50,y:82},{slot:1,x:82,y:58},{slot:2,x:18,y:58},{slot:3,x:30,y:30},{slot:4,x:50,y:17}];
+  const slotHtml=(cfg)=>{
+    const pos=POS_FORM[cfg.slot];
+    const id=tit[cfg.slot]; const p=id!=null&&t.elenco.find(x=>x.id===id);
+    const ini=p?p.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase():'—';
+    const foraPos=p&&p.pos!==pos;
+    return `<button class="jog-slot" style="left:${cfg.x}%;top:${cfg.y}%" onclick="abrirSeletorTitular(${cfg.slot})">
+      <span class="jog-chip ${foraPos?'fora-pos':''}"><b class="jog-ini">${esc(ini)}</b><span class="jog-ovr">${p?p.ovr:'--'}</span></span>
+      <span class="jog-pos">${pos}</span>
+      <span class="jog-nome">${p?esc(p.nome.split(' ').slice(-1)[0]):'vazio'}</span>
+    </button>`;
+  };
+  const titObjs=tit.map(id=>t.elenco.find(p=>p.id===id)).filter(Boolean);
+  const mediaTit=titObjs.length?Math.round(media(titObjs,p=>p.ovr)):'--';
+  const banco=t.elenco.filter(p=>!p.lesao && !tit.includes(p.id)).sort((a,b)=>b.ovr-a.ovr);
+  const bancoHtml=banco.length?banco.map(p=>`<div class="banco-chip"><span class="bc-pos">${bd(p.pos)}</span><span class="bc-nome">${esc(p.nome.split(' ').slice(-1)[0])}</span><span class="bc-ovr ovr">${p.ovr}</span></div>`).join(''):'<span class="hint">Todos os aptos estão escalados.</span>';
+  const lesionados=t.elenco.filter(p=>p.lesao);
+  return `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+    <p class="hint" style="margin:0">Toque num jogador para escolher o titular da posição.</p>
+    <button class="btn ghost mini" onclick="autoFormacao()">✨ Automática</button>
+  </div>
+  <div class="split">
+    <div class="card quadra-card">
+      <div class="quadra">${_QUADRA_SVG}${layout.map(slotHtml).join('')}</div>
+      <div class="quadra-info"><span>Média do quinteto titular</span><b class="ovr big">${mediaTit}</b></div>
+    </div>
+    <div>
+      <div class="card"><h3 class="sub">Banco de reservas</h3><div class="banco">${bancoHtml}</div></div>
+      ${lesionados.length?`<div class="card" style="margin-top:12px"><h3 class="sub">Departamento médico</h3>${lesionados.map(p=>`<div class="kv"><span>${esc(p.nome)}</span><span class="inj">⚕ ${p.lesao} jogos</span></div>`).join('')}</div>`:''}
+    </div>
+  </div>`;
+}
+function vComissao(){
+  const subs=[['formacao','⛹️ Formação'],['tatica','🎯 Tática & Rotação'],['treino','🏋️ Treino']];
+  const nav=`<div class="subnav">${subs.map(([k,n])=>`<button class="subtab ${SUBP===k?'on':''}" onclick="setSubP('${k}')">${n}</button>`).join('')}</div>`;
+  let corpo;
+  if(SUBP==='tatica') corpo=vTaticas();
+  else if(SUBP==='treino') corpo=vTreino();
+  else corpo=subFormacao();
+  return `<h2 class="sec">Comissão Técnica</h2>${nav}${corpo}`;
 }
 
 function vTaticas(){
