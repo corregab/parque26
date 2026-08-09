@@ -6737,7 +6737,9 @@ function ligaOuvirMundo(ligaId){
       }
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'liga_propostas',filter:'liga_id=eq.'+ligaId},(payload)=>{
-      const p=payload.new; if(p && p.para_user===CLOUD.user.id && p.status==='pendente') toast&&toast('📨 Nova proposta de troca recebida!');
+      const p=payload.new;
+      if(p && p.para_user===CLOUD.user.id && p.status==='pendente') toast&&toast('📨 Nova proposta de troca recebida!');
+      if(p && p.status==='aceita'){ window._movCache=null; if(typeof ABA!=='undefined'&&ABA==='transferencias'&&typeof ligaMovRefresh==='function') ligaMovRefresh(); }
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'liga_propostas',filter:'liga_id=eq.'+ligaId},(payload)=>{
       const p=payload.new; if(p && p.status==='aceita'){ window._movCache=null; if(typeof ABA!=='undefined'&&ABA==='transferencias'&&typeof ligaMovRefresh==='function') ligaMovRefresh(); }
