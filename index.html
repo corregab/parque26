@@ -3264,11 +3264,9 @@ function subFormacao(){
   const slotHtml=(cfg)=>{
     const pos=POS_FORM[cfg.slot];
     const id=tit[cfg.slot]; const p=id!=null&&t.elenco.find(x=>x.id===id);
-    const ini=p?p.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase():'—';
     const foraPos=p&&p.pos!==pos;
     return `<button class="jog-slot" style="left:${cfg.x}%;top:${cfg.y}%" onclick="abrirSeletorTitular(${cfg.slot})">
-      <span class="jog-chip ${foraPos?'fora-pos':''}"><b class="jog-ini">${esc(ini)}</b><span class="jog-ovr">${p?p.ovr:'--'}</span></span>
-      <span class="jog-pos">${pos}</span>
+      <span class="jog-chip ${foraPos?'fora-pos':''}"><b class="jog-ini">${pos}</b><span class="jog-ovr">${p?p.ovr:'--'}</span></span>
       <span class="jog-nome">${p?esc(p.nome.split(' ').slice(-1)[0]):'vazio'}</span>
     </button>`;
   };
