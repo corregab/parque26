@@ -1772,6 +1772,7 @@ function avancarRodada(preRes){
     atualizarMoral();
     if(typeof atualizarOlheiro==='function')atualizarOlheiro();
     if(typeof gerarPropostasIA==='function'){gerarPropostasIA();expirarPropostas();}
+    if(typeof mercadoIAOffline==='function') mercadoIAOffline();
     S.rodada++;
     if(meuRes){
       const meuA = meuRes.A.t.id===S.meuTime;
@@ -2369,6 +2370,55 @@ function aceitarOferta(timeId){
 /* ============================================================
    PROPOSTAS DE TROCA VINDAS DA IA
    ============================================================ */
+
+/* ---------- MERCADO IA (offline): times da IA trocam entre si ---------- */
+function _iaPorPos(t){ const g={PG:[],SG:[],SF:[],PF:[],C:[]}; t.elenco.forEach(p=>{ if(g[p.pos])g[p.pos].push(p); }); for(const k in g)g[k].sort((a,b)=>b.ovr-a.ovr); return g; }
+function mercadoIAOffline(){
+  if(!S||S.fase!=='regular') return;
+  if(S.cal && S.rodada > S.cal.length*0.72) return;    // trade deadline
+  if(Math.random()>0.35) return;                       // maioria das rodadas tem mercado
+  const POSL=['PG','SG','SF','PF','C'];
+  const sob=p=>p.nome.split(' ').slice(-1)[0];
+  const iaTimes=S.times.filter(t=>t.id!==S.meuTime);
+  const ordem=[...iaTimes].sort(()=>Math.random()-0.5);
+  const jaTrocou=new Set(); let trocas=0;
+  const maxTrocas=1+(Math.random()<0.6?1:0)+(Math.random()<0.3?1:0);   // 1 a 3
+  for(let i=0;i<ordem.length && trocas<maxTrocas;i++){
+    const A=ordem[i]; if(jaTrocou.has(A.id))continue;
+    const gA=_iaPorPos(A), necA=necessidadesTime(A);
+    const precisa=POSL.filter(p=>necA[p]>=30).sort((a,b)=>necA[b]-necA[a]); // maiores carências
+    if(!precisa.length) continue;
+    let feito=false;
+    for(const pX of precisa){
+      for(let j=0;j<ordem.length && !feito;j++){
+        const B=ordem[j]; if(B.id===A.id||jaTrocou.has(B.id))continue;
+        const gB=_iaPorPos(B), necB=necessidadesTime(B);
+        if(gB[pX].length<2 || necB[pX]>42) continue;    // B tem sobra na posição que A precisa
+        const jB=gB[pX][1]; if(!jB||jB.egg) continue;   // B cede o reserva
+        for(const pY of POSL){
+          if(pY===pX || gA[pY].length<2) continue;      // A cede reserva de posição com sobra
+          if(gB[pY].length>=3) continue;                // B não empilha demais
+          const jA=gA[pY][1]; if(!jA||jA.egg) continue;
+          const vA=valorMercado(jA), vB=valorMercado(jB);
+          if(Math.abs(vA-vB) <= Math.max(vA,vB)*0.25){
+            A.elenco=A.elenco.filter(p=>p.id!==jA.id);
+            B.elenco=B.elenco.filter(p=>p.id!==jB.id);
+            jA.time=B.id; jB.time=A.id; B.elenco.push(jA); A.elenco.push(jB);
+            [A,B].forEach(t=>{ if(t.minutos){ delete t.minutos[jA.id]; delete t.minutos[jB.id]; } if(Array.isArray(t.titulares)) t.titulares=t.titulares.filter(id=>id!==jA.id&&id!==jB.id); });
+            noticia('🔄 Mercado: '+A.nick+' e '+B.nick+' fazem troca — '+sob(jA)+' ('+jA.ovr+') por '+sob(jB)+' ('+jB.ovr+')','m');
+            if(!S.movIA)S.movIA=[];
+            S.movIA.unshift({de:A.id,para:B.id,deu:jA.id,recebeu:jB.id,r:S.rodada,t:S.temporada});
+            S.movIA=S.movIA.slice(0,40);
+            jaTrocou.add(A.id); jaTrocou.add(B.id); trocas++; feito=true; break;
+          }
+        }
+        if(feito)break;
+      }
+      if(feito)break;
+    }
+  }
+}
+
 function gerarPropostasIA(){
   // outros times ocasionalmente oferecem trocas ao usuário
   if(!S.propostas)S.propostas=[];
@@ -2871,6 +2921,17 @@ function gerarNoticias(){
       `Negócio fechado! ${tA.nick} acertam com o ${tB.nick}`,
       `Mercado pega fogo: ${tA.nick} e ${tB.nick} mexem no elenco`]),
       txt:`As duas equipes se acertaram numa movimentação que promete mudar o rumo da temporada.`});
+  }
+  else if(!S.online && S.movIA && S.movIA.length){
+    const recentes=S.movIA.filter(m=>m.t===S.temporada && m.r>=(S.rodada-3));
+    const m=recentes[0];
+    if(m){ const tA=S.times[m.de], tB=S.times[m.para];
+      if(tA&&tB) nt.push({tag:'MERCADO',cor:'#3b9bd9', peso:8, manch:pick([
+        `BOMBA no mercado: ${tA.nick} e ${tB.nick} fecham troca`,
+        `Negócio fechado! ${tA.nick} acertam com o ${tB.nick}`,
+        `Mercado pega fogo: ${tA.nick} e ${tB.nick} mexem no elenco`]),
+        txt:`${tA.cidade} e ${tB.cidade} se acertaram numa movimentação de bastidores que agita a liga.`});
+    }
   }
 
   // 5) PATROCÍNIO / NEGÓCIOS
