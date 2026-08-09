@@ -1028,11 +1028,11 @@ const EGGS = [
     apelido:'A Muralha'
   },
   {
-    nome:'Pedro Hernandez', pos:'PG', idade:19, arq:'PLAY',
-    molde:{arr2:80,arr3:86,ll:88,fin:72,drible:90,passe:94,defP:52,defI:40,reb:52,atl:74,res:80,qi:90},
+    nome:'Pedro Hernandez', pos:'PG', idade:19, arq:'DEF',
+    molde:{arr2:80,arr3:78,ll:84,fin:78,drible:82,passe:80,defP:86,defI:58,reb:56,atl:83,res:85,qi:86},
     potBase:89,
     destino:'SAS', destinoTrigger:'time', // evolui jogando nos Spurs
-    lenda:'Armador-maestro, um dos melhores passadores (molde Trae Young). Nasceu para jogar nos Spurs.',
+    lenda:'Armador two-way: defensor implacável de perímetro e peça de time campeão (molde Jrue Holiday). Nasceu para jogar nos Spurs.',
     apelido:'O Cérebro'
   },
   {
@@ -1108,6 +1108,7 @@ function subirAtributosEgg(p,n){
   // sobe os atributos-chave do arquétipo dele
   const chaves = p.arq==='PROT'? ['defI','reb','atl','defP'] :
                  p.arq==='SCOR'? ['arr3','arr2','drible','fin'] :
+                 p.arq==='DEF'? ['defP','defI','atl','qi'] :
                  p.pos==='PG'? ['passe','drible','arr3','qi'] :
                  ['passe','fin','reb','qi'];
   chaves.forEach(k=>{ p.at[k]=clamp(p.at[k]+n,20,99); });
