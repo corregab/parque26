@@ -709,13 +709,13 @@ const TETO = 145000000;
 
 /* ===== FUNÇÕES (papéis) e JOGADAS (padrões ofensivos) ===== */
 const FUNCOES = {
-  estrela:    {nome:'Primeira opção',    emoji:'⭐', usage:1.75, w3:0.10, wRim:0.10, ast:0,   clutch:1},
-  scorer:     {nome:'Pontuador',         emoji:'🎯', usage:1.40, w3:0.14, wRim:0.06, ast:0},
-  armador:    {nome:'Armador',           emoji:'🎪', usage:1.02, w3:0.05, wRim:-0.05, ast:1.0},
-  ala3:       {nome:'Ala de 3 (spot-up)',emoji:'🏹', usage:0.95, w3:0.55, wRim:-0.30, ast:0},
-  defensor:   {nome:'Defensor (3&D)',    emoji:'🛡️', usage:0.72, w3:0.26, wRim:-0.14, ast:0, def:1},
-  poste:      {nome:'Pivô / Poste',      emoji:'💪', usage:1.08, w3:-0.45, wRim:0.55, ast:0, reb:1},
-  coadjuvante:{nome:'Coadjuvante',       emoji:'🔧', usage:0.60, w3:0,    wRim:0,    ast:0.2}
+  estrela:    {nome:'Primeira opção',    emoji:'⭐', usage:0.7, w3:0.10, wRim:0.10, ast:0,   clutch:1},
+  scorer:     {nome:'Pontuador',         emoji:'🎯', usage:0.72, w3:0.14, wRim:0.06, ast:0},
+  armador:    {nome:'Armador',           emoji:'🎪', usage:0.8,  w3:0.05, wRim:-0.05, ast:1.6},
+  ala3:       {nome:'Ala de 3 (spot-up)',emoji:'🏹', usage:0.98, w3:0.55, wRim:-0.30, ast:0},
+  defensor:   {nome:'Defensor (3&D)',    emoji:'🛡️', usage:0.95, w3:0.26, wRim:-0.14, ast:0, def:1},
+  poste:      {nome:'Pivô / Poste',      emoji:'💪', usage:0.82, w3:-0.45, wRim:0.55, ast:0, reb:1},
+  coadjuvante:{nome:'Coadjuvante',       emoji:'🔧', usage:1.10, w3:0,    wRim:0,    ast:0.2}
 };
 const ORDEM_FUNCOES=['estrela','scorer','armador','ala3','defensor','poste','coadjuvante'];
 
@@ -1259,7 +1259,7 @@ function jogada(O,D,ctx){
   of.forEach(p=>{const w=Math.pow(Math.max(1,p.ovr-44),1.3)*FUNCOES[funcaoDe(p)].usage; if(w>topPeso){topPeso=w;topId=p.id;}});
   // ---- posse do jogador
   const h=sorteioPeso(of,p=>{
-    let peso=Math.pow(Math.max(1,p.ovr-44),1.34)*(1+(p.at.drible-60)/300);
+    let peso=Math.pow(Math.max(1,p.ovr-44),0.16)*(1+(p.at.drible-60)/300);
     peso *= FUNCOES[funcaoDe(p)].usage;
     if(jgd.usaBig && ['C','PF'].includes(p.pos)) peso*=jgd.usaBig;
     if(jgd.usaArm && p.pos==='PG') peso*=jgd.usaArm;
@@ -1294,7 +1294,7 @@ function jogada(O,D,ctx){
   // ---- escolha do arremesso
   const foco=tatO.foco; // 0 dentro, 1 equilíbrio, 2 perímetro
   const fnH=FUNCOES[funcaoDe(h)];
-  const w3  = Math.max(.05, 1.02+(h.at.arr3-56)*0.058 + (foco-1)*0.50 + (jgd.w3||0) + (fnH.w3||0) + (zonaD?0.34:0));
+  const w3  = Math.max(.05, 0.6+(h.at.arr3-56)*0.045 + (foco-1)*0.50 + (jgd.w3||0) + (fnH.w3||0) + (zonaD?0.34:0));
   const wRim= Math.max(.10, 1.45+(h.at.fin-62)*0.045+(h.at.atl-66)*0.020 - (foco-1)*0.32 + (jgd.wRim||0) + (fnH.wRim||0) - (zonaD?0.34:0));
   const wMid= Math.max(.15, 0.85-(h.at.arr3-56)*0.012 + (jgd.wMid||0));
   const r=Math.random()*(w3+wRim+wMid);
@@ -1302,9 +1302,9 @@ function jogada(O,D,ctx){
   const fad=(h.fadiga-82)*0.0009, form=(h.ref.forma-95)*0.0009+(h.ref.moral-70)*0.0004;
   const mom=(O.momBonus||0);
   let prob, pFalta;
-  if(tipo===3){ prob=.354+(h.at.arr3-70)*.0029-(defP-68)*.0020+casaBonus+fad+form+mom; if(zonaD)prob+=0.020; prob=clamp(prob,.16,.53); pFalta=.028; }
-  else if(tipo===2){ prob=.428+(h.at.arr2-70)*.0029-(defP-68)*.0019+casaBonus+fad+form+mom; prob=clamp(prob,.26,.58); pFalta=.05; }
-  else { prob=.604+(h.at.fin-70)*.0032-(defI-68)*.0024+casaBonus+fad+form+mom; if(zonaD)prob-=0.030; prob=clamp(prob,.38,.78); pFalta=.195; }
+  if(tipo===3){ prob=.3+(h.at.arr3-70)*.0026-(defP-68)*.0036+casaBonus+fad+form+mom; if(zonaD)prob+=0.020; prob=clamp(prob,.16,.53); pFalta=.028; }
+  else if(tipo===2){ prob=.378+(h.at.arr2-70)*.0027-(defP-68)*.0034+casaBonus+fad+form+mom; prob=clamp(prob,.26,.58); pFalta=.05; }
+  else { prob=.53+(h.at.fin-70)*.0030-(defI-68)*.0042+casaBonus+fad+form+mom; if(zonaD)prob-=0.030; prob=clamp(prob,.38,.78); pFalta=.195; }
   if(instrD.doubleTeam && h.id===topId) prob-=0.075; // craque marcado converte menos
   pFalta*=(1+(tatD.pressao-1)*0.14);
   // ---- toco
@@ -1322,10 +1322,10 @@ function jogada(O,D,ctx){
     const v=tipo===3?3:2; h.b.fgm++; if(tipo===3)h.b.tpm++; h.b.pts+=v; O.pts+=v;
     // assistência
     const cand=of.filter(p=>p!==h);
-    let pAst=(tipo===3?.78:tipo===2?.44:.47)*clamp(media(of,p=>p.at.passe)/66,.7,1.3);
-    pAst=clamp(pAst+(jgd.ast||0)*0.28, .05, .96);
+    let pAst=(tipo===3?.88:tipo===2?.56:.58)*clamp(media(of,p=>p.at.passe)/66,.7,1.3);
+    pAst=clamp(pAst+(jgd.ast||0)*0.28, .05, .98);
     let ast=null;
-    if(cand.length&&Math.random()<pAst){ast=sorteioPeso(cand,p=>p.at.passe+p.at.qi*0.35+FUNCOES[funcaoDe(p)].ast*30);ast.b.ast++;}
+    if(cand.length&&Math.random()<pAst){ast=sorteioPeso(cand,p=>p.at.passe*1.2+p.at.qi*0.4+FUNCOES[funcaoDe(p)].ast*75);ast.b.ast++;}
     const desc = tipo===3?'BOLA DE 3 de '+nome(h):tipo===2?'jumper de '+nome(h):'cesta de '+nome(h)+' no garrafão';
     put(desc+(ast?' (assist. '+nome(ast)+')':'')+' — '+O.t.ab+' '+O.pts,tipo===3?'ev-3':'');
     if(falta){
