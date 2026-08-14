@@ -1809,6 +1809,7 @@ function avancarRodada(preRes){
     if(typeof atualizarOlheiro==='function')atualizarOlheiro();
     if(typeof gerarPropostasIA==='function'){gerarPropostasIA();expirarPropostas();}
     if(typeof mercadoIAOffline==='function') mercadoIAOffline();
+    if(typeof processarTreinosOffline==='function') processarTreinosOffline();
     S.rodada++;
     if(meuRes){
       const meuA = meuRes.A.t.id===S.meuTime;
@@ -4386,71 +4387,113 @@ function aplicarTreino(pid, progKey){
 /* ============================================================
    UI DA ABA TREINO
    ============================================================ */
+/* ---------- TREINO OFFLINE (mesmo sistema do online: dura rodadas, slots, acelerar) ---------- */
+function aplicarGanhoTreinoOffline(p, progKey, dur){
+  const prog=PROGRAMAS[progKey]; if(!prog||!p.at) return {tipo:'x',ovr:0};
+  const jovem=p.idade<=21?1.6:p.idade<=24?1.25:p.idade<=27?0.9:p.idade<=30?0.55:0.3;
+  const margem=clamp((p.pot-p.ovr)/12,0.15,1);
+  const antes=p.ovr;
+  if(prog.pot){
+    const chance=(p.idade<=20?0.85:p.idade<=22?0.65:p.idade<=24?0.45:p.idade<=26?0.2:0.05)*Math.min(1.6,dur/8);
+    if(Math.random()<chance){ const dd=1+Math.floor(Math.random()*3); p.pot=clamp(p.pot+dd,p.ovr,99); return {tipo:'pot',pot:dd}; }
+    return {tipo:'pot',pot:0};
+  }
+  const escala=dur/10;
+  const forca=jovem*(0.6+margem)*escala;
+  let subiu=0;
+  prog.at.forEach(k=>{ if(p.at[k]==null)return; const teto=Math.min(99,p.pot+4); const inc=Math.round(forca*(0.8+Math.random()*0.7)); if(inc>0&&p.at[k]<teto){ p.at[k]=Math.min(teto,p.at[k]+inc); subiu+=inc; } });
+  p.ovr=calcOvr(p);
+  return {tipo:'at',ovr:p.ovr-antes,at:subiu};
+}
+function _acharJogTr(id){ const t=S.times[S.meuTime]; return t.elenco.find(x=>x.id===id); }
+function _concluirTreinoOffline(tr){
+  const p=_acharJogTr(tr.jogador_id);
+  let res;
+  if(!p){ res={cancelado:true}; }
+  else{ res=aplicarGanhoTreinoOffline(p, tr.programa, tr.rodadas_total); res.jogador=tr.jogador_nome; }
+  S.treinosConcluidos=S.treinosConcluidos||[];
+  S.treinosConcluidos.unshift({jogador_nome:tr.jogador_nome, programa:tr.programa, resultado:res});
+  S.treinosConcluidos=S.treinosConcluidos.slice(0,6);
+  if(p && !res.cancelado && typeof noticia==='function'){
+    let txt = res.tipo==='pot' ? (res.pot>0?('potencial +'+res.pot):'potencial não subiu desta vez') : (res.ovr>0?('overall +'+res.ovr):'ganho pequeno');
+    noticia('🏋 '+tr.jogador_nome.split(' ').pop()+' concluiu o treino de '+(PROGRAMAS[tr.programa]?PROGRAMAS[tr.programa].nome.toLowerCase():tr.programa)+' — '+txt,'v');
+  }
+  return res;
+}
+function processarTreinosOffline(){
+  if(!S||!S.treinosAtivos||!S.treinosAtivos.length) return;
+  const restam=[];
+  S.treinosAtivos.forEach(tr=>{
+    tr.rodadas_feitas=(tr.rodadas_feitas||0)+1;
+    if(tr.rodadas_feitas>=tr.rodadas_total){ _concluirTreinoOffline(tr); }
+    else restam.push(tr);
+  });
+  S.treinosAtivos=restam;
+}
+function treinoIniciarOffline(){
+  if(!S.treinosAtivos)S.treinosAtivos=[];
+  if(S.treinosAtivos.length>=TREINO_SLOTS){ toast('Você já tem '+TREINO_SLOTS+' treinos em andamento'); return; }
+  const jid=+((el('trJog')&&el('trJog').value)||window._treinoSel||0);
+  const prog=(el('trProg')&&el('trProg').value)||'arremesso';
+  const dur=+((el('trDur')&&el('trDur').value)||10);
+  const p=_acharJogTr(jid);
+  if(!p){ toast('Escolha um jogador'); return; }
+  if(S.treinosAtivos.some(x=>x.jogador_id===jid)){ toast('Esse jogador já está treinando'); return; }
+  S.treinosAtivos.push({id:'t'+Date.now()+Math.floor(Math.random()*1000), jogador_id:jid, jogador_nome:p.nome, programa:prog, rodadas_total:dur, rodadas_feitas:0});
+  toast('🏋 '+p.nome.split(' ').pop()+' começou a treinar '+(PROGRAMAS[prog]?PROGRAMAS[prog].nome.toLowerCase():prog));
+  window._treinoSel=null; try{salvar();}catch(e){} render();
+}
+function treinoAcelerarOffline(id){
+  const tr=(S.treinosAtivos||[]).find(x=>x.id===id); if(!tr) return;
+  const rest=Math.max(0,tr.rodadas_total-tr.rodadas_feitas);
+  const custo=rest*TREINO_CUSTO_RODADA;
+  const t=S.times[S.meuTime];
+  if((t.caixa||0)<custo){ toast('Caixa insuficiente ('+M$(custo)+')'); return; }
+  t.caixa-=custo;
+  tr.rodadas_feitas=tr.rodadas_total;
+  const res=_concluirTreinoOffline(tr);
+  S.treinosAtivos=S.treinosAtivos.filter(x=>x.id!==id);
+  let txt = res.tipo==='pot'?(res.pot>0?('Potencial +'+res.pot+'! 📈'):'Concluído'):(res.ovr>0?('Overall +'+res.ovr+'! 💪'):'Concluído');
+  toast('⚡ '+txt+' (−'+M$(custo)+')');
+  try{salvar();}catch(e){} render();
+}
+function treinoCancelarOffline(id){
+  S.treinosAtivos=(S.treinosAtivos||[]).filter(x=>x.id!==id);
+  toast('Treino cancelado'); try{salvar();}catch(e){} render();
+}
 function vTreino(){
   if(S.online && typeof vTreinoOnline==='function') return vTreinoOnline();
   const t=S.times[S.meuTime];
-  if(S.treinosRest===undefined)S.treinosRest=TREINOS_POR_TEMP;
-  if(!S.treinos)S.treinos={};
-  const sel=S.treinoSel||t.elenco[0].id;
-  const p=t.elenco.find(x=>x.id===sel)||t.elenco[0];
-  const usos=S.treinos[p.id]||0;
-  const prog=S.treinoProg||'arremesso';
-  const g=ganhoTreino(p,PROGRAMAS[prog]);
-  // pré-visualização do efeito
-  let previa;
-  if(PROGRAMAS[prog].pot) previa=`Chance de subir potencial: <b>${Math.round(g.chance*100)}%</b> (+${g.delta} se der certo)`;
-  else{
-    const forcaTxt = g.forca>=1.4?'forte':g.forca>=0.9?'bom':g.forca>=0.5?'moderado':'pequeno';
-    previa=`Ganho esperado: <b>${forcaTxt}</b> nos atributos (${PROGRAMAS[prog].at.map(k=>k.toUpperCase()).join(', ')})`;
+  if(!S.treinosAtivos)S.treinosAtivos=[];
+  if(!S.treinosConcluidos)S.treinosConcluidos=[];
+  const ativos=S.treinosAtivos;
+  const usados=new Set(ativos.map(x=>x.jogador_id));
+  const podeNovo=ativos.length<TREINO_SLOTS;
+  let ativosHtml = ativos.length ? '' : '<p class="hint">Nenhum treino em andamento. Coloque um jogador para treinar! 🏋</p>';
+  ativos.forEach(tr=>{
+    const pct=Math.round(tr.rodadas_feitas/tr.rodadas_total*100);
+    const rest=Math.max(0,tr.rodadas_total-tr.rodadas_feitas);
+    const custo=rest*TREINO_CUSTO_RODADA;
+    const prog=PROGRAMAS[tr.programa];
+    ativosHtml+=`<div class="tr-card"><div class="tr-top"><b>${esc(tr.jogador_nome||'Jogador')}</b><span class="tr-prog">${prog?prog.nome:tr.programa}</span></div><div class="tr-bar"><i style="width:${pct}%"></i></div><div class="tr-info">Rodada ${tr.rodadas_feitas}/${tr.rodadas_total} · faltam ${rest}</div><div class="row" style="margin-top:8px"><button class="btn mini" onclick="treinoAcelerarOffline('${tr.id}')">⚡ Concluir agora (${M$(custo)})</button><button class="btn ghost mini" onclick="treinoCancelarOffline('${tr.id}')">Cancelar</button></div></div>`;
+  });
+  let concHtml='';
+  (S.treinosConcluidos||[]).forEach(tr=>{
+    const r=tr.resultado||{}; let txt;
+    if(r.cancelado) txt='treino perdido (jogador saiu do elenco)';
+    else if(r.tipo==='pot') txt = r.pot>0?('potencial +'+r.pot+' 📈'):'potencial não subiu desta vez';
+    else txt = (r.ovr>0)?('overall +'+r.ovr+' 💪'):((r.at>0)?('atributos +'+r.at):'ganho mínimo');
+    concHtml+=`<div class="tr-conc"><b>${esc(tr.jogador_nome||'')}</b> — ${esc(PROGRAMAS[tr.programa]?PROGRAMAS[tr.programa].nome:tr.programa)}: ${txt}</div>`;
+  });
+  let formHtml;
+  if(podeNovo){
+    const disp=t.elenco.filter(p=>!usados.has(p.id)).sort((a,b)=>b.ovr-a.ovr);
+    const sel=window._treinoSel||(disp[0]&&disp[0].id);
+    formHtml=`<div class="card" style="margin-top:12px"><h3 class="sub">➕ Novo treino</h3><label class="hint">Jogador</label><select id="trJog" onchange="window._treinoSel=+this.value">${disp.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${esc(p.nome)} · ${p.pos} · ${p.ovr}ovr · ${p.idade}a · pot ${p.pot}</option>`).join('')}</select><label class="hint" style="margin-top:8px;display:block">Programa de treino</label><select id="trProg">${PROG_KEYS.map(k=>`<option value="${k}">${PROGRAMAS[k].nome} — ${PROGRAMAS[k].desc}</option>`).join('')}</select><label class="hint" style="margin-top:8px;display:block">Duração</label><select id="trDur"><option value="5">5 rodadas</option><option value="10" selected>10 rodadas</option><option value="20">20 rodadas (ganho máximo)</option></select><button class="btn" style="width:100%;margin-top:10px" onclick="treinoIniciarOffline()">Iniciar treino</button></div>`;
+  } else {
+    formHtml=`<p class="hint" style="margin-top:12px">Você já tem ${TREINO_SLOTS} treinos em andamento (o máximo). Conclua ou cancele um para treinar outro jogador.</p>`;
   }
-  const rows=t.elenco.map(x=>{
-    const u=S.treinos[x.id]||0;
-    return `<tr class="clickable ${x.id===p.id?'me':''}" onclick="S.treinoSel=${x.id};render()">
-      <td class="name">${esc(x.nome)}</td><td>${bd(x.pos)}</td><td>${x.idade}</td>
-      <td><span class="ovr">${x.ovr}</span></td><td class="muted">${x.pot}</td>
-      <td>${x.pot-x.ovr>0?'<span style="color:var(--green)">+'+(x.pot-x.ovr)+'</span>':'—'}</td>
-      <td>${u>0?'🏋'.repeat(Math.min(u,3)):''}</td></tr>`;
-  }).join('');
-  return `<h2 class="sec">Centro de treinamento</h2>
-  <div class="card" style="border-left:4px solid var(--blue)">
-    <div class="row" style="justify-content:space-between">
-      <p class="hint" style="margin:0">Use as sessões de treino para desenvolver jogadores. Jovens ganham muito mais — e o programa <b>Desenvolvimento</b> pode elevar o potencial (o teto) deles. Cada ponto de atributo respeita o potencial do jogador.</p>
-      <span class="pill ${S.treinosRest>0?'w':'l'}" style="white-space:nowrap">${S.treinosRest} sessõe(s) restante(s)</span>
-    </div>
-  </div>
-  <div class="split" style="margin-top:14px">
-    <div class="card tbl-wrap">
-      <h3 class="sub">Elenco</h3>
-      <table><thead><tr><th>Jogador</th><th>Pos</th><th>Id</th><th>Ovr</th><th>Pot</th><th>Margem</th><th>Treinos</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-    </div>
-    <div>
-      <div class="card">
-        <h3 class="sub">Treinar: ${esc(p.nome)}</h3>
-        <div class="kv"><span>Posição / idade</span><b>${POSNM[p.pos]} · ${p.idade} anos</b></div>
-        <div class="kv"><span>Overall / potencial</span><b>${p.ovr} / ${p.pot}</b></div>
-        <div class="bar" style="margin:6px 0"><i style="width:${p.ovr}%;background:var(--wood)"></i></div>
-        <h3 class="sub" style="margin-top:14px">Programa de treino</h3>
-        <select onchange="S.treinoProg=this.value;render()">
-          ${PROG_KEYS.map(k=>`<option value="${k}" ${prog===k?'selected':''}>${PROGRAMAS[k].nome}</option>`).join('')}
-        </select>
-        <p class="hint" style="margin:8px 0">${esc(PROGRAMAS[prog].desc)}</p>
-        <div class="card" style="background:var(--bg2);margin:8px 0"><div class="hint">${previa}</div></div>
-        ${p.idade>=30 && PROGRAMAS[prog].pot?`<p class="hint" style="color:var(--red)">⚠ Jogador veterano: o potencial dificilmente sobe nessa idade.</p>`:''}
-        <button class="btn" style="width:100%;margin-top:6px" ${S.treinosRest<=0?'disabled':''} onclick="treinar(${p.id},'${prog}')">
-          ${S.treinosRest<=0?'Sem sessões restantes':'Aplicar treino (−1 sessão)'}</button>
-      </div>
-      <div class="card" style="margin-top:14px">
-        <h3 class="sub">Como funciona</h3>
-        <p class="hint">Você recebe <b>${TREINOS_POR_TEMP} sessões por temporada</b>, renovadas a cada nova temporada. Distribua entre desenvolver joias (potencial) e lapidar atributos específicos de quem já vai jogar. O ganho cai bastante depois dos 27 anos.</p>
-      </div>
-    </div>
-  </div>`;
-}
-function treinar(pid,prog){
-  const err=aplicarTreino(pid,prog);
-  if(err)alert(err);
-  render();
+  return `<h2 class="sec">Centro de treinamento</h2><div class="card"><p class="hint">Coloque jogadores para treinar por várias rodadas. O progresso corre sozinho a cada rodada — <b>jovens com margem até o potencial ganham muito mais</b>. Dá para pagar para concluir na hora. Até ${TREINO_SLOTS} treinos ao mesmo tempo.</p></div><h3 class="admin-h">🏋 Em andamento (${ativos.length}/${TREINO_SLOTS})</h3>${ativosHtml}${concHtml?`<h3 class="admin-h">✅ Concluídos recentes</h3>${concHtml}`:''}${formHtml}`;
 }
 /* ============================================================
    UI — Carreira do técnico (histórico + ofertas de emprego)
