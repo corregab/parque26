@@ -155,6 +155,15 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .sheet-head{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel2);position:sticky;top:0}
 .sheet-head h3{font-family:var(--display);font-size:22px;text-transform:uppercase;letter-spacing:.5px}
 .sheet-body{padding:16px}
+.nov-tag{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.5px;color:var(--bg);background:var(--amber);padding:3px 9px;border-radius:20px;margin-bottom:14px;text-transform:uppercase}
+.nov-item{display:flex;gap:13px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--line)}
+.nov-item:last-of-type{border-bottom:0}
+.nov-emoji{font-size:26px;line-height:1;flex-shrink:0;width:34px;text-align:center}
+.nov-item b{display:block;font-family:var(--display);font-size:16px;letter-spacing:.3px;color:var(--bone);text-transform:uppercase;margin-bottom:3px}
+.nov-item p{font-size:13.5px;color:var(--mute);line-height:1.55;margin:0}
+.nov-foot{text-align:center;font-size:11px;color:var(--mute);margin-top:6px}
+.hub-novidades{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--wood-lo);color:var(--amber);font-family:var(--mono);font-size:12px;padding:7px 14px;border-radius:22px;cursor:pointer;margin-top:4px}
+.hub-novidades:hover{background:var(--panel2)}
 .x{margin-left:auto;background:none;border:1px solid var(--line);color:var(--bone);width:30px;height:30px;cursor:pointer;font-size:16px;line-height:1}
 .x:hover{border-color:var(--red);color:var(--red)}
 
@@ -7601,6 +7610,7 @@ function renderHub(){
   }
   html+=`<div id="hubLigas"></div>`;
   html+=`${typeof ligaBotaoHub==='function'?ligaBotaoHub():''}`;
+  html+=`<div style="text-align:center;margin-top:10px"><button class="hub-novidades" onclick="mostrarNovidades(true)">🗞️ Ver novidades</button></div>`;
   const cont=el('hubList'); if(cont) cont.innerHTML=html;
   if(typeof renderHubLigas==='function') renderHubLigas();
 }
@@ -7624,10 +7634,35 @@ function mostrarCriar(){
 }
 function mostrarSetup(){ mostrarHub(); }
 
+/* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
+   Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
+const NOVIDADES = {
+  versao: '2026.08',
+  titulo: '🗞️ Novidades do PARQUÊ',
+  data: 'Atualização de agosto/2026',
+  itens: [
+    {emoji:'🏀', t:'Elencos 2026-27 atualizados', d:'Todos os 30 times com as movimentações mais recentes da liga — incluindo as trocas do meio da temporada. Trae Young e Anthony Davis no Washington, Harden no Cleveland, Zubac no Indiana, Kuminga no Atlanta e muito mais. Vale para carreiras novas.'},
+    {emoji:'📊', t:'Estatísticas mais realistas', d:'O motor de simulação foi recalibrado: acabou o jogador fazendo 60 pontos por jogo. Agora os cestinhas ficam na casa dos 30, com assistências e rebotes coerentes — tanto no modo carreira quanto nas ligas online.'},
+    {emoji:'🔄', t:'Mercado entre os times', d:'Os times comandados pela máquina agora negociam entre si ao longo da temporada, deixando a liga mais viva.'},
+    {emoji:'🎽', t:'Comissão técnica visual', d:'Monte sua formação numa quadra de parquet, ajuste táticas, rotação e treinos — tudo num lugar só.'},
+    {emoji:'📰', t:'Feed de notícias e boxscores', d:'Acompanhe a temporada por um feed estilo ESPN e veja o boxscore detalhado de cada jogo.'},
+  ]
+};
+function mostrarNovidades(forcar){
+  const key='parque26:novidadesVistas';
+  if(!forcar){
+    try{ if(localStorage.getItem(key)===NOVIDADES.versao) return; }catch(e){}
+  }
+  const itens=NOVIDADES.itens.map(i=>`<div class="nov-item"><span class="nov-emoji">${i.emoji}</span><div><b>${i.t}</b><p>${i.d}</p></div></div>`).join('');
+  abrirModal(NOVIDADES.titulo, `<div class="nov-tag">${NOVIDADES.data}</div>${itens}<div class="nov-foot">Bom jogo! 🏆</div><div class="row" style="justify-content:center;margin-top:14px"><button class="btn" onclick="closeModal()">Bora jogar!</button></div>`);
+  try{ localStorage.setItem(key, NOVIDADES.versao); }catch(e){}
+}
+
 async function iniciarApp(){
   if(typeof cloudInit==='function') cloudInit();
   migrarLegado();
   mostrarHub();   // primeiro acesso (e todo acesso) abre na tela de início/hub
+  setTimeout(()=>{ try{ mostrarNovidades(); }catch(e){} }, 650); // aviso de novidades (1x por versão)
 }
 iniciarApp();
 
