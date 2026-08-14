@@ -2005,7 +2005,19 @@ function processarOffseason(){
       p.ovrPico = Math.max(p.ovrPico||0, p.ovr); // guarda o auge da carreira
       p.stats=zeroStats();p.lesao=0;p.lesaoTxt='';p.forma=RI(90,100);
       p.anos--;
-      if(p.idade>=36 && Math.random()<.45+(p.idade-36)*.18 || p.ovr<44&&p.idade>=33){
+      // aposentadoria: cresce com a idade, mas despenca para quem ainda joga em alto nível
+      let chApos=0;
+      if(p.idade>=35){
+        chApos=(p.idade-34)*0.09 + Math.max(0,(70-p.ovr))*0.035;
+        if(p.ovr>=90) chApos*=0.12;        // superstars jogam até bem velhos
+        else if(p.ovr>=84) chApos*=0.28;   // all-stars seguem firmes
+        else if(p.ovr>=78) chApos*=0.50;   // titulares sólidos
+        else if(p.ovr>=72) chApos*=0.78;   // rotação
+      }
+      if(p.ovr<44 && p.idade>=32) chApos=Math.max(chApos,0.85); // reservas velhos e apagados
+      if(p.idade>=43) chApos=Math.max(chApos,0.60);             // ninguém joga para sempre
+      chApos=clamp(chApos,0,0.96);
+      if(Math.random()<chApos){
         p.aposentou=true;sai.push(p);rel.push(p.nome+' ('+t.ab+') anunciou aposentadoria aos '+p.idade);
         if(typeof aposentarCamisa==='function') aposentarCamisa(p, t.ab); // lendas têm a camisa aposentada
       } else if(p.anos<=0){ p.salario=valorSalarial(p); sai.push(p); p.time=null; S.livres.push(p); }
