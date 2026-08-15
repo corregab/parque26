@@ -3069,15 +3069,52 @@ const ICONS={
 function ICON(n){return `<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
 /* Escudo original estilizado (nao e o logo oficial): disco na cor do time,
    costuras de bola de basquete e a sigla. Gerado por SVG, escala em qualquer tamanho. */
+let _escudoSeq=0;
+const ESCUDO_ESTILO={
+ ATL:['shield','chevron'],BOS:['circle','star'],BKN:['patch','stripes'],CHA:['hex','bolt'],CHI:['shield','star'],CLE:['circle','stripes'],DET:['patch','rings'],IND:['diamond','bolt'],MIA:['circle','bolt'],MIL:['shield','mountain'],NYK:['patch','stripes'],ORL:['circle','star'],PHI:['shield','star'],TOR:['hex','ball'],WAS:['shield','stripes'],
+ DAL:['diamond','star'],DEN:['shield','mountain'],GSW:['circle','bolt'],HOU:['circle','bolt'],LAC:['patch','ball'],LAL:['circle','star'],MEM:['hex','ball'],MIN:['shield','mountain'],NOP:['diamond','rings'],OKC:['shield','bolt'],PHX:['circle','rings'],POR:['hex','mountain'],SAC:['shield','crown'],SAS:['patch','star'],UTA:['diamond','mountain']
+};
+function _escLum(hex){try{const n=parseInt(hex.slice(1),16);return (0.2126*((n>>16)&255)+0.7152*((n>>8)&255)+0.0722*(n&255))/255;}catch(e){return 0;}}
+function _escShade(hex,f){try{const n=parseInt(hex.slice(1),16);let r=Math.round(((n>>16)&255)*f),g=Math.round(((n>>8)&255)*f),b=Math.round((n&255)*f);return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);}catch(e){return hex;}}
+function _escForma(f){
+  switch(f){
+    case 'shield': return 'M14 15 H86 V50 Q86 80 50 93 Q14 80 14 50 Z';
+    case 'diamond': return 'M50 5 L93 50 L50 95 L7 50 Z';
+    case 'hex': return 'M50 5 L89 27 V73 L50 95 L11 73 V27 Z';
+    case 'patch': return 'M22 8 H78 A14 14 0 0 1 92 22 V78 A14 14 0 0 1 78 92 H22 A14 14 0 0 1 8 78 V22 A14 14 0 0 1 22 8 Z';
+    default: return null;
+  }
+}
+function _escMotivo(m,accent){
+  const s=`stroke="${accent}" fill="none"`, f=`fill="${accent}"`;
+  switch(m){
+    case 'star': return `<path d="M50 20 L58 42 L81 42 L62 56 L69 78 L50 64 L31 78 L38 56 L19 42 L42 42 Z" ${f} opacity="0.15"/>`;
+    case 'stripes': return `<g ${s} stroke-width="7" opacity="0.15"><line x1="-10" y1="35" x2="60" y2="-35"/><line x1="0" y1="62" x2="92" y2="-30"/><line x1="30" y1="92" x2="115" y2="12"/></g>`;
+    case 'ball': return `<g ${s} stroke-width="2.4" opacity="0.26"><line x1="6" y1="50" x2="94" y2="50"/><path d="M24 9 Q50 50 24 91"/><path d="M76 9 Q50 50 76 91"/></g>`;
+    case 'chevron': return `<g ${s} stroke-width="6" opacity="0.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 40 L50 60 L78 40"/><path d="M22 54 L50 74 L78 54"/></g>`;
+    case 'bolt': return `<path d="M57 18 L36 55 L49 55 L43 82 L66 43 L52 43 Z" ${f} opacity="0.17"/>`;
+    case 'rings': return `<g ${s} opacity="0.2"><circle cx="50" cy="50" r="34" stroke-width="3"/><circle cx="50" cy="50" r="22" stroke-width="3"/></g>`;
+    case 'mountain': return `<path d="M12 74 L36 42 L50 58 L67 38 L88 74 Z" ${f} opacity="0.18"/>`;
+    case 'crown': return `<path d="M26 64 L32 40 L41 55 L50 36 L59 55 L68 40 L74 64 Z" ${f} opacity="0.18"/>`;
+    default: return '';
+  }
+}
 function escudoTime(ab,size){
   size=size||40;
   const c=(typeof TIME_CORES!=='undefined'&&TIME_CORES[ab])?TIME_CORES[ab]:['#FDB927','#D8A81C'];
-  const accent=c[0],dark=c[1];
+  const accent=c[0], darkRaw=c[1];
+  const dark = _escLum(darkRaw)>0.5 ? _escShade(darkRaw,0.30) : darkRaw;   // times de cor clara: escurece mantendo o tom
+  const est=ESCUDO_ESTILO[ab]||['circle','ball'];
+  const path=_escForma(est[0]);
+  const id='esc'+(++_escudoSeq);
+  const fill = path ? `<path d="${path}" fill="${dark}"/>` : `<circle cx="50" cy="50" r="46" fill="${dark}"/>`;
+  const border = path ? `<path d="${path}" fill="none" stroke="${accent}" stroke-width="4" stroke-linejoin="round"/>` : `<circle cx="50" cy="50" r="46" fill="none" stroke="${accent}" stroke-width="4"/>`;
+  const clip = path ? `<clipPath id="${id}"><path d="${path}"/></clipPath>` : `<clipPath id="${id}"><circle cx="50" cy="50" r="46"/></clipPath>`;
+  const fsz = ab.length>=3?29:36;
   return `<svg class="escudo" viewBox="0 0 100 100" width="${size}" height="${size}" aria-label="${ab}" role="img">`+
-    `<circle cx="50" cy="50" r="46" fill="${dark}"/>`+
-    `<g stroke="${accent}" stroke-width="2" fill="none" opacity="0.22"><path d="M22 9 Q48 50 22 91"/><path d="M78 9 Q52 50 78 91"/></g>`+
-    `<circle cx="50" cy="50" r="46" fill="none" stroke="${accent}" stroke-width="4"/>`+
-    `<text x="50" y="50" dy="0.35em" text-anchor="middle" font-family="'Oswald','Barlow Condensed',sans-serif" font-weight="700" font-size="34" letter-spacing="0.5" fill="${accent}">${ab}</text>`+
+    `<defs>${clip}</defs>`+ fill +
+    `<g clip-path="url(#${id})">${_escMotivo(est[1],accent)}</g>`+ border +
+    `<text x="50" y="50" dy="0.34em" text-anchor="middle" font-family="'Oswald','Barlow Condensed',sans-serif" font-weight="700" font-size="${fsz}" letter-spacing="0.5" fill="${accent}">${ab}</text>`+
   `</svg>`;
 }
 function acaoCentral(){
