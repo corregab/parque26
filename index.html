@@ -6,7 +6,7 @@
 <title>PARQUÊ '26 — Manager de Basquete</title>
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#000000">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -593,6 +593,114 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .sel-ovr{font-weight:700;font-size:15px}
 .mini-tag{font-size:9px;background:rgba(232,163,61,.2);color:var(--amber);padding:1px 6px;border-radius:6px;font-weight:600;vertical-align:middle}
 .mini-tag.alt{background:rgba(154,141,128,.2);color:var(--mute)}
+
+
+/* ══════════════════════════════════════════════════════════════
+   REDESIGN — GM esportivo / broadcast (só apresentação)
+   Sobrescreve a camada visual mantendo classes/IDs/eventos.
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --r:3px;                     /* raio padrão discreto */
+  --court:#b06a26;             /* madeira da quadra (identidade, uso pontual) */
+  --accent-soft:color-mix(in srgb, var(--accent) 14%, transparent);
+  --hair:#1e1e1e;              /* divisória fina */
+}
+body{background:var(--bg);color:var(--text);font-family:var(--ui);-webkit-font-smoothing:antialiased}
+
+/* —— Tipografia esportiva: Oswald condensado nos títulos/números —— */
+.brand{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;letter-spacing:.6px;text-transform:uppercase;line-height:.95}
+.brand em{color:var(--accent);font-style:normal}
+.brand small{font-family:var(--ui);font-size:9.5px;letter-spacing:2.5px;color:var(--text-dim);font-weight:600;margin-top:3px}
+h2.sec{font-family:'Oswald',sans-serif;font-weight:600;font-size:21px;letter-spacing:.4px;text-transform:uppercase;color:var(--text);display:flex;align-items:center;gap:10px;margin:2px 0 12px}
+h2.sec:before{content:"";width:4px;height:19px;background:var(--accent);display:block;border-radius:0}
+h3.sub,.admin-h,.admin-badge{font-family:var(--ui);font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:var(--text-dim);font-weight:700}
+.admin-h{color:var(--text-dim);margin:18px 0 9px;border-bottom:1px solid var(--hair);padding-bottom:6px}
+
+/* —— HUD como placar de transmissão —— */
+.top{background:var(--bg);border-bottom:1px solid var(--line);padding:12px 16px 11px;position:relative}
+.top:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,var(--accent) 0 34%,transparent 34%);opacity:.5}
+.hud{background:none;border:0;padding:0 0 0 14px;border-left:1px solid var(--hair)}
+.hud:first-child{border-left:0;padding-left:0}
+.hud span{font-size:9px;letter-spacing:1.6px;color:var(--text-mut);text-transform:uppercase;font-weight:700}
+.hud b{font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;letter-spacing:0;color:var(--text);font-variant-numeric:tabular-nums}
+.hud.pos b{color:var(--pos)} .hud.neg b{color:var(--neg)}
+
+/* —— Superfícies editoriais: retas, borda fina, sem sombra —— */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:none}
+.card.accent{border-left:3px solid var(--accent)}
+.score,.qbox{box-shadow:none}
+*{text-shadow:none!important}
+
+/* —— Botões sólidos, sem gradiente/glow —— */
+button.btn{background:var(--accent);color:#0a0a0a;border:1px solid var(--accent);border-radius:var(--r);font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.5px;text-transform:uppercase;box-shadow:none;padding:11px 16px}
+button.btn:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
+button.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+button.btn.ghost:hover{background:var(--surface-2);border-color:var(--text-dim);color:var(--text)}
+button.btn.mini{padding:7px 11px;font-size:12px}
+button.btn:disabled{background:var(--surface-2);border-color:var(--line);color:#555}
+
+/* —— Kv / linhas de dados estilo stat sheet —— */
+.kv{border-bottom:1px solid var(--hair);padding:7px 0;font-size:13.5px;color:var(--text-dim)}
+.kv b{font-family:'Oswald',sans-serif;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.kv.clk:hover{background:var(--accent-soft)}
+
+/* —— Pills discretas e retangulares (uso pontual) —— */
+.pill{border-radius:2px;padding:2px 7px;font-size:10px;letter-spacing:1.2px;background:var(--surface-2);border:1px solid var(--line);color:var(--text-dim);font-weight:700}
+.pill.w{background:transparent;border-color:color-mix(in srgb,var(--pos) 45%,transparent);color:var(--pos)}
+.pill.l{background:transparent;border-color:color-mix(in srgb,var(--neg) 45%,transparent);color:var(--neg)}
+.mini-tag{border-radius:2px;background:var(--accent-soft);color:var(--accent);font-weight:700}
+.mini-tag.alt{background:var(--surface-2);color:var(--text-dim)}
+
+/* —— Placar / scoreboard broadcast —— */
+.score{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);gap:16px;padding:18px 16px}
+.score .t .nm{font-family:var(--ui);font-size:11px;letter-spacing:1.6px;color:var(--text-dim);font-weight:700}
+.score .t .pt{font-family:'Oswald',sans-serif;font-weight:700;font-size:54px;font-variant-numeric:tabular-nums;color:var(--text)}
+.score .t.win .pt{color:var(--accent)}
+.score .vs{font-family:'Oswald',sans-serif;font-size:13px;color:var(--text-mut);letter-spacing:2px;font-weight:500}
+
+/* —— Feed de notícias editorial —— */
+.news li{border-bottom:1px solid var(--hair)}
+.news li:before{content:"";width:3px;background:var(--accent);flex:0 0 3px;margin:2px 0}
+.hint{color:var(--text-dim);font-size:12.5px;line-height:1.55}
+
+/* —— Sub-navegações sólidas (sem gradiente) —— */
+.subtab,.subpl,.preset-btn,.def-opt,.jogadaopt{border-radius:var(--r);box-shadow:none}
+.subtab{background:var(--surface);border:1px solid var(--line);color:var(--text-dim);font-family:'Oswald',sans-serif;letter-spacing:.4px;text-transform:uppercase;font-weight:500}
+.subtab:hover{border-color:var(--text-dim);color:var(--text)}
+.subtab.on{background:var(--accent);color:#0a0a0a;border-color:var(--accent);font-weight:600}
+.subpl.on,.def-opt.on,.jogadaopt.on,.preset-btn.on{border-color:var(--accent);background:var(--accent-soft);color:var(--text)}
+.liga-tab.on{background:var(--accent);color:#0a0a0a;border-color:var(--accent)}
+
+/* —— Tabelas: stat sheet de transmissão —— */
+table{border-collapse:collapse}
+th{font-family:var(--ui);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-mut);font-weight:700}
+td{font-size:13.5px}
+td.num,.num,table .mono{font-family:'Oswald',sans-serif;font-variant-numeric:tabular-nums;font-weight:500}
+tr.meu,.meu{background:var(--accent-soft)!important}
+tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+
+/* —— Barra inferior: ícones, fab sólido menos arredondado —— */
+.bottombar{background:#0b0b0b;border-top:1px solid var(--line);backdrop-filter:none;-webkit-backdrop-filter:none}
+.bottombar .navb{gap:4px;color:var(--text-mut)}
+.bottombar .navb svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+.bottombar .navb .lb{font-family:var(--ui);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+.bottombar .navb.on{color:var(--accent)}
+.fab{width:54px;height:54px;border-radius:9px;background:var(--accent);box-shadow:none;color:#0a0a0a}
+.fab svg{width:22px;height:22px;stroke:#0a0a0a;fill:none;stroke-width:2}
+.fab .flb{font-family:'Oswald',sans-serif;font-weight:700;font-size:8.5px;letter-spacing:.4px}
+
+/* —— Grid "Mais": ícones SVG, cartões sóbrios —— */
+.mais-card{border-radius:var(--r);background:var(--surface);border:1px solid var(--line)}
+.mais-card:hover{background:var(--surface-2);border-color:var(--text-mut)}
+.mais-card svg{width:24px;height:24px;stroke:var(--text);fill:none;stroke-width:1.7}
+.mais-card .lb{font-family:var(--ui);font-weight:700;font-size:12px;letter-spacing:.2px}
+.voltar-mais{border-radius:var(--r);font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.6px;font-weight:500}
+
+/* —— Formação: bordas retas nas fichas, mantém a quadra —— */
+.jog-slot,.banco-item,.sel-item{border-radius:var(--r)}
+
+/* —— Overline utilitário e números grandes de destaque —— */
+.big-num{font-family:'Oswald',sans-serif;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
 
 </style>
 </head>
@@ -2932,6 +3040,25 @@ function hud(){
     <div class="hud"><span>Campanha</span><b>${t.v}-${t.d}</b></div>
     <div class="hud ${cx>=0?'pos':'neg'}"><span>Caixa</span><b>${$(cx)}</b></div>`;
 }
+const ICONS={
+  home:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
+  users:'<circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3 2.7-5 5.5-5s5.5 2 5.5 5"/><path d="M16 6a3 3 0 0 1 0 6"/><path d="M20.5 20c0-2.4-1.8-4.1-3.7-4.7"/>',
+  skip:'<path d="M6 5l9 7-9 7z" fill="currentColor" stroke="none"/><line x1="18" y1="5" x2="18" y2="19"/>',
+  standings:'<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+  more:'<circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"/>',
+  clipboard:'<rect x="6" y="4" width="12" height="17" rx="1"/><path d="M9.5 4V3h5v1"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="13" y2="14"/>',
+  swap:'<path d="M7 4L4 7l3 3"/><path d="M4 7h13"/><path d="M17 20l3-3-3-3"/><path d="M20 17H7"/>',
+  calendar:'<rect x="4" y="5" width="16" height="16" rx="1"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="8" y1="3" x2="8" y2="6"/><line x1="16" y1="3" x2="16" y2="6"/>',
+  dollar:'<line x1="12" y1="3" x2="12" y2="21"/><path d="M16 7.5C16 5.6 14 4.5 12 4.5S8 5.6 8 7.5s2 3 4 3 4 1.1 4 3-2 3-4 3-4-1.1-4-3"/>',
+  megaphone:'<path d="M4 10v4l11 4V6z"/><path d="M15 8.5a3.5 3.5 0 0 1 0 7"/>',
+  bars:'<line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/>',
+  trophy:'<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5.2v.8A3 3 0 0 0 8 9.8"/><path d="M16 6h2.8v.8A3 3 0 0 1 16 9.8"/><line x1="12" y1="13" x2="12" y2="16"/><rect x="9.5" y="16" width="5" height="4" rx=".5"/>',
+  medal:'<circle cx="12" cy="14.5" r="4.5"/><path d="M9.5 10L7 3.5h4l1.8 4"/><path d="M14.5 10L17 3.5h-4l-1.8 4"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/>',
+  users2:'<circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c0-3.3 3-5 6.5-5s6.5 1.7 6.5 5"/>',
+  transfer:'<path d="M4 8.5h13l-3.2-3.2"/><path d="M20 15.5H7l3.2 3.2"/>'
+};
+function ICON(n){return `<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
 function acaoCentral(){
   // botao central: joga/avanca o proximo jogo do usuario
   try{ if(typeof jogarAoVivo==='function'){ jogarAoVivo(); return; } }catch(e){}
@@ -2942,21 +3069,21 @@ function montarBottomBar(){
   const on=k=>(ABA===k?'on':'');
   const temProp = !!(S && S.propostas && S.propostas.length);
   bb.innerHTML=
-    `<button class="navb ${on('inicio')}" data-t="inicio"><div class="ic">🏛️</div><div class="lb">Escritório</div></button>`+
-    `<button class="navb ${on('elenco')}" data-t="elenco"><div class="ic">👥</div><div class="lb">Elenco</div></button>`+
-    `<button class="central" id="fabCentral"><div class="fab"><div class="fic">⏭️</div><div class="flb">AVANÇAR</div></div></button>`+
-    `<button class="navb ${on('tabela')}" data-t="tabela"><div class="ic">📊</div><div class="lb">Liga</div></button>`+
-    `<button class="navb ${on('mais')}" data-t="mais"><div class="ic">⋯</div><div class="lb">Mais</div>${temProp?'<span class="dot"></span>':''}</button>`;
+    `<button class="navb ${on('inicio')}" data-t="inicio"><div class="ic">${ICON('home')}</div><div class="lb">Escritório</div></button>`+
+    `<button class="navb ${on('elenco')}" data-t="elenco"><div class="ic">${ICON('users')}</div><div class="lb">Elenco</div></button>`+
+    `<button class="central" id="fabCentral"><div class="fab">${ICON('skip')}<div class="flb">AVANÇAR</div></div></button>`+
+    `<button class="navb ${on('tabela')}" data-t="tabela"><div class="ic">${ICON('standings')}</div><div class="lb">Liga</div></button>`+
+    `<button class="navb ${on('mais')}" data-t="mais"><div class="ic">${ICON('more')}</div><div class="lb">Mais</div>${temProp?'<span class="dot"></span>':''}</button>`;
   bb.querySelectorAll('.navb').forEach(b=>b.onclick=()=>{ABA=b.dataset.t;render();});
   const fab=el('fabCentral'); if(fab) fab.onclick=acaoCentral;
 }
 function vMais(){
   const online = !!(S && S.online);
   const itens = online
-    ? [['taticas','🎽','Comissão'],['mercado','🔁','Mercado'],['calendario','📅','Calendário'],['financas','💰','Finanças'],['marketing','📣','Marketing'],['stats','📈','Estatíst.'],['jogadores','🧑‍🤝‍🧑','Jogadores'],['transferencias','🔄','Transfer.'],['carreira','🏆','Carreira'],['premios','🎖️','Prêmios']]
-    : [['taticas','🎽','Comissão'],['mercado','🔁','Mercado'],['calendario','📅','Calendário'],['financas','💰','Finanças'],['marketing','📣','Marketing'],['stats','📈','Estatíst.'],['carreira','🏆','Carreira'],['premios','🎖️','Prêmios'],['editor','⚙️','Editar liga']];
+    ? [['taticas','clipboard','Comissão'],['mercado','swap','Mercado'],['calendario','calendar','Calendário'],['financas','dollar','Finanças'],['marketing','megaphone','Marketing'],['stats','bars','Estatíst.'],['jogadores','users2','Jogadores'],['transferencias','transfer','Transfer.'],['carreira','trophy','Carreira'],['premios','medal','Prêmios']]
+    : [['taticas','clipboard','Comissão'],['mercado','swap','Mercado'],['calendario','calendar','Calendário'],['financas','dollar','Finanças'],['marketing','megaphone','Marketing'],['stats','bars','Estatíst.'],['carreira','trophy','Carreira'],['premios','medal','Prêmios'],['editor','settings','Editar liga']];
   const dotMerc = !!(S && S.propostas && S.propostas.length);
-  const cards=itens.map(([k,ic,lb])=>`<button class="mais-card" onclick="ABA='${k}';render()"><div class="ic">${ic}</div><div class="lb">${lb}</div>${(k==='mercado'&&dotMerc)?'<span class="dot"></span>':''}</button>`).join('');
+  const cards=itens.map(([k,ic,lb])=>`<button class="mais-card" onclick="ABA='${k}';render()">${ICON(ic)}<div class="lb">${lb}</div>${(k==='mercado'&&dotMerc)?'<span class="dot"></span>':''}</button>`).join('');
   return `<h2 class="sec">Mais</h2><div class="mais-grid">${cards}</div>`;
 }
 const SECUNDARIAS_MAIS=['taticas','mercado','calendario','financas','marketing','stats','carreira','premios','editor','jogadores','transferencias'];
