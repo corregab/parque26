@@ -702,6 +702,14 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 /* —— Overline utilitário e números grandes de destaque —— */
 .big-num{font-family:'Oswald',sans-serif;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
 
+
+/* —— Escudos dos times —— */
+.escudo{display:inline-block;vertical-align:middle;flex:0 0 auto}
+.teamgrid button{position:relative}
+.teamgrid button .escudo{position:absolute;top:12px;right:12px;opacity:.9}
+.tab-esc{display:inline-flex;align-items:center;gap:8px}
+.score .t .escudo{margin-bottom:6px}
+.brand-esc{display:flex;align-items:center;gap:10px}
 </style>
 </head>
 <body>
@@ -3033,7 +3041,7 @@ function montarTabs(){
 function hud(){
   const t=S.times[S.meuTime];
   const cx=t.caixa;
-  el('hdTeam').textContent=t.cidade.toUpperCase()+' '+t.nick.toUpperCase();
+  el('hdTeam').innerHTML='<span class="brand-esc">'+escudoTime(t.ab,20)+'<span>'+t.cidade.toUpperCase()+' '+t.nick.toUpperCase()+'</span></span>';
   el('hud').innerHTML=`
     <div class="hud"><span>Temporada</span><b>${S.temporada}</b></div>
     <div class="hud"><span>${S.fase==='regular'?'Jogos':'Fase'}</span><b>${S.fase==='regular'?(S.times[S.meuTime].v+S.times[S.meuTime].d)+'/'+JOGOS_TEMP:S.fase==='playin'?'PLAY-IN':S.fase==='playoffs'?['QUARTAS','SEMIS','FINAL C.','FINAL'][S.po.fase]:'—'}</b></div>
@@ -3059,6 +3067,19 @@ const ICONS={
   transfer:'<path d="M4 8.5h13l-3.2-3.2"/><path d="M20 15.5H7l3.2 3.2"/>'
 };
 function ICON(n){return `<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
+/* Escudo original estilizado (nao e o logo oficial): disco na cor do time,
+   costuras de bola de basquete e a sigla. Gerado por SVG, escala em qualquer tamanho. */
+function escudoTime(ab,size){
+  size=size||40;
+  const c=(typeof TIME_CORES!=='undefined'&&TIME_CORES[ab])?TIME_CORES[ab]:['#FDB927','#D8A81C'];
+  const accent=c[0],dark=c[1];
+  return `<svg class="escudo" viewBox="0 0 100 100" width="${size}" height="${size}" aria-label="${ab}" role="img">`+
+    `<circle cx="50" cy="50" r="46" fill="${dark}"/>`+
+    `<g stroke="${accent}" stroke-width="2" fill="none" opacity="0.22"><path d="M22 9 Q48 50 22 91"/><path d="M78 9 Q52 50 78 91"/></g>`+
+    `<circle cx="50" cy="50" r="46" fill="none" stroke="${accent}" stroke-width="4"/>`+
+    `<text x="50" y="50" dy="0.35em" text-anchor="middle" font-family="'Oswald','Barlow Condensed',sans-serif" font-weight="700" font-size="34" letter-spacing="0.5" fill="${accent}">${ab}</text>`+
+  `</svg>`;
+}
 function acaoCentral(){
   // botao central: joga/avanca o proximo jogo do usuario
   try{ if(typeof jogarAoVivo==='function'){ jogarAoVivo(); return; } }catch(e){}
@@ -3335,9 +3356,9 @@ function vInicio(){
 const kpi=(t,v,s)=>`<div class="card"><h3 class="sub">${t}</h3><div class="big">${v}</div><div class="hint">${s}</div></div>`;
 function placarMini(j){
   const aw=j.A.pts>j.B.pts;
-  return `<div class="score"><div class="t ${aw?'win':''}"><div class="nm">${esc(j.A.ab)}</div><div class="pt">${j.A.pts}</div></div>
+  return `<div class="score"><div class="t ${aw?'win':''}">${escudoTime(j.A.ab,30)}<div class="nm">${esc(j.A.ab)}</div><div class="pt">${j.A.pts}</div></div>
     <div class="vs">FINAL${j.ot?' / '+j.ot+'PR':''}</div>
-    <div class="t ${!aw?'win':''}"><div class="nm">${esc(j.B.ab)}</div><div class="pt">${j.B.pts}</div></div></div>`;
+    <div class="t ${!aw?'win':''}">${escudoTime(j.B.ab,30)}<div class="nm">${esc(j.B.ab)}</div><div class="pt">${j.B.pts}</div></div></div>`;
 }
 function playinHTML(){
   const bloco=(cf,nome)=>{
@@ -3718,7 +3739,7 @@ function vTabela(){
   const tab=conf=>`<div class="card tbl-wrap"><h3 class="sub">Conferência ${conf==='L'?'Leste':'Oeste'}</h3>
     <table><thead><tr><th>#</th><th>Time</th><th>V</th><th>D</th><th>%</th><th>PP</th><th>PS</th><th>Saldo</th><th>Seq</th></tr></thead><tbody>
     ${classificacao(conf).map((t,i)=>`<tr class="${t.id===S.meuTime?'me':''}">
-      <td>${i+1}${i===7?'<span class="muted">|</span>':''}</td><td class="name">${esc(t.cidade)} ${esc(t.nick)}</td>
+      <td>${i+1}${i===7?'<span class="muted">|</span>':''}</td><td class="name"><span class="tab-esc">${escudoTime(t.ab,22)}${esc(t.cidade)} ${esc(t.nick)}</span></td>
       <td>${t.v}</td><td>${t.d}</td><td>${(pctV(t)*100).toFixed(0)}</td>
       <td>${t.v+t.d?round(t.pf/(t.v+t.d),1):'—'}</td><td>${t.v+t.d?round(t.pc/(t.v+t.d),1):'—'}</td>
       <td style="color:${t.pf-t.pc>=0?'var(--green)':'var(--red)'}">${t.pf-t.pc>0?'+':''}${t.pf-t.pc}</td>
@@ -7735,7 +7756,7 @@ function montarSetup(){
   g.innerHTML=ord.map(t=>{
     const tit=(typeof CAMPEOES!=='undefined'&&CAMPEOES[t.ab])?` · <span class="champ">🏆${CAMPEOES[t.ab][0]}</span>`:'';
     const est=[...t.elenco].sort((x,y)=>y.ovr-x.ovr)[0];
-    return `<button data-i="${t.id}" style="border-left-color:${t.cor||'var(--line)'}">
+    return `<button data-i="${t.id}" style="border-left-color:${t.cor||'var(--line)'}">${escudoTime(t.ab,34)}
     <div class="cty">${esc(t.cidade)} · ${t.conf==='L'?'Leste':'Oeste'}${tit}</div>
     <div class="nk">${esc(t.nick)}</div>
     <div class="fr"><span>força ${forcaTime(t)}</span> <span class="star">${esc(est.nome.split(' ').slice(-1)[0])} ${est.ovr}</span></div></button>`;}).join('');
