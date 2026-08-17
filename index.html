@@ -2130,6 +2130,30 @@ function proximaFasePO(){
 }
 
 /* ---------- OFFSEASON ---------- */
+/* Reenche os elencos na offseason: os times recontratam agentes livres ate um minimo
+   saudavel, priorizando a posicao mais carente. Evita que os elencos definhem ao longo
+   das temporadas (jogadores expiram e vao pra agencia livre, mas ninguem os traz de volta). */
+function reencherElencos(min){
+  min=min||13;
+  S.livres=S.livres||[];
+  const posOrder=['PG','SG','SF','PF','C'];
+  S.times.forEach(t=>{
+    if(!t.elenco)t.elenco=[];
+    let guard=0;
+    while(t.elenco.length<min && S.livres.length && guard++<60){
+      S.livres.sort((a,b)=>b.ovr-a.ovr);
+      const cont={PG:0,SG:0,SF:0,PF:0,C:0};
+      t.elenco.forEach(p=>{ if(cont[p.pos]!=null)cont[p.pos]++; });
+      const carente=[...posOrder].sort((a,b)=>cont[a]-cont[b])[0];
+      let idx=S.livres.findIndex(p=>p.pos===carente);
+      if(idx<0)idx=0;
+      const p=S.livres.splice(idx,1)[0];
+      if(!p)break;
+      p.time=t.id; if(!(p.anos>0))p.anos=RI(2,4); p.salario=valorSalarial(p);
+      t.elenco.push(p);
+    }
+  });
+}
 function processarOffseason(){
   const rel=[];
   S.livres=S.livres||[];
@@ -2211,6 +2235,7 @@ function processarOffseason(){
   });
   // remove picks de 2ª rodada já vencidos
   S.picks=S.picks.filter(p=>p.ano>=S.temporada);
+  reencherElencos(13);   // times recontratam agentes livres ate um elenco saudavel
   S.temporada++;
   S.fase='draft';
   noticia('📋 Temporada '+S.temporada+' — Draft de novatos disponível','p');
