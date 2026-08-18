@@ -729,6 +729,25 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .dpick-meta{font-size:12px;color:var(--text-dim);font-family:var(--mono);white-space:nowrap}
 .dpick-now{display:flex;align-items:center;gap:12px}
 @keyframes dpickIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+
+/* —— Draft: big board, tiers e necessidades —— */
+.bb-list{display:flex;flex-direction:column;gap:2px}
+.bb-row{display:grid;grid-template-columns:26px 1fr auto auto auto;align-items:center;gap:10px;padding:7px 10px;background:var(--surface);border-bottom:1px solid var(--hair)}
+.bb-rk{font-family:'Oswald',sans-serif;font-weight:700;color:var(--text-mut);text-align:center}
+.bb-nm{font-weight:600;font-size:13.5px;cursor:pointer}
+.bb-pos{font-family:var(--mono);font-size:11px;color:var(--text-dim)}
+.bb-ovr{font-family:'Oswald',sans-serif;font-weight:600;font-variant-numeric:tabular-nums}
+.tier{font-family:var(--ui);font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:2px;text-transform:uppercase;white-space:nowrap}
+.tier-fr{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+.tier-ti{background:color-mix(in srgb,var(--pos) 16%,transparent);color:var(--pos)}
+.tier-ro{background:var(--surface-2);color:var(--text-dim)}
+.tier-pj{background:var(--surface-2);color:var(--text-mut)}
+.nec-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.nec-chip{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 8px;border-radius:2px;background:var(--surface-2);color:var(--text-dim);border:1px solid var(--line)}
+.nec-chip.nec-baixa{background:color-mix(in srgb,var(--neg) 16%,transparent);color:var(--neg);border-color:color-mix(in srgb,var(--neg) 40%,transparent)}
+.nec-chip.nec-alta{color:var(--pos)}
+.prosp-serve{background:var(--accent-soft)}
+.prosp-need{font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px}
 </style>
 </head>
 <body>
@@ -4302,6 +4321,18 @@ function verJogo(){
 }
 
 /* ---------- DRAFT ---------- */
+function tierProspecto(p){
+  const teto=Math.max(p.ovr||0,p.pot||0);
+  if(teto>=88) return {t:'Franquia',c:'tier-fr'};
+  if(teto>=82) return {t:'Titular',c:'tier-ti'};
+  if(teto>=75) return {t:'Rotação',c:'tier-ro'};
+  return {t:'Projeto',c:'tier-pj'};
+}
+function necessidadesTime(t){
+  const forca={PG:0,SG:0,SF:0,PF:0,C:0};
+  (t.elenco||[]).filter(p=>!p.egg).forEach(p=>{ if(forca[p.pos]!=null) forca[p.pos]+=(p.ovr>=78?1.6:p.ovr>=70?1:0.45); });
+  return Object.keys(forca).map(pos=>({pos,forca:forca[pos]})).sort((a,b)=>a.forca-b.forca);
+}
 function vDraft(){
   S.draftFeitos=S.draftFeitos||[];
   // === TELA DA LOTERIA (antes das escolhas) ===
@@ -4312,9 +4343,19 @@ function vDraft(){
       return `<div class="lot-row ${meu?'meu':''}"><span class="lot-pick">${l.obtido}</span>${escudoTime(t.ab,28)}<span class="lot-nm">${esc(t.cidade)} ${esc(t.nick)}${meu?' · VOCÊ':''}</span><span class="lot-mov">era #${l.esperado} ${mov}</span></div>`;
     }).join('');
     const meuNaLot=S.loteria.find(l=>l.time===S.meuTime);
+    // BIG BOARD: melhores prospectos ranqueados
+    const top=(S.draft||[]).slice(0,12).map((p,i)=>{
+      const tr=tierProspecto(p);
+      return `<div class="bb-row"><span class="bb-rk">${i+1}</span><span class="bb-nm clickable" onclick="fichaJogador(${p.id})">${esc(p.nome)}</span><span class="bb-pos">${p.pos}</span><span class="bb-ovr">${p.ovr}<span class="muted">▸${p.pot}</span></span><span class="tier ${tr.c}">${tr.t}</span></div>`;
+    }).join('');
+    // necessidade do meu time
+    const nec=necessidadesTime(S.times[S.meuTime]).slice(0,2).map(n=>n.pos).join(' e ');
     return `<h2 class="sec">Loteria do Draft</h2>
       <div class="card accent"><p class="hint">As primeiras escolhas são sorteadas — os piores times têm mais chance, mas a sorte decide. ${meuNaLot?`Você tirou a <b>${meuNaLot.obtido}ª escolha</b>!`:'Seu time não caiu entre as escolhas sorteadas desta vez.'}</p></div>
       <div class="lot-board">${lot}</div>
+      <h3 class="admin-h">Big board · melhores prospectos</h3>
+      <div class="hint" style="margin:-4px 0 8px">Seu time pede reforço em <b>${nec}</b>.</div>
+      <div class="bb-list">${top}</div>
       <button class="btn" style="width:100%;margin-top:14px" onclick="iniciarEscolhasDraft()">Começar o draft ▸</button>`;
   }
   // === TELA DE ESCOLHAS ===
@@ -4331,10 +4372,16 @@ function vDraft(){
     return `<h2 class="sec">Draft concluído</h2><div class="card"><p class="hint">As ${total} escolhas foram feitas. Os prospectos não escolhidos viraram agentes livres.</p></div>${boardHtml}`;
   }
   if(minhaVez){
-    const prosp=S.draft.slice(0,16).map(p=>`<tr><td class="name clickable" onclick="fichaJogador(${p.id})">${esc(p.nome)}</td><td>${bd(p.pos)}</td><td>${p.idade}</td><td><span class="ovr">${p.ovr}</span></td><td class="muted">${p.pot}</td><td class="muted" style="font-size:11px">${ARQNM[p.arq]||p.arq||''}</td><td><button class="btn mini" onclick="draftar(${p.id})">Escolher</button></td></tr>`).join('');
+    const nec=necessidadesTime(S.times[S.meuTime]);
+    const carentes=nec.slice(0,2).map(n=>n.pos);
+    const barra=nec.map(n=>{const forte=n.forca>=3, carente=carentes.includes(n.pos);return `<span class="nec-chip ${carente?'nec-baixa':(forte?'nec-alta':'')}">${n.pos}</span>`;}).join('');
+    const prosp=S.draft.slice(0,16).map(p=>{
+      const tr=tierProspecto(p), serve=carentes.includes(p.pos);
+      return `<tr class="${serve?'prosp-serve':''}"><td class="name clickable" onclick="fichaJogador(${p.id})">${esc(p.nome)}${serve?' <span class="prosp-need">↳ posição carente</span>':''}</td><td>${bd(p.pos)}</td><td><span class="ovr">${p.ovr}</span></td><td class="muted">${p.pot}</td><td><span class="tier ${tr.c}">${tr.t}</span></td><td><button class="btn mini" onclick="draftar(${p.id})">Escolher</button></td></tr>`;
+    }).join('');
     return `<h2 class="sec">Draft · escolha ${S.draftPick+1} de ${total}</h2>
-      <div class="card accent"><p style="margin:0"><b>É a sua vez!</b> <span class="hint">Você ainda tem ${minhasRestantes} escolha(s) neste draft.</span></p></div>
-      <div class="tbl-wrap" style="max-height:320px;overflow:auto;margin-top:10px"><table><thead><tr><th>Prospecto</th><th>Pos</th><th>Id</th><th>Ovr</th><th>Pot</th><th>Arquétipo</th><th></th></tr></thead><tbody>${prosp}</tbody></table></div>
+      <div class="card accent"><p style="margin:0 0 8px"><b>É a sua vez!</b> <span class="hint">Você ainda tem ${minhasRestantes} escolha(s).</span></p><div class="nec-bar"><span class="hint">Necessidade do elenco:</span>${barra}</div></div>
+      <div class="tbl-wrap" style="max-height:340px;overflow:auto;margin-top:10px"><table><thead><tr><th>Prospecto</th><th>Pos</th><th>Ovr</th><th>Pot</th><th>Tier</th><th></th></tr></thead><tbody>${prosp}</tbody></table></div>
       ${boardHtml}`;
   }
   const t=S.times[quem];
