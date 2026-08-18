@@ -2190,24 +2190,34 @@ function proximaFasePO(){
    das temporadas (jogadores expiram e vao pra agencia livre, mas ninguem os traz de volta). */
 function reencherElencos(min){
   min=min||13;
+  const PISO=10;      // todo time precisa de pelo menos isso (viabilidade)
+  const RESERVA=24;   // deixa ~esse tanto de agentes livres no mercado
   S.livres=S.livres||[];
   const posOrder=['PG','SG','SF','PF','C'];
-  S.times.forEach(t=>{
-    if(!t.elenco)t.elenco=[];
-    let guard=0;
-    while(t.elenco.length<min && S.livres.length && guard++<60){
-      S.livres.sort((a,b)=>b.ovr-a.ovr);
-      const cont={PG:0,SG:0,SF:0,PF:0,C:0};
-      t.elenco.forEach(p=>{ if(cont[p.pos]!=null)cont[p.pos]++; });
-      const carente=[...posOrder].sort((a,b)=>cont[a]-cont[b])[0];
-      let idx=S.livres.findIndex(p=>p.pos===carente);
-      if(idx<0)idx=0;
-      const p=S.livres.splice(idx,1)[0];
-      if(!p)break;
-      p.time=t.id; if(!(p.anos>0))p.anos=RI(2,4); p.salario=valorSalarial(p);
-      t.elenco.push(p);
-    }
-  });
+  const _contratar=(t)=>{
+    S.livres.sort((a,b)=>b.ovr-a.ovr);
+    const cont={PG:0,SG:0,SF:0,PF:0,C:0};
+    t.elenco.forEach(p=>{ if(cont[p.pos]!=null)cont[p.pos]++; });
+    const carente=[...posOrder].sort((a,b)=>cont[a]-cont[b])[0];
+    let idx=S.livres.findIndex(p=>p.pos===carente);
+    if(idx<0)idx=0;
+    const p=S.livres.splice(idx,1)[0];
+    if(!p)return false;
+    p.time=t.id; if(!(p.anos>0))p.anos=RI(2,4); p.salario=valorSalarial(p);
+    t.elenco.push(p);
+    return true;
+  };
+  const _encher=(alvo, respeitarReserva)=>{
+    S.times.forEach(t=>{
+      if(!t.elenco)t.elenco=[];
+      let guard=0;
+      while(t.elenco.length<alvo && S.livres.length>(respeitarReserva?RESERVA:0) && guard++<60){
+        if(!_contratar(t))break;
+      }
+    });
+  };
+  _encher(PISO, false);   // 1º: garante o piso viável em todos (mesmo consumindo a reserva)
+  _encher(min, true);     // 2º: completa até o alvo, mas preservando o mercado de agentes livres
 }
 function processarOffseason(){
   const rel=[];
