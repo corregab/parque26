@@ -751,12 +751,13 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 
 /* —— Esquemas táticos —— */
 .esq-list{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
-.esq-opt{flex:0 0 auto;min-width:110px;display:flex;flex-direction:column;gap:3px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;cursor:pointer;text-align:left}
+.esq-opt{flex:0 0 auto;min-width:110px;display:flex;flex-direction:column;gap:3px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;cursor:pointer;text-align:left;color:var(--text);font-family:var(--ui)}
 .esq-opt:hover{border-color:var(--text-dim)}
 .esq-opt.on{border-color:var(--accent);background:var(--accent-soft)}
-.esq-top{font-size:13px;font-weight:600}
-.esq-top b{font-weight:700}
+.esq-top{font-size:13px;font-weight:600;color:var(--text)}
+.esq-top b{font-weight:700;color:var(--text)}
 .esq-comp{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:.5px}
+.esq-opt.on .esq-top,.esq-opt.on .esq-top b{color:var(--text)}
 .esq-opt.on .esq-comp{color:var(--accent)}
 </style>
 </head>
@@ -3721,12 +3722,13 @@ function resumoTatico(t){
    ============================================================ */
 let SUBP='formacao';
 const ESQUEMAS = {
-  padrao:   {nome:'Padrão',         emoji:'⛹️', pos:['PG','SG','SF','PF','C'], desc:'1 armador, 2 alas, 2 grandes. Equilíbrio clássico.', bonus:{}},
-  torres:   {nome:'Torres gêmeas',  emoji:'🗼', pos:['PG','SG','SF','C','C'],  desc:'Dois pivôs no garrafão. Domina rebotes e a defesa interior, mas perde ritmo e espaçamento.', bonus:{wRim:0.14, ast:0.05, w3:-0.10}},
-  smallball:{nome:'Small ball',     emoji:'⚡', pos:['PG','SG','SF','SF','PF'], desc:'Sem pivô de ofício. Muito espaçamento e bola de 3, mas sofre nos rebotes.', bonus:{w3:0.18, ast:0.06, wRim:-0.08}},
-  duplopg:  {nome:'Dois armadores', emoji:'🎯', pos:['PG','PG','SF','PF','C'], desc:'Backcourt duplo de criação. Mais passe e ritmo, defesa de perímetro mais exigida.', bonus:{ast:0.22, w3:0.05}},
-  trioalto: {nome:'Trio alto',      emoji:'🧱', pos:['PG','SG','PF','PF','C'], desc:'Três jogadores grandes. Protege a cesta e domina as tabelas, ataque mais pesado.', bonus:{wRim:0.10, w3:-0.08}}
+  padrao:   {nome:'Padrão',         emoji:'⛹️', pos:['PG','SG','SF','PF','C'], desc:'1 armador, 2 alas, 2 grandes. Equilíbrio clássico.', bonus:{}, layout:[{x:50,y:82},{x:82,y:58},{x:18,y:58},{x:30,y:30},{x:50,y:17}]},
+  torres:   {nome:'Torres gêmeas',  emoji:'🗼', pos:['PG','SG','SF','C','C'],  desc:'Dois pivôs no garrafão. Domina rebotes e a defesa interior, mas perde ritmo e espaçamento.', bonus:{wRim:0.14, ast:0.05, w3:-0.10}, layout:[{x:50,y:80},{x:83,y:55},{x:17,y:55},{x:37,y:20},{x:63,y:20}]},
+  smallball:{nome:'Small ball',     emoji:'⚡', pos:['PG','SG','SF','SF','PF'], desc:'Sem pivô de ofício. Muito espaçamento e bola de 3, mas sofre nos rebotes.', bonus:{w3:0.18, ast:0.06, wRim:-0.08}, layout:[{x:50,y:83},{x:80,y:64},{x:20,y:52},{x:72,y:28},{x:40,y:19}]},
+  duplopg:  {nome:'Dois armadores', emoji:'🎯', pos:['PG','PG','SF','PF','C'], desc:'Backcourt duplo de criação. Mais passe e ritmo, defesa de perímetro mais exigida.', bonus:{ast:0.22, w3:0.05}, layout:[{x:34,y:80},{x:66,y:80},{x:18,y:50},{x:40,y:28},{x:60,y:17}]},
+  trioalto: {nome:'Trio alto',      emoji:'🧱', pos:['PG','SG','PF','PF','C'], desc:'Três jogadores grandes. Protege a cesta e domina as tabelas, ataque mais pesado.', bonus:{wRim:0.10, w3:-0.08}, layout:[{x:50,y:82},{x:83,y:60},{x:26,y:32},{x:56,y:34},{x:50,y:16}]}
 };
+function layoutEsquema(t){ const e=ESQUEMAS[esquemaDe(t)]; return (e&&e.layout?e.layout:ESQUEMAS.padrao.layout).map((c,i)=>({slot:i,x:c.x,y:c.y})); }
 const ORDEM_ESQUEMAS=['padrao','torres','smallball','duplopg','trioalto'];
 function esquemaDe(t){ return (t&&t.tatica&&t.tatica.esquema&&ESQUEMAS[t.tatica.esquema])?t.tatica.esquema:'padrao'; }
 function posFormDe(t){ return ESQUEMAS[esquemaDe(t)].pos; }
@@ -3813,7 +3815,7 @@ function subFormacao(){
   const tit=formacaoAtual(t);
   t.titulares=tit;
   if(!t._formInit){ sincMinutosFormacao(t); t._formInit=true; }
-  const layout=[{slot:0,x:50,y:82},{slot:1,x:82,y:58},{slot:2,x:18,y:58},{slot:3,x:30,y:30},{slot:4,x:50,y:17}];
+  const layout=layoutEsquema(t);
   const slotHtml=(cfg)=>{
     const pos=posFormDe(t)[cfg.slot];
     const id=tit[cfg.slot]; const p=id!=null&&t.elenco.find(x=>x.id===id);
