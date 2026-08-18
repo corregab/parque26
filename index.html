@@ -748,6 +748,16 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .nec-chip.nec-alta{color:var(--pos)}
 .prosp-serve{background:var(--accent-soft)}
 .prosp-need{font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px}
+
+/* —— Esquemas táticos —— */
+.esq-list{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.esq-opt{flex:0 0 auto;min-width:110px;display:flex;flex-direction:column;gap:3px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;cursor:pointer;text-align:left}
+.esq-opt:hover{border-color:var(--text-dim)}
+.esq-opt.on{border-color:var(--accent);background:var(--accent-soft)}
+.esq-top{font-size:13px;font-weight:600}
+.esq-top b{font-weight:700}
+.esq-comp{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:.5px}
+.esq-opt.on .esq-comp{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -1476,7 +1486,14 @@ function jogada(O,D,ctx){
   const defI=media(df,p=>p.at.defI);
   const casaBonus=(O.casa?0.015:0)+(O.sorte||0);
   // ---- jogada ofensiva ativa e usage por função
-  const jgd = JOGADAS[tatO.jogada] || JOGADAS.balanceado;
+  const _jgdBase = JOGADAS[tatO.jogada] || JOGADAS.balanceado;
+  const _esqB = (ESQUEMAS[tatO.esquema]||ESQUEMAS.padrao).bonus||{};
+  const jgd = Object.assign({}, _jgdBase, {
+    w3:(_jgdBase.w3||0)+(_esqB.w3||0),
+    wRim:(_jgdBase.wRim||0)+(_esqB.wRim||0),
+    wMid:(_jgdBase.wMid||0)+(_esqB.wMid||0),
+    ast:(_jgdBase.ast||0)+(_esqB.ast||0)
+  });
   const instrO=tatO.instr||{}, instrD=tatD.instr||{};
   const defTipo=tatD.defesa||0; // 0 homem a homem, 1 zona, 2 pressão total
   const zonaD=defTipo===1;
@@ -3273,6 +3290,8 @@ function vMais(){
 const SECUNDARIAS_MAIS=['taticas','mercado','calendario','financas','marketing','stats','carreira','premios','editor','jogadores','transferencias'];
 function render(){
   if(S && S.online && ABA==='editor') ABA='inicio';   // editor não existe no modo online
+  // destrava o draft: se todas as escolhas ja foram feitas mas a fase nao avancou, conclui agora
+  if(S && S.fase==='draft' && S.ordemDraft && S.draftPick>=S.ordemDraft.length && typeof finalizarDraft==='function'){ finalizarDraft(); }
   if(S && S.times && S.times[S.meuTime]) aplicarCoresTime(S.times[S.meuTime].ab);
   hud();
   const MAP={inicio:vInicio,elenco:vElenco,taticas:vComissao,calendario:vCal,tabela:vTabela,
@@ -3691,6 +3710,26 @@ function resumoTatico(t){
    COMISSÃO TÉCNICA — Formação + Tática/Rotação + Treino
    ============================================================ */
 let SUBP='formacao';
+const ESQUEMAS = {
+  padrao:   {nome:'Padrão',         emoji:'⛹️', pos:['PG','SG','SF','PF','C'], desc:'1 armador, 2 alas, 2 grandes. Equilíbrio clássico.', bonus:{}},
+  torres:   {nome:'Torres gêmeas',  emoji:'🗼', pos:['PG','SG','SF','C','C'],  desc:'Dois pivôs no garrafão. Domina rebotes e a defesa interior, mas perde ritmo e espaçamento.', bonus:{wRim:0.14, ast:0.05, w3:-0.10}},
+  smallball:{nome:'Small ball',     emoji:'⚡', pos:['PG','SG','SF','SF','PF'], desc:'Sem pivô de ofício. Muito espaçamento e bola de 3, mas sofre nos rebotes.', bonus:{w3:0.18, ast:0.06, wRim:-0.08}},
+  duplopg:  {nome:'Dois armadores', emoji:'🎯', pos:['PG','PG','SF','PF','C'], desc:'Backcourt duplo de criação. Mais passe e ritmo, defesa de perímetro mais exigida.', bonus:{ast:0.22, w3:0.05}},
+  trioalto: {nome:'Trio alto',      emoji:'🧱', pos:['PG','SG','PF','PF','C'], desc:'Três jogadores grandes. Protege a cesta e domina as tabelas, ataque mais pesado.', bonus:{wRim:0.10, w3:-0.08}}
+};
+const ORDEM_ESQUEMAS=['padrao','torres','smallball','duplopg','trioalto'];
+function esquemaDe(t){ return (t&&t.tatica&&t.tatica.esquema&&ESQUEMAS[t.tatica.esquema])?t.tatica.esquema:'padrao'; }
+function posFormDe(t){ return ESQUEMAS[esquemaDe(t)].pos; }
+function setEsquema(nm){
+  if(!ESQUEMAS[nm])return;
+  const t=S.times[S.meuTime];
+  t.tatica=t.tatica||{};
+  t.tatica.esquema=nm;
+  t.titulares=[]; t.titulares=formacaoAtual(t);  // re-monta respeitando a nova composição
+  sincMinutosFormacao(t);
+  toast&&toast('Esquema: '+ESQUEMAS[nm].nome);
+  render(); salvar();
+}
 const POS_FORM=['PG','SG','SF','PF','C'];
 const POS_NOME={PG:'Armador',SG:'Ala-armador',SF:'Ala',PF:'Ala-pivô',C:'Pivô'};
 function setSubP(k){ SUBP=k; render(); }
@@ -3698,7 +3737,7 @@ function formacaoAtual(t){
   let tit=Array.isArray(t.titulares)?[...t.titulares]:[];
   const usados=new Set();
   tit.forEach(id=>{ if(id!=null && t.elenco.find(p=>p.id===id && !p.lesao)) usados.add(id); });
-  POS_FORM.forEach((pos,i)=>{
+  posFormDe(t).forEach((pos,i)=>{
     const cur=tit[i];
     const ok = cur!=null && t.elenco.find(p=>p.id===cur && !p.lesao);
     if(!ok){
@@ -3738,7 +3777,7 @@ function autoFormacao(){
 }
 function abrirSeletorTitular(slot){
   const t=S.times[S.meuTime];
-  const pos=POS_FORM[slot];
+  const pos=posFormDe(t)[slot];
   const tit=formacaoAtual(t);
   const aptos=t.elenco.filter(p=>!p.lesao).sort((a,b)=> (b.pos===pos?1:0)-(a.pos===pos?1:0) || b.ovr-a.ovr );
   const html=`<p class="hint" style="margin-bottom:10px">Escolha o titular para <b>${POS_NOME[pos]} (${pos})</b>:</p>
@@ -3766,7 +3805,7 @@ function subFormacao(){
   if(!t._formInit){ sincMinutosFormacao(t); t._formInit=true; }
   const layout=[{slot:0,x:50,y:82},{slot:1,x:82,y:58},{slot:2,x:18,y:58},{slot:3,x:30,y:30},{slot:4,x:50,y:17}];
   const slotHtml=(cfg)=>{
-    const pos=POS_FORM[cfg.slot];
+    const pos=posFormDe(t)[cfg.slot];
     const id=tit[cfg.slot]; const p=id!=null&&t.elenco.find(x=>x.id===id);
     const foraPos=p&&p.pos!==pos;
     return `<button class="jog-slot" style="left:${cfg.x}%;top:${cfg.y}%" onclick="abrirSeletorTitular(${cfg.slot})">
@@ -3779,7 +3818,13 @@ function subFormacao(){
   const banco=t.elenco.filter(p=>!p.lesao && !tit.includes(p.id)).sort((a,b)=>b.ovr-a.ovr);
   const bancoHtml=banco.length?banco.map(p=>`<div class="banco-chip"><span class="bc-pos">${bd(p.pos)}</span><span class="bc-nome">${esc(p.nome.split(' ').slice(-1)[0])}</span><span class="bc-ovr ovr">${p.ovr}</span></div>`).join(''):'<span class="hint">Todos os aptos estão escalados.</span>';
   const lesionados=t.elenco.filter(p=>p.lesao);
-  return `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+  const esqAtual=esquemaDe(t);
+  const esqCards=ORDEM_ESQUEMAS.map(k=>{const e=ESQUEMAS[k];return `<button class="esq-opt ${k===esqAtual?'on':''}" onclick="setEsquema('${k}')"><span class="esq-top">${e.emoji} <b>${e.nome}</b></span><span class="esq-comp">${e.pos.join(' · ')}</span></button>`;}).join('');
+  const esqDesc=ESQUEMAS[esqAtual].desc;
+  return `<h3 class="admin-h">Esquema tático</h3>
+  <div class="esq-list">${esqCards}</div>
+  <p class="hint" style="margin:8px 0 14px">${esqDesc}</p>
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
     <p class="hint" style="margin:0">Toque num jogador para escolher o titular da posição.</p>
     <button class="btn ghost mini" onclick="autoFormacao()">✨ Automática</button>
   </div>
