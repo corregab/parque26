@@ -710,6 +710,25 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .tab-esc{display:inline-flex;align-items:center;gap:8px}
 .score .t .escudo{margin-bottom:6px}
 .brand-esc{display:flex;align-items:center;gap:10px}
+
+/* —— Draft: loteria e board —— */
+.lot-board{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.lot-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.lot-row.meu{border-color:var(--accent);background:var(--accent-soft)}
+.lot-pick{font-family:'Oswald',sans-serif;font-weight:700;font-size:19px;color:var(--accent);min-width:26px;text-align:center}
+.lot-nm{flex:1;font-weight:600;font-size:14px}
+.lot-mov{font-size:11px;color:var(--text-dim);letter-spacing:.3px}
+.lot-up{color:var(--pos);font-weight:700} .lot-dn{color:var(--neg);font-weight:700}
+.dboard{display:flex;flex-direction:column;gap:3px;max-height:420px;overflow:auto}
+.dpick{display:grid;grid-template-columns:26px 22px 1fr auto;align-items:center;gap:9px;padding:7px 10px;background:var(--surface);border-bottom:1px solid var(--hair);border-radius:2px;animation:dpickIn .32s ease-out}
+.dpick.meu{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.dpick-n{font-family:'Oswald',sans-serif;font-weight:700;color:var(--text-dim);text-align:center;font-size:14px}
+.dpick-tm{font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;letter-spacing:.3px}
+.dpick-tm em{color:var(--text-mut);font-size:10px;font-style:normal}
+.dpick-pl{font-weight:600;font-size:13.5px;grid-column:3;justify-self:start}
+.dpick-meta{font-size:12px;color:var(--text-dim);font-family:var(--mono);white-space:nowrap}
+.dpick-now{display:flex;align-items:center;gap:12px}
+@keyframes dpickIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
@@ -2218,7 +2237,25 @@ function processarOffseason(){
   // easter eggs: injeta os 3 prospectos especiais no PRIMEIRO draft
   if(typeof injetarEggsNoDraft==='function') injetarEggsNoDraft();
   // ordem do draft: pior time escolhe 1º; MAS quem POSSUI o pick daquele slot escolhe
-  const ordemTimes = classificacao().slice().reverse().map(t=>t.id); // pior->melhor
+  // === LOTERIA DO DRAFT (estilo NBA): os piores times entram no sorteio das primeiras escolhas ===
+  const invertido = classificacao().slice().reverse().map(t=>t.id); // pior -> melhor
+  const LOT_N = Math.min(14, invertido.length);                     // 14 piores entram na loteria
+  const naLoteria = invertido.slice(0, LOT_N);
+  const foraLoteria = invertido.slice(LOT_N);                       // times de playoff: ordem fixa
+  const pesoLot = {};
+  naLoteria.forEach((id,i)=>{ pesoLot[id] = Math.pow(LOT_N - i, 1.7); }); // pior = mais chance
+  const sorteados = [];
+  const pool = naLoteria.slice();
+  const NSORT = Math.min(4, pool.length);                           // sorteia as 4 primeiras escolhas
+  for(let k=0;k<NSORT && pool.length;k++){
+    let tot=pool.reduce((s,id)=>s+pesoLot[id],0), r=Math.random()*tot, esc=pool[0];
+    for(const id of pool){ r-=pesoLot[id]; if(r<=0){esc=id;break;} }
+    sorteados.push(esc); pool.splice(pool.indexOf(esc),1);
+  }
+  const restoLot = naLoteria.filter(id=>!sorteados.includes(id));   // resto da loteria: ordem original
+  const ordemTimes = sorteados.concat(restoLot).concat(foraLoteria);
+  // guarda o resultado da loteria para exibir (posicao esperada x sorteada)
+  S.loteria = sorteados.map((id,i)=>({ time:id, esperado: invertido.indexOf(id)+1, obtido: i+1 }));
   // pega os picks de 1ª rodada do ano atual, na ordem dos slots
   const picks1 = ordemTimes.map(donoId=>{
     const pk=(S.picks||[]).find(p=>p.ano===S.temporada && p.rodada===1 && p.dono===donoId);
@@ -2241,7 +2278,52 @@ function processarOffseason(){
   noticia('📋 Temporada '+S.temporada+' — Draft de novatos disponível','p');
   return rel;
 }
+function fazerPickDraft(escolha){
+  const tid=S.ordemDraft[S.draftPick];
+  const dono=(S.ordemDonos?S.ordemDonos[S.draftPick]:tid);
+  let p;
+  if(escolha){ p=escolha; }
+  else { const top=S.draft.slice(0,4); p=sorteioPeso(top,x=>x.ovr+x.pot*0.6); }
+  if(!p){ S.draftPick++; return; }
+  S.draft=S.draft.filter(x=>x!==p);
+  p.time=tid; S.times[tid].elenco.push(p);
+  S.draftFeitos=S.draftFeitos||[];
+  S.draftFeitos.push({pick:S.draftPick+1, timeAb:S.times[tid].ab, timeNick:S.times[tid].nick, donoAb:S.times[dono].ab, viaTroca:(dono!==tid), nome:p.nome, pos:p.pos, ovr:p.ovr, pot:p.pot, meu:(tid===S.meuTime)});
+  if(tid===S.meuTime) noticia('📋 Você selecionou '+p.nome+' ('+p.pos+', ovr '+p.ovr+', pot '+p.pot+')','p');
+  S.draftPick++;
+}
+function finalizarDraft(){
+  if(S._draftTimer){clearTimeout(S._draftTimer);S._draftTimer=null;}
+  (S.draft||[]).forEach(p=>S.livres.push(p));
+  S.draft=[];
+  S.draftFase='fim';
+  faseAgentesLivres();
+}
+function avancarDraftAuto(){
+  if(S._draftTimer){clearTimeout(S._draftTimer);S._draftTimer=null;}
+  if(S.fase!=='draft'){return;}
+  if(S.draftPick>=S.ordemDraft.length){ finalizarDraft(); render(); return; }
+  const tid=S.ordemDraft[S.draftPick];
+  if(tid===S.meuTime){ render(); return; }   // vez do usuario: para e espera a escolha
+  fazerPickDraft();                           // escolha automatica da CPU
+  render();
+}
+function iniciarEscolhasDraft(){ S.draftFase='escolhas'; render(); }
+function pularDraftAnim(){
+  if(S._draftTimer){clearTimeout(S._draftTimer);S._draftTimer=null;}
+  let guard=0;
+  while(S.fase==='draft' && S.draftPick<S.ordemDraft.length && S.ordemDraft[S.draftPick]!==S.meuTime && guard++<80){ fazerPickDraft(); }
+  if(S.draftPick>=S.ordemDraft.length) finalizarDraft();
+  render();
+}
+// compat: mantem a assinatura antiga usada em outros pontos
 function executarDraft(escolhaUsuario){
+  if(escolhaUsuario!==undefined){ fazerPickDraft(escolhaUsuario); }
+  let guard=0;
+  while(S.draftPick<S.ordemDraft.length && S.ordemDraft[S.draftPick]!==S.meuTime && guard++<80){ fazerPickDraft(); }
+  if(S.draftPick>=S.ordemDraft.length) finalizarDraft();
+}
+function _executarDraft_legado(escolhaUsuario){
   // roda o draft até a vez do usuário (ou completa)
   while(S.draftPick<S.ordemDraft.length){
     const tid=S.ordemDraft[S.draftPick];
@@ -3182,6 +3264,10 @@ function render(){
   el('view').innerHTML=voltar+f();
   if(f.pos)f.pos();
   montarBottomBar();
+  // anima o draft: quando e vez da CPU, agenda a proxima escolha automaticamente
+  if(S && S.fase==='draft' && S.draftFase==='escolhas' && !S._draftTimer && S.draftPick<S.ordemDraft.length && S.ordemDraft[S.draftPick]!==S.meuTime){
+    S._draftTimer=setTimeout(avancarDraftAuto, 430);
+  }
   salvar();
 }
 
@@ -4217,43 +4303,60 @@ function verJogo(){
 
 /* ---------- DRAFT ---------- */
 function vDraft(){
-  const quem=S.ordemDraft[S.draftPick];
-  const minhaVez=quem===S.meuTime;
-  const donoSlot=S.ordemDonos?S.ordemDonos[S.draftPick]:quem;
-  // quantas escolhas o usuário ainda tem neste draft
-  const minhasRestantes=S.ordemDraft.slice(S.draftPick).filter(id=>id===S.meuTime).length;
-  const slotDe = donoSlot!==quem ? ` (pick originalmente de ${esc(S.times[donoSlot].ab)}, adquirido via troca)` : '';
-  return `<div class="card accent"><h3 class="sub">Draft de novatos · escolha ${S.draftPick+1} de 30</h3>
-    <div class="hint" style="margin-bottom:8px">Escolhe agora: <b>${esc(S.times[quem].ab)}</b>${slotDe} · você ainda tem <b>${minhasRestantes}</b> escolha(s) neste draft.</div>
-    ${minhaVez?`<p><b>É a sua vez de escolher!</b></p>
-      <div class="tbl-wrap" style="max-height:340px;overflow:auto;margin-top:8px"><table><thead><tr>
-      <th>Prospecto</th><th>Pos</th><th>Id</th><th>Ovr</th><th>Pot</th><th>Arquétipo</th><th></th></tr></thead><tbody>
-      ${S.draft.slice(0,16).map(p=>`<tr><td class="name clickable" onclick="fichaJogador(${p.id})">${esc(p.nome)}</td>
-        <td>${bd(p.pos)}</td><td>${p.idade}</td><td><span class="ovr">${p.ovr}</span></td>
-        <td class="muted">${p.pot}</td><td class="muted" style="font-size:11px">${ARQNM[p.arq]||p.arq||''}</td>
-        <td><button class="btn mini" onclick="draftar(${p.id})">Selecionar</button></td></tr>`).join('')}
-      </tbody></table></div>`
-    :`<p class="hint">${esc(S.times[quem].nick)} está escolhendo...</p>
-      <button class="btn" onclick="rodarDraft()">Avançar até minha próxima escolha</button>`}</div>`;
-}
-function rodarDraft(){
-  // avança automaticamente até a vez do usuário ou o fim
-  let guard=0;
-  while(S.fase==='draft' && S.ordemDraft[S.draftPick]!==S.meuTime && guard++<60){
-    executarDraft();
+  S.draftFeitos=S.draftFeitos||[];
+  // === TELA DA LOTERIA (antes das escolhas) ===
+  if(S.draftFase==='loteria' && S.loteria && S.loteria.length){
+    const lot=S.loteria.map(l=>{
+      const t=S.times[l.time], meu=l.time===S.meuTime, dif=l.esperado-l.obtido;
+      const mov = dif>0?`<span class="lot-up">▲ ${dif}</span>`:(dif<0?`<span class="lot-dn">▼ ${-dif}</span>`:`<span class="muted">=</span>`);
+      return `<div class="lot-row ${meu?'meu':''}"><span class="lot-pick">${l.obtido}</span>${escudoTime(t.ab,28)}<span class="lot-nm">${esc(t.cidade)} ${esc(t.nick)}${meu?' · VOCÊ':''}</span><span class="lot-mov">era #${l.esperado} ${mov}</span></div>`;
+    }).join('');
+    const meuNaLot=S.loteria.find(l=>l.time===S.meuTime);
+    return `<h2 class="sec">Loteria do Draft</h2>
+      <div class="card accent"><p class="hint">As primeiras escolhas são sorteadas — os piores times têm mais chance, mas a sorte decide. ${meuNaLot?`Você tirou a <b>${meuNaLot.obtido}ª escolha</b>!`:'Seu time não caiu entre as escolhas sorteadas desta vez.'}</p></div>
+      <div class="lot-board">${lot}</div>
+      <button class="btn" style="width:100%;margin-top:14px" onclick="iniciarEscolhasDraft()">Começar o draft ▸</button>`;
   }
-  render();
+  // === TELA DE ESCOLHAS ===
+  const total=S.ordemDraft.length;
+  const acabou=S.draftPick>=total;
+  const quem=acabou?null:S.ordemDraft[S.draftPick];
+  const minhaVez=!acabou && quem===S.meuTime;
+  const minhasRestantes=S.ordemDraft.slice(S.draftPick).filter(id=>id===S.meuTime).length;
+  const board=S.draftFeitos.slice().reverse().slice(0,40).map(f=>
+    `<div class="dpick ${f.meu?'meu':''}"><span class="dpick-n">${f.pick}</span>${escudoTime(f.timeAb,22)}<span class="dpick-tm">${f.timeAb}${f.viaTroca?` <em>via ${f.donoAb}</em>`:''}</span><span class="dpick-pl">${esc(f.nome)}</span><span class="dpick-meta">${f.pos} · <b>${f.ovr}</b>${f.pot>f.ovr?` <span class="muted">▸${f.pot}</span>`:''}</span></div>`
+  ).join('');
+  const boardHtml=S.draftFeitos.length?`<h3 class="admin-h">Escolhas do draft (${S.draftFeitos.length}/${total})</h3><div class="dboard">${board}</div>`:'';
+  if(acabou){
+    return `<h2 class="sec">Draft concluído</h2><div class="card"><p class="hint">As ${total} escolhas foram feitas. Os prospectos não escolhidos viraram agentes livres.</p></div>${boardHtml}`;
+  }
+  if(minhaVez){
+    const prosp=S.draft.slice(0,16).map(p=>`<tr><td class="name clickable" onclick="fichaJogador(${p.id})">${esc(p.nome)}</td><td>${bd(p.pos)}</td><td>${p.idade}</td><td><span class="ovr">${p.ovr}</span></td><td class="muted">${p.pot}</td><td class="muted" style="font-size:11px">${ARQNM[p.arq]||p.arq||''}</td><td><button class="btn mini" onclick="draftar(${p.id})">Escolher</button></td></tr>`).join('');
+    return `<h2 class="sec">Draft · escolha ${S.draftPick+1} de ${total}</h2>
+      <div class="card accent"><p style="margin:0"><b>É a sua vez!</b> <span class="hint">Você ainda tem ${minhasRestantes} escolha(s) neste draft.</span></p></div>
+      <div class="tbl-wrap" style="max-height:320px;overflow:auto;margin-top:10px"><table><thead><tr><th>Prospecto</th><th>Pos</th><th>Id</th><th>Ovr</th><th>Pot</th><th>Arquétipo</th><th></th></tr></thead><tbody>${prosp}</tbody></table></div>
+      ${boardHtml}`;
+  }
+  const t=S.times[quem];
+  const donoSlot=S.ordemDonos?S.ordemDonos[S.draftPick]:quem;
+  const via=donoSlot!==quem?` <span class="hint">(pick via ${esc(S.times[donoSlot].ab)})</span>`:'';
+  return `<h2 class="sec">Draft · escolha ${S.draftPick+1} de ${total}</h2>
+    <div class="card"><div class="dpick-now">${escudoTime(t.ab,32)}<div><div class="hint">Escolhendo agora${via}</div><b style="font-family:'Oswald',sans-serif;font-size:19px;text-transform:uppercase">${esc(t.cidade)} ${esc(t.nick)}</b></div></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost mini" onclick="pularDraftAnim()">Pular até minha vez ▸▸</button></div></div>
+    ${boardHtml}`;
 }
+function rodarDraft(){ avancarDraftAuto(); }
 function draftar(id){
-  const p=S.draft.find(x=>x.id===id);
-  executarDraft(p);
-  if(S.fase==='draft')executarDraft();
-  render();
+  const p=(S.draft||[]).find(x=>x.id===id);
+  if(!p)return;
+  fazerPickDraft(p);
+  render();   // o render agenda a continuacao automatica das CPUs
 }
 function encerrarTemporada(){
   const rel=processarOffseason();
   rel.slice(0,6).forEach(r=>noticia('🎓 '+r));
   S.draftPick=0;S.avaliado=false;
+  S.draftFeitos=[]; S.draftFase='loteria';   // começa mostrando a loteria; board zerado
   render();
 }
 /* ============================================================
