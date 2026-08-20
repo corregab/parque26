@@ -8251,12 +8251,19 @@ function talvezLembrarCadastro(){
   if(typeof cloudLogado==='function' && cloudLogado()) return;         // já tem conta
   const m=document.getElementById('modal');
   if(m && m.classList.contains('on')) return;                          // não briga com outro modal
+  const LIMIAR=3*24*60*60*1000; // patamar "já tá jogando sem conta há um tempo"
   // marca a 1ª vez que essa pessoa apareceu jogando sem conta (não existia ainda -> registra agora)
   const keyPrimeiro='parque26:primeiroAcessoSemConta';
   let primeiro=0;
   try{ primeiro=+(localStorage.getItem(keyPrimeiro)||0); }catch(e){}
-  if(!primeiro){ primeiro=Date.now(); try{ localStorage.setItem(keyPrimeiro, String(primeiro)); }catch(e){} return; }
-  const LIMIAR=3*24*60*60*1000; // só começa a cobrar depois de já estar jogando sem conta há uns dias
+  if(!primeiro){
+    // já tem carreira salva neste aparelho? então não é gente nova — já vem jogando sem conta.
+    // conta como se o prazo já tivesse vencido, pra avisar já na próxima entrada.
+    const jaTemSave = (typeof lerIdx==='function') && lerIdx().length>0;
+    primeiro = jaTemSave ? (Date.now()-LIMIAR-1000) : Date.now();
+    try{ localStorage.setItem(keyPrimeiro, String(primeiro)); }catch(e){}
+    if(!jaTemSave) return;   // instalação zerada: começa a contar o prazo normal a partir de agora
+  }
   if(Date.now()-primeiro<LIMIAR) return;
   const key='parque26:lembreteCadastro';
   let ultimo=0;
