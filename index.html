@@ -8245,11 +8245,42 @@ function mostrarNovidades(forcar){
   try{ localStorage.setItem(key, NOVIDADES.versao); }catch(e){}
 }
 
+/* Lembrete gentil de cadastro para quem joga só localmente (sem conta na nuvem).
+   Não interrompe outro modal aberto, e não repete antes de alguns dias. */
+function talvezLembrarCadastro(){
+  if(typeof cloudLogado==='function' && cloudLogado()) return;         // já tem conta
+  const m=document.getElementById('modal');
+  if(m && m.classList.contains('on')) return;                          // não briga com outro modal
+  // marca a 1ª vez que essa pessoa apareceu jogando sem conta (não existia ainda -> registra agora)
+  const keyPrimeiro='parque26:primeiroAcessoSemConta';
+  let primeiro=0;
+  try{ primeiro=+(localStorage.getItem(keyPrimeiro)||0); }catch(e){}
+  if(!primeiro){ primeiro=Date.now(); try{ localStorage.setItem(keyPrimeiro, String(primeiro)); }catch(e){} return; }
+  const LIMIAR=3*24*60*60*1000; // só começa a cobrar depois de já estar jogando sem conta há uns dias
+  if(Date.now()-primeiro<LIMIAR) return;
+  const key='parque26:lembreteCadastro';
+  let ultimo=0;
+  try{ ultimo=+(localStorage.getItem(key)||0); }catch(e){}
+  const INTERVALO=2*24*60*60*1000; // depois disso, cobra de novo a cada 2 dias
+  if(Date.now()-ultimo<INTERVALO) return;
+  try{ localStorage.setItem(key, String(Date.now())); }catch(e){}
+  abrirModal('☁️ SALVA ESSA PORRA NA NUVEM!', `
+    <p class="hint">Sério, tu tá jogando faz tempo e isso tá salvo só nesse aparelho. Limpou os dados, trocou de celular, desinstalou o app... <b>TU VAI PERDER TUDO, HEINN</b> 😤</p>
+    <div class="nov-item"><span class="nov-emoji">☁️</span><div><b>Backup na nuvem</b><p>Sua carreira fica protegida e nunca some.</p></div></div>
+    <div class="nov-item"><span class="nov-emoji">📱</span><div><b>Jogue de qualquer lugar</b><p>Continue no celular, no computador, onde quiser — é só entrar com sua conta.</p></div></div>
+    <div class="nov-item"><span class="nov-emoji">🏀</span><div><b>Ligas online</b><p>Crie ou entre em ligas para jogar junto com os amigos.</p></div></div>
+    <div class="row" style="justify-content:center;gap:8px;margin-top:14px">
+      <button class="btn" onclick="closeModal();if(typeof cloudPainelLogin==='function')cloudPainelLogin('criar')">Criar conta grátis</button>
+      <button class="btn ghost" onclick="closeModal()">Continuar sem cadastro</button>
+    </div>`);
+}
+
 async function iniciarApp(){
   if(typeof cloudInit==='function') cloudInit();
   migrarLegado();
   mostrarHub();   // primeiro acesso (e todo acesso) abre na tela de início/hub
   setTimeout(()=>{ try{ mostrarNovidades(); }catch(e){} }, 650); // aviso de novidades (1x por versão)
+  setTimeout(()=>{ try{ talvezLembrarCadastro(); }catch(e){} }, 1600); // lembrete de cadastro p/ quem joga só local
 }
 iniciarApp();
 
