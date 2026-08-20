@@ -4216,21 +4216,25 @@ function vFin(){
   const recPatroc=Math.round(t.patroc*0.3)+recPatrocContratos;  // base institucional + contratos da camisa
   const recTV=t.tv||60e6;
   const receitaTotal=recBilheteria+recConsumo+recPatroc+recTV;
-  // DESPESAS anuais
+  // DESPESAS anuais (recorrentes de verdade — o que sai do caixa a cada rodada)
   const despFolha=folha(t);
-  const despLuxo=impostoLuxo(t);
   const despTecnico=(S.carreiraTec&&S.carreiraTec.salarioTec)|| 6e6;
   const despOper=Math.round(18e6 + t.mercado*2e6); // operação, viagens, comissão
-  const despesaTotal=despFolha+despLuxo+despTecnico+despOper;
+  const despesaTotal=despFolha+despTecnico+despOper;
   const resultado=receitaTotal-despesaTotal;
+  // imposto de luxo NÃO é recorrente: só é cobrado ao fechar um contrato acima do teto
+  // (renovação ou agente livre). Aqui é só um alerta do risco atual, não entra no resultado.
+  const riscoLuxo=impostoLuxo(t);
   const linha=(nome,val,cor)=>`<div class="kv"><span>${nome}</span><b style="${cor?'color:'+cor:''}">${$(val)}</b></div>`;
   return `<h2 class="sec">Finanças</h2>
   <div class="grid g4">
-    ${kpi('Caixa',$(t.caixa),t.caixa<0?'⚠ negativo':'saudável')}
+    ${kpi('Caixa',$(t.caixa),t.caixa<0?'⚠ acumulado negativo':'saudável')}
     ${kpi('Receita anual',$(receitaTotal),'projeção')}
-    ${kpi('Despesa anual',$(despesaTotal),despLuxo>0?'inclui imposto de luxo':'operação normal')}
+    ${kpi('Despesa anual',$(despesaTotal),'operação recorrente')}
     ${kpi('Resultado',$(resultado),resultado>=0?'superávit':'déficit')}
   </div>
+  <p class="hint" style="margin:-4px 0 12px">O <b>Resultado</b> é o fluxo desta temporada — o que entra menos o que sai a cada rodada. O <b>Caixa</b> é o saldo acumulado de toda a carreira: um bom ano melhora o saldo, mas não apaga dívidas antigas de outras temporadas.</p>
+  ${riscoLuxo>0?`<div class="card accent" style="margin-bottom:14px"><p class="hint" style="margin:0">⚠ Sua folha está <b>${$(despFolha-TETO)}</b> acima do teto salarial. Isso não é cobrado automaticamente todo ano — mas se você <b>renovar</b> um contrato ou <b>contratar</b> um agente livre estando acima do teto, paga um imposto de luxo de cerca de <b>${$(riscoLuxo)}</b> naquele momento.</p></div>`:''}
   <div class="grid g2" style="margin-top:14px">
     <div class="card"><h3 class="sub">📈 Receitas (anual)</h3>
       ${linha('Direitos de TV',recTV)}
@@ -4241,7 +4245,6 @@ function vFin(){
     </div>
     <div class="card"><h3 class="sub">📉 Despesas (anual)</h3>
       ${linha('Folha salarial',despFolha, despFolha>TETO?'var(--red)':'')}
-      ${linha('Imposto de luxo',despLuxo, despLuxo>0?'var(--red)':'')}
       ${linha('Salário do técnico',despTecnico)}
       ${linha('Operação e viagens',despOper)}
       <div class="kv" style="border-top:2px solid var(--wood);margin-top:4px"><span><b>Total</b></span><b>${$(despesaTotal)}</b></div>
@@ -4261,7 +4264,7 @@ function vFin(){
       <div class="kv"><span>Teto salarial</span><b>${$(TETO)}</b></div>
       <div class="kv"><span>Espaço disponível</span><b style="color:${TETO-despFolha>=0?'var(--green)':'var(--red)'}">${$(TETO-despFolha)}</b></div>
       <div class="bar" style="margin:6px 0"><i style="width:${clamp(despFolha/TETO*100,0,100)}%;background:${despFolha>TETO?'var(--red)':'var(--wood)'}"></i></div>
-      ${despLuxo>0?`<p class="hint" style="color:var(--red)">Você está no imposto de luxo: paga ${$(despLuxo)}/ano por estar ${$(despFolha-TETO)} acima do teto.</p>`:'<p class="hint">Abaixo do teto — sem imposto de luxo.</p>'}
+      ${riscoLuxo>0?`<p class="hint" style="color:var(--red)">Se você renovar ou contratar acima do teto agora, paga um imposto de luxo de cerca de ${$(riscoLuxo)} naquele momento — não é cobrado sozinho todo ano.</p>`:'<p class="hint">Abaixo do teto — sem risco de imposto de luxo.</p>'}
       <h3 class="sub" style="margin-top:14px">Maiores salários</h3>
       ${[...t.elenco].sort((a,b)=>b.salario-a.salario).slice(0,6).map(p=>
         `<div class="kv"><span>${bd(p.pos)} ${esc(p.nome)} <span class="muted">${p.ovr}</span></span><b>${$(p.salario)} · ${p.anos}a</b></div>`).join('')}
