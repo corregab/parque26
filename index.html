@@ -2269,7 +2269,7 @@ function processarOffseason(){
     t.v=0;t.d=0;t.pf=0;t.pc=0;t.seq=[];
     t.caixa += t.patroc*0.15;
     t.patroc = Math.round((12+t.mercado*5+ (t.prestigio-70)*0.35)*1e6*R(.9,1.15));
-    t.tv = Math.round((30+t.mercado*3.5)*1e6*R(.98,1.06));
+    t.tv = Math.round((90+t.mercado*3.5)*1e6*R(.98,1.06));
     t.prestigio = clamp(Math.round(t.prestigio*0.82 + forcaTime(t)*0.18 + (t.camp?2:0)),40,95);
   });
   S.livres=S.livres.filter(p=>!p.aposentou);
@@ -2581,11 +2581,15 @@ function registrarTemporadaCarreira(){
     // checar play-in
     resultado = pctV(t)>=0.5? 'Fora dos playoffs' : 'Temporada de reconstrução';
   }
+  const fin=(typeof relatorioFinanceiroAnual==='function')?relatorioFinanceiroAnual(t):null;
   const entrada={
     temp:S.temporada, time:t.ab, timeNome:t.cidade+' '+t.nick,
     v:t.v, d:t.d, aproveitamento:Math.round(pctV(t)*100),
     resultado, objetivo:S.objetivo.txt, cumpriu: cumpriuObjetivo(),
-    forca:forcaTime(t)
+    forca:forcaTime(t),
+    // retrato financeiro real desta temporada (para dar pra auditar depois)
+    financas: fin?{receita:fin.receitaTotal, despesa:fin.despesaTotal, resultado:fin.resultado,
+      folha:fin.despFolha, caixaFim:t.caixa}:null
   };
   c.historico.push(entrada);
   c.temporadas++;
@@ -4207,26 +4211,31 @@ function impostoLuxo(t){
   if(excede>25e6) mult=2.5; else if(excede>15e6) mult=2.0;
   return Math.round(excede*mult);
 }
-function vFin(){
-  const t=S.times[S.meuTime];
-  const oc=ocupacao(t),pub=Math.round(t.capacidade*oc);
+// Calcula o retrato financeiro do time (mesma fórmula usada na tela de Finanças e no
+// histórico de carreira, para os dois nunca divergirem). despesaTotal é só o que realmente
+// sai do caixa toda rodada — o imposto de luxo é cobrado à parte, na hora de um contrato.
+function relatorioFinanceiroAnual(t){
+  const oc=ocupacao(t), pub=Math.round(t.capacidade*oc);
   const jogosCasa=Math.round(JOGOS_TEMP/2);
-  // RECEITAS anuais
   const recBilheteria=Math.round(pub*t.ingresso*jogosCasa);
   const recConsumo=Math.round(pub*13*jogosCasa);
   const recPatrocContratos=(typeof receitaPatrocinios==='function')?receitaPatrocinios():0;
-  const recPatroc=Math.round(t.patroc*0.3)+recPatrocContratos;  // base institucional + contratos da camisa
-  const recTV=t.tv||60e6;
+  const recPatroc=Math.round(t.patroc*0.75)+recPatrocContratos;
+  const recTV=t.tv||97e6;
   const receitaTotal=recBilheteria+recConsumo+recPatroc+recTV;
-  // DESPESAS anuais (recorrentes de verdade — o que sai do caixa a cada rodada)
   const despFolha=folha(t);
   const despTecnico=(S.carreiraTec&&S.carreiraTec.salarioTec)|| 6e6;
-  const despOper=Math.round(18e6 + t.mercado*2e6); // operação, viagens, comissão
+  const despOper=Math.round(18e6 + t.mercado*2e6);
   const despesaTotal=despFolha+despTecnico+despOper;
   const resultado=receitaTotal-despesaTotal;
-  // imposto de luxo NÃO é recorrente: só é cobrado ao fechar um contrato acima do teto
-  // (renovação ou agente livre). Aqui é só um alerta do risco atual, não entra no resultado.
   const riscoLuxo=impostoLuxo(t);
+  return {receitaTotal,despesaTotal,resultado,despFolha,despTecnico,despOper,riscoLuxo,recBilheteria,recConsumo,recPatroc,recTV,oc,pub,jogosCasa};
+}
+function vFin(){
+  const t=S.times[S.meuTime];
+  const fin=relatorioFinanceiroAnual(t);
+  const {receitaTotal,despesaTotal,resultado,despFolha,despTecnico,despOper,riscoLuxo,
+         recBilheteria,recConsumo,recPatroc,recTV,oc,pub,jogosCasa}=fin;
   const linha=(nome,val,cor)=>`<div class="kv"><span>${nome}</span><b style="${cor?'color:'+cor:''}">${$(val)}</b></div>`;
   return `<h2 class="sec">Finanças</h2>
   <div class="grid g4">
@@ -5026,6 +5035,23 @@ function vCarreira(){
         <td>${/Campe/.test(h.resultado)?'<b style="color:var(--amber)">'+esc(h.resultado)+'</b>':esc(h.resultado)}</td>
         <td>${h.cumpriu?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--red)">✗</span>'} <span class="muted" style="font-size:11px">${esc(h.objetivo)}</span></td></tr>`).join('')}</tbody></table>`
       :'<p class="hint">Nenhuma temporada concluída ainda. Seu histórico aparece aqui ao fim de cada temporada.</p>'}
+    </div>
+    <div class="card tbl-wrap" style="margin-top:14px">
+      <h3 class="sub">💰 Histórico financeiro</h3>
+      ${(()=>{
+        const comFin=c.historico.filter(h=>h.financas);
+        if(!comFin.length) return '<p class="hint">Ainda não há retrato financeiro salvo para temporadas antigas — a partir de agora, cada temporada concluída guarda receita, despesa, resultado e o caixa final, para você auditar depois.</p>';
+        const linhas=[...comFin].reverse().map(h=>{
+          const f=h.financas;
+          return `<tr><td>${h.temp}</td><td>${$(f.receita)}</td><td>${$(f.despesa)}</td>
+            <td style="color:${f.resultado>=0?'var(--green)':'var(--red)'}">${f.resultado>=0?'+':''}${$(f.resultado)}</td>
+            <td style="color:${f.caixaFim>=0?'var(--green)':'var(--red)'}">${$(f.caixaFim)}</td></tr>`;
+        }).join('');
+        const faltando=c.historico.length-comFin.length;
+        return `<table><thead><tr><th>Temp.</th><th>Receita</th><th>Despesa</th><th>Resultado</th><th>Caixa (fim)</th></tr></thead><tbody>${linhas}</tbody></table>
+        ${faltando?`<p class="hint" style="margin-top:6px">${faltando} temporada(s) anterior(es) a este recurso não têm retrato financeiro salvo.</p>`:''}`;
+      })()}
+    </div>
     </div>
     <div>
       <div class="card"><h3 class="sub">Situação atual</h3>
