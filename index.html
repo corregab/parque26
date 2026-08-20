@@ -2640,20 +2640,22 @@ function avaliarEmprego(){
   const cumpriu=cumpriuObjetivo();
   const alcancado=['não classificou','chegou ao Play-In','chegou aos Playoffs (1ª rodada)','chegou às Semifinais','chegou à Final de Conferência','foi Vice-campeão','foi CAMPEÃO'][prof];
   let ok=cumpriu;
-  // limiar financeiro acompanha a economia da liga em carreiras longas (evita punir com um número
-  // fixo que fica obsoleto depois de muitas temporadas) e NUNCA demite no ano em que você foi campeão
+  // limiar financeiro acompanha a economia da liga em carreiras longas, em vez de um número
+  // fixo que fica obsoleto depois de muitas temporadas (a economia da liga se move com o tempo)
   const caixaLigaMedia = S.times.reduce((s,x)=>s+(x.caixa||0),0)/S.times.length;
   const limiarFin = Math.min(-45e6, caixaLigaMedia*1.6);
   const rombo = t.caixa < limiarFin;
-  if(prof<6 && rombo) ok=false; // rombo financeiro grave pesa, exceto no ano em que você foi campeão
+  if(rombo) ok=false; // rombo financeiro grave pesa mesmo se a temporada esportiva foi um sucesso
   if(!ok){
     S.avisos=(S.avisos||0)+1;
     const restantes=2-S.avisos;
-    const motivo = (rombo && cumpriu)? 'Apesar do desempenho, o rombo no caixa preocupa a diretoria.'
-                 : 'Meta: "'+S.objetivo.txt+'" — seu time '+alcancado+'.';
+    const motivo = (rombo && cumpriu)
+      ? 'Seu time '+alcancado+' nesta temporada, mas o caixa está em '+$(t.caixa)+' — bem abaixo do que a diretoria tolera. A gestão financeira também conta.'
+      : 'Meta: "'+S.objetivo.txt+'" — seu time '+alcancado+'.';
     if(S.avisos>=2){
       S.demitido=true;
       S.carreiraTec.desempregado=true;
+      S.carreiraTec.motivoDemissao=motivo;   // guardado para exibir na tela de demissão
       noticia('🚪 Você foi demitido pelo '+t.cidade+' '+t.nick+'. '+motivo,'x');
       gerarOfertasEmprego();
     } else {
@@ -5050,6 +5052,7 @@ function telaDesemprego(){
   const ofertas=c.ofertas||[];
   return `<div class="card accent" style="padding:24px">
     <div class="big" style="color:var(--red);font-size:30px">VOCÊ FOI DEMITIDO</div>
+    ${c.motivoDemissao?`<div class="card" style="margin:12px 0;border-left:3px solid var(--red)"><h3 class="sub" style="color:var(--red)">Motivo</h3><p style="margin:4px 0 0">${esc(c.motivoDemissao)}</p></div>`:''}
     <p class="hint" style="margin:10px 0">Sua passagem terminou, mas a carreira continua. Com reputação <b>${c.reputacao}/100</b>, estes clubes querem conversar:</p>
     ${ofertas.length?`<div class="grid g2" style="margin-top:10px">${ofertas.map(o=>`
       <div class="card" style="border-left:3px solid ${S.times[o.timeId].cor||'var(--wood)'}">
