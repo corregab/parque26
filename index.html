@@ -2640,11 +2640,16 @@ function avaliarEmprego(){
   const cumpriu=cumpriuObjetivo();
   const alcancado=['não classificou','chegou ao Play-In','chegou aos Playoffs (1ª rodada)','chegou às Semifinais','chegou à Final de Conferência','foi Vice-campeão','foi CAMPEÃO'][prof];
   let ok=cumpriu;
-  if(t.caixa < -45e6) ok=false; // rombo financeiro grave sempre pesa
+  // limiar financeiro acompanha a economia da liga em carreiras longas (evita punir com um número
+  // fixo que fica obsoleto depois de muitas temporadas) e NUNCA demite no ano em que você foi campeão
+  const caixaLigaMedia = S.times.reduce((s,x)=>s+(x.caixa||0),0)/S.times.length;
+  const limiarFin = Math.min(-45e6, caixaLigaMedia*1.6);
+  const rombo = t.caixa < limiarFin;
+  if(prof<6 && rombo) ok=false; // rombo financeiro grave pesa, exceto no ano em que você foi campeão
   if(!ok){
     S.avisos=(S.avisos||0)+1;
     const restantes=2-S.avisos;
-    const motivo = (t.caixa<-45e6 && cumpriu)? 'Apesar do desempenho, o rombo no caixa preocupa a diretoria.'
+    const motivo = (rombo && cumpriu)? 'Apesar do desempenho, o rombo no caixa preocupa a diretoria.'
                  : 'Meta: "'+S.objetivo.txt+'" — seu time '+alcancado+'.';
     if(S.avisos>=2){
       S.demitido=true;
