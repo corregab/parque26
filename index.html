@@ -766,6 +766,24 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .fc-info{font-size:13.5px}
 .fc-act{display:flex;align-items:center;gap:8px;white-space:nowrap}
 .fc-val{font-family:var(--mono);font-size:12px;color:var(--text-dim)}
+
+/* —— Comissão: staff, desenvolvimento e olheiro —— */
+.staff-list{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-top:8px}
+.staff-opt{flex:0 0 auto;min-width:150px;display:flex;flex-direction:column;gap:3px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer;text-align:left;color:var(--text);font-family:var(--ui)}
+.staff-opt:hover{border-color:var(--text-dim)}
+.staff-opt.on{border-color:var(--accent);background:var(--accent-soft)}
+.staff-nome{font-weight:700;font-size:13.5px}
+.staff-meta{font-size:11px;color:var(--text-dim)}
+.staff-opt.on .staff-meta{color:var(--accent)}
+.dev-log{padding:6px 0;border-bottom:1px solid var(--hair);font-size:13px}
+.olh-diag{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.olh-pos{display:grid;grid-template-columns:38px 1fr;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--hair)}
+.olh-pos-tag{font-family:'Oswald',sans-serif;font-weight:700;font-size:18px;text-align:center}
+.olh-pos-info{display:flex;flex-direction:column;gap:1px}
+.olh-pos-info b{font-size:13px}
+.olh-pos-info span{font-size:12px}
+.olh-pos-bar{grid-column:2;height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin-top:3px}
+.olh-pos-bar i{display:block;height:100%;border-radius:3px}
 </style>
 </head>
 <body>
@@ -2025,6 +2043,7 @@ function avancarRodada(preRes){
     if(typeof gerarPropostasIA==='function'){gerarPropostasIA();expirarPropostas();}
     if(typeof mercadoIAOffline==='function') mercadoIAOffline();
     if(typeof processarTreinosOffline==='function') processarTreinosOffline();
+    if(typeof desenvolverAutomatico==='function') desenvolverAutomatico();
     S.rodada++;
     if(meuRes){
       const meuA = meuRes.A.t.id===S.meuTime;
@@ -3989,15 +4008,40 @@ function subFormacao(){
     </div>
   </div>`;
 }
+
 function vComissao(){
-  const subs=[['formacao','⛹️ Formação'],['tatica','🎯 Tática & Rotação'],['treino','🏋️ Treino']];
+  const subs=[['formacao','⛹️ Formação'],['tatica','🎯 Tática & Rotação'],['treino','🏋️ Treino'],['desenv','🧑‍🏫 Desenvolvimento'],['olheiro','🔍 Olheiro']];
   const nav=`<div class="subnav">${subs.map(([k,n])=>`<button class="subtab ${SUBP===k?'on':''}" onclick="setSubP('${k}')">${n}</button>`).join('')}</div>`;
   let corpo;
   if(SUBP==='tatica') corpo=vTaticas();
   else if(SUBP==='treino') corpo=vTreino();
+  else if(SUBP==='desenv') corpo=vDesenvolvimento();
+  else if(SUBP==='olheiro') corpo=vOlheiro();
   else corpo=subFormacao();
   return `<h2 class="sec">Comissão Técnica</h2>${nav}${corpo}`;
 }
+function vDesenvolvimento(){
+  const t=S.times[S.meuTime];
+  const nivel=(S.treinadorDes&&S.treinadorDes.temp===S.temporada)?S.treinadorDes.nivel:0;
+  const cards=STAFF_DESENV.map((s,i)=>`<button class="staff-opt ${i===nivel?'on':''}" onclick="contratarTreinadorDes(${i})"><span class="staff-nome">${s.nome}</span><span class="staff-meta">${i===0?'sem custo':$(s.custo)+'/ano'} · ${i===0?'nenhum ganho':'ritmo '+['','lento','médio','rápido'][i]}</span></button>`).join('');
+  const linhas=[...t.elenco].filter(p=>!p.egg).sort((a,b)=>a.idade-b.idade).map(p=>{
+    const k=atributoMaisFraco(p); const jovem=p.idade<=24;
+    return `<tr><td class="name">${esc(p.nome)}</td><td>${bd(p.pos)}</td><td>${p.idade}${jovem?' <span class="muted">jovem</span>':''}</td><td><span class="ovr">${p.ovr}</span></td><td>${AT_NOMES[k]||k} <span class="muted">(${p.at[k]})</span></td></tr>`;
+  }).join('');
+  const log=(S.devLog||[]).slice(0,12).map(d=>`<div class="dev-log"><b>${esc(d.nome.split(' ').pop())}</b> — ${d.at} → ${d.novo}${d.dovr>0?` <span style="color:var(--pos)">(ovr +${d.dovr})</span>`:''}</div>`).join('');
+  return `<div class="card accent"><h3 class="sub">🧑‍🏫 Preparador de desenvolvimento</h3><p class="hint">O preparador lapida, aos poucos, o <b>ponto fraco de cada jogador</b> a cada rodada. Evolução realista: jovens melhoram mais rápido, veteranos bem devagar.</p><div class="staff-list">${cards}</div></div>${nivel>0?`<div class="card" style="margin-top:12px"><h3 class="sub">Evolução recente</h3>${log||'<p class="hint">Assim que a temporada rolar, os ganhos aparecem aqui.</p>'}</div>`:''}<div class="card tbl-wrap" style="margin-top:12px"><h3 class="sub">Ponto fraco de cada jogador</h3><table><thead><tr><th>Jogador</th><th>Pos</th><th>Idade</th><th>Ovr</th><th>Foco do treino</th></tr></thead><tbody>${linhas}</tbody></table></div>`;
+}
+function vOlheiro(){
+  const r=relatorioOlheiro();
+  const corMap={neg:'var(--neg)',warn:'var(--amber)',pos:'var(--pos)',mut:'var(--text-dim)'};
+  const diagHtml=r.diag.map(d=>`<div class="olh-pos"><div class="olh-pos-tag" style="color:${corMap[d.cor]}">${d.pos}</div><div class="olh-pos-info"><b>${d.prof} jogador(es)${d.melhor?' · melhor '+d.melhor+' ovr':''}</b><span style="color:${corMap[d.cor]}">${d.status}</span></div><div class="olh-pos-bar"><i style="width:${d.nec}%;background:${corMap[d.cor]}"></i></div></div>`).join('');
+  const livresHtml=r.livresUteis.length?r.livresUteis.map(p=>`<tr><td class="name clickable" onclick="fichaJogador(${p.id})">${esc(p.nome)}</td><td>${bd(p.pos)}</td><td><span class="ovr">${p.ovr}</span></td><td class="muted">${p.idade}a</td><td>${$(p.salario)}</td><td><button class="btn mini" onclick="ABA='mercado';render()">Ver mercado</button></td></tr>`).join(''):'<tr><td colspan="6" class="hint">Nenhum agente livre atende às carências agora.</td></tr>';
+  const picksHtml=r.meusPicks.length?r.meusPicks.map(pk=>{const v=pk.valor;const tier=v>=70?'alto':v>=40?'médio':'baixo';return `<div class="pill">${pk.ano} · valor ${tier}</div>`;}).join(''):'<span class="hint">Sem picks de 1ª rodada.</span>';
+  return `<div class="card accent"><h3 class="sub">🔍 Diagnóstico do olheiro</h3><p class="hint">Leitura do elenco por posição — a barra mostra o tamanho da carência. Priorize o que está em vermelho.</p><div class="olh-diag">${diagHtml}</div></div><div class="card tbl-wrap" style="margin-top:12px"><h3 class="sub">🎯 Agentes livres para suas carências</h3><table><thead><tr><th>Jogador</th><th>Pos</th><th>Ovr</th><th>Idade</th><th>Salário</th><th></th></tr></thead><tbody>${livresHtml}</tbody></table></div><div class="card" style="margin-top:12px"><h3 class="sub">📊 Seus picks de 1ª rodada</h3><div class="row" style="gap:6px;flex-wrap:wrap">${picksHtml}</div><p class="hint" style="margin-top:8px">Picks valiosos podem virar moeda de troca por um reforço imediato — veja oportunidades no Mercado.</p></div>`;
+}
+
+
+
 
 function vTaticas(){
   const t=S.times[S.meuTime];
@@ -4767,6 +4811,35 @@ const SCOUT_NIVEIS=[
   {nome:'Olheiro de elite', custo:18000000, n:5, alcance:7},
 ];
 
+// Relatório do olheiro: diagnóstico do elenco + oportunidades no mercado (livres, picks).
+function relatorioOlheiro(){
+  const meu=S.times[S.meuTime];
+  const nec=necessidades(meu);
+  const POSNOME={PG:'armador',SG:'ala-armador',SF:'ala',PF:'ala-pivô',C:'pivô'};
+  // diagnóstico por posição
+  const diag=['PG','SG','SF','PF','C'].map(pos=>{
+    const naPos=meu.elenco.filter(p=>p.pos===pos).sort((a,b)=>b.ovr-a.ovr);
+    const melhor=naPos[0]?naPos[0].ovr:0, prof=naPos.length;
+    let status, cor;
+    if(!prof){ status='SEM '+POSNOME[pos]+' — buraco na posição'; cor='neg'; }
+    else if(nec[pos]>=45){ status='carência séria — precisa de reforço titular'; cor='neg'; }
+    else if(nec[pos]>=25){ status='pouca profundidade — falta um reserva'; cor='warn'; }
+    else if(melhor>=82){ status='ponto forte do elenco'; cor='pos'; }
+    else { status='posição coberta'; cor='mut'; }
+    return {pos, melhor, prof, nec:Math.round(nec[pos]||0), status, cor};
+  }).sort((a,b)=>b.nec-a.nec);
+  // agentes livres que atendem às maiores carências
+  const carentes=diag.filter(d=>d.nec>=25).map(d=>d.pos);
+  const livresUteis=(S.livres||[]).filter(p=> carentes.includes(p.pos) && p.ovr>=(meu.elenco.filter(x=>x.pos===p.pos).sort((a,b)=>b.ovr-a.ovr)[0]?.ovr-6||55))
+    .sort((a,b)=>b.ovr-a.ovr).slice(0,6);
+  // valor dos meus picks de 1ª rodada
+  const meusPicks=(typeof picksDe==='function'?picksDe(S.meuTime):[]).filter(pk=>pk.rodada===1)
+    .map(pk=>({ano:pk.ano, valor:(typeof valorPick==='function'?valorPick(pk):0)}))
+    .sort((a,b)=>a.ano-b.ano);
+  // oportunidades de troca do olheiro contratado (se houver)
+  const trocas=(S.scoutContrato&&S.scoutContrato.ops)?S.scoutContrato.ops.slice(0,4):[];
+  return {diag, livresUteis, meusPicks, trocas, resumo:diag[0]};
+}
 function necessidades(t){
   const porPos={PG:[],SG:[],SF:[],PF:[],C:[]};
   t.elenco.forEach(p=>porPos[p.pos].push(p.ovr));
@@ -5018,6 +5091,65 @@ const PROGRAMAS = {
 const PROG_KEYS=Object.keys(PROGRAMAS);
 
 // ganho de treino depende da idade (jovens crescem mais) e da margem até o potencial
+// ===== TREINADOR DE DESENVOLVIMENTO (staff automático) =====
+// Corrige, aos poucos, o atributo mais fraco de cada jogador do seu time a cada rodada.
+const AT_NOMES={arr2:'Arremesso de 2',arr3:'Arremesso de 3',ll:'Lance livre',fin:'Finalização',
+  drible:'Drible',passe:'Passe',defP:'Defesa de perímetro',defI:'Defesa interior',
+  reb:'Rebote',atl:'Atletismo',res:'Resistência',qi:'QI de jogo'};
+const STAFF_DESENV=[
+  {nome:'Sem preparador',            custo:0,        ritmo:0},
+  {nome:'Preparador júnior',         custo:3000000,  ritmo:0.5},
+  {nome:'Preparador de desenvolvimento', custo:8000000,  ritmo:1.0},
+  {nome:'Guru do desenvolvimento',   custo:16000000, ritmo:1.7}
+];
+// atributo mais fraco do jogador, com leve preferência pelos que importam na posição
+function atributoMaisFraco(p){
+  const w=W[p.pos]||{};
+  let pior=null, piorScore=1e9;
+  for(const k in p.at){
+    const relev=(w[k]||0.02);
+    const score=p.at[k] - relev*8; // valor baixo + relevante na posição = prioridade
+    if(score<piorScore){ piorScore=score; pior=k; }
+  }
+  return pior;
+}
+function treinadorDesAtivo(){
+  return S.treinadorDes && S.treinadorDes.temp===S.temporada && S.treinadorDes.nivel>0;
+}
+function contratarTreinadorDes(nivel){
+  const nv=STAFF_DESENV[nivel]; if(!nv)return;
+  const t=S.times[S.meuTime];
+  if(nivel>0 && t.caixa<nv.custo){ alert('Caixa insuficiente para contratar '+nv.nome+' ('+$(nv.custo)+').'); return; }
+  if(nivel>0) t.caixa-=nv.custo;
+  S.treinadorDes={nivel, temp:S.temporada};
+  noticia(nivel>0?('🧑\u200d🏫 '+nv.nome+' contratado ('+$(nv.custo)+'/ano). Vai lapidar o ponto fraco de cada jogador ao longo da temporada.'):'Preparador dispensado.', nivel>0?'v':'p');
+  render();
+}
+// roda a cada rodada: desenvolve devagar o ponto fraco de cada jogador
+function desenvolverAutomatico(){
+  if(!treinadorDesAtivo()) return;
+  const ritmo=STAFF_DESENV[S.treinadorDes.nivel].ritmo;
+  const t=S.times[S.meuTime];
+  S.devLog=S.devLog||[];
+  (t.elenco||[]).forEach(p=>{
+    if(p.lesao>0) return;
+    // jovens evoluem mais rápido; perto do potencial rende menos
+    const fatorIdade = p.idade<=21?1.5 : p.idade<=24?1.15 : p.idade<=27?0.8 : p.idade<=30?0.5 : 0.28;
+    const margem = clamp((p.pot+4 - p.ovr)/14, 0.1, 1);
+    p._devProg = (p._devProg||0) + ritmo*fatorIdade*margem*0.16; // bem devagar
+    if(p._devProg>=1){
+      p._devProg-=1;
+      const k=atributoMaisFraco(p);
+      const teto=Math.min(99, p.pot+4);
+      if(p.at[k]<teto){
+        p.at[k]=clamp(p.at[k]+1,20,teto);
+        const antes=p.ovr; p.ovr=calcOvr(p);
+        S.devLog.unshift({nome:p.nome, at:AT_NOMES[k]||k, novo:p.at[k], ovr:p.ovr, dovr:p.ovr-antes, r:S.rodada});
+        S.devLog=S.devLog.slice(0,30);
+      }
+    }
+  });
+}
 function ganhoTreino(p, prog){
   const jovem = p.idade<=21?1.6 : p.idade<=24?1.25 : p.idade<=27?0.9 : p.idade<=30?0.55 : 0.3;
   const margem = clamp((p.pot - p.ovr)/12, 0.15, 1); // perto do teto rende menos
