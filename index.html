@@ -3311,6 +3311,11 @@ function vMais(){
 }
 const SECUNDARIAS_MAIS=['taticas','mercado','calendario','financas','marketing','stats','carreira','premios','editor','jogadores','transferencias'];
 function render(){
+  // se havia um jogo ao vivo rodando e esta tela não é mais a dele, mata o timer
+  // (evita o jogo continuar simulando em segundo plano e pular temporadas sozinho)
+  if(typeof AVUI!=='undefined' && AVUI && AVUI.timer && !document.getElementById('avClock')){
+    clearInterval(AVUI.timer); AVUI.timer=null;
+  }
   if(S && S.online && ABA==='editor') ABA='inicio';   // editor não existe no modo online
   // destrava o draft: se todas as escolhas ja foram feitas mas a fase nao avancou, conclui agora
   if(S && S.fase==='draft' && S.ordemDraft && S.draftPick>=S.ordemDraft.length && typeof finalizarDraft==='function'){ finalizarDraft(); }
@@ -5352,6 +5357,13 @@ function avPausar(){
 }
 
 function avTick(){
+  // trava de segurança: se a tela do jogo ao vivo não está mais no DOM (o usuário saiu
+  // pela barra inferior, por ex.), o timer não pode continuar avançando o jogo em segundo
+  // plano — isso fazia a carreira "pular vários anos sozinha". Desarma e sai.
+  if(!AV || !AVUI || !document.getElementById('avClock')){
+    if(AVUI){ clearInterval(AVUI.timer); AVUI.timer=null; }
+    return;
+  }
   const r=avPasso();
   avPintarNovos(r.eventos);
   avAtualizaPlacar();
