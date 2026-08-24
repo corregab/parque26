@@ -759,6 +759,13 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .esq-comp{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:.5px}
 .esq-opt.on .esq-top,.esq-opt.on .esq-top b{color:var(--text)}
 .esq-opt.on .esq-comp{color:var(--accent)}
+
+/* —— Fim de contrato (encerrar temporada) —— */
+.fc-list{display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:340px;overflow:auto}
+.fc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.fc-info{font-size:13.5px}
+.fc-act{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.fc-val{font-family:var(--mono);font-size:12px;color:var(--text-dim)}
 </style>
 </head>
 <body>
@@ -2189,21 +2196,49 @@ function proximaFasePO(){
 /* Reenche os elencos na offseason: os times recontratam agentes livres ate um minimo
    saudavel, priorizando a posicao mais carente. Evita que os elencos definhem ao longo
    das temporadas (jogadores expiram e vao pra agencia livre, mas ninguem os traz de volta). */
+// Verifica se um time é controlado por um humano (o seu, no offline; qualquer humano no online).
+// Times de humanos NUNCA recebem contratação automática — o técnico decide.
+function timeControladoPorHumano(t){
+  if(!t) return false;
+  if(t.id===S.meuTime) return true;
+  if(S.online && S.humanos && S.humanos.includes(t.id)) return true;
+  return false;
+}
 function reencherElencos(min){
   min=min||13;
-  const PISO=10;      // todo time precisa de pelo menos isso (viabilidade)
+  const PISO=10;      // mínimo viável para um time da IA conseguir competir
   const RESERVA=24;   // deixa ~esse tanto de agentes livres no mercado
   S.livres=S.livres||[];
   const posOrder=['PG','SG','SF','PF','C'];
-  const _contratar=(t)=>{
-    S.livres.sort((a,b)=>b.ovr-a.ovr);
-    const cont={PG:0,SG:0,SF:0,PF:0,C:0};
-    t.elenco.forEach(p=>{ if(cont[p.pos]!=null)cont[p.pos]++; });
-    const carente=[...posOrder].sort((a,b)=>cont[a]-cont[b])[0];
-    let idx=S.livres.findIndex(p=>p.pos===carente);
-    if(idx<0)idx=0;
-    const p=S.livres.splice(idx,1)[0];
-    if(!p)return false;
+  // "força" de um time por posição: soma ponderada por overall. Serve pra achar a real lacuna.
+  const forcaPorPos=(t)=>{
+    const f={PG:0,SG:0,SF:0,PF:0,C:0}, n={PG:0,SG:0,SF:0,PF:0,C:0};
+    t.elenco.forEach(p=>{ if(f[p.pos]!=null){ f[p.pos]+=(p.ovr>=78?1.6:p.ovr>=70?1:0.5); n[p.pos]++; } });
+    return {f,n};
+  };
+  // quanto o time pode gastar: times com caixa saudável miram reforços melhores; quebrados seguram.
+  const tetoContratacao=(t)=>{
+    if(t.caixa < -120e6) return 6e6;    // endividado: só peças baratas de fundo de banco
+    if(t.caixa < 0)       return 14e6;  // no vermelho: reforços medianos
+    if(t.caixa < 80e6)    return 26e6;  // saudável: bons rotativos
+    return 60e6;                        // rico: pode brigar por titular caro
+  };
+  // a IA escolhe o MELHOR livre que (a) preenche a posição mais carente e (b) cabe no orçamento
+  const _contratarIA=(t)=>{
+    const {f,n}=forcaPorPos(t);
+    // posição mais carente = menor força; desempate por menos jogadores
+    const carente=[...posOrder].sort((a,b)=> (f[a]-f[b]) || (n[a]-n[b]) )[0];
+    const teto=tetoContratacao(t);
+    // candidatos: primeiro tenta a posição carente dentro do orçamento, com melhor ovr
+    const cabe=p=>valorSalarial(p)<=teto;
+    let pool=S.livres.filter(p=>p.pos===carente && cabe(p));
+    if(!pool.length) pool=S.livres.filter(cabe);            // nenhum na posição: pega o melhor que cabe
+    if(!pool.length) pool=S.livres.slice();                 // orçamento apertado: aceita o mais barato
+    pool.sort((a,b)=> (b.ovr-a.ovr) );
+    const p = pool[0];
+    if(!p) return false;
+    const idx=S.livres.indexOf(p); if(idx<0) return false;
+    S.livres.splice(idx,1);
     p.time=t.id; if(!(p.anos>0))p.anos=RI(2,4); p.salario=valorSalarial(p);
     t.elenco.push(p);
     return true;
@@ -2211,14 +2246,15 @@ function reencherElencos(min){
   const _encher=(alvo, respeitarReserva)=>{
     S.times.forEach(t=>{
       if(!t.elenco)t.elenco=[];
+      if(timeControladoPorHumano(t)) return;               // NUNCA mexe no elenco de um humano
       let guard=0;
       while(t.elenco.length<alvo && S.livres.length>(respeitarReserva?RESERVA:0) && guard++<60){
-        if(!_contratar(t))break;
+        if(!_contratarIA(t))break;
       }
     });
   };
-  _encher(PISO, false);   // 1º: garante o piso viável em todos (mesmo consumindo a reserva)
-  _encher(min, true);     // 2º: completa até o alvo, mas preservando o mercado de agentes livres
+  _encher(PISO, false);   // 1º: garante o piso viável em todos os times da IA
+  _encher(min, true);     // 2º: completa até o alvo por necessidade/finanças, preservando o mercado
 }
 function processarOffseason(){
   const rel=[];
@@ -4480,7 +4516,49 @@ function draftar(id){
   fazerPickDraft(p);
   render();   // o render agenda a continuacao automatica das CPUs
 }
+// Passo 1 do encerramento: mostra os jogadores do SEU time que vão sair por fim de contrato,
+// deixando você renovar quem quiser antes de confirmar. Só depois processa a offseason.
 function encerrarTemporada(){
+  if(S.online){ encerrarTemporadaConfirmado(); return; } // online: fluxo do host, sem tela local
+  const t=S.times[S.meuTime];
+  const saindo=t.elenco.filter(p=>!p.egg && (p.anos||0)<=1); // contratos que expiram nesta offseason
+  if(!saindo.length){ encerrarTemporadaConfirmado(); return; }
+  saindo.sort((a,b)=>b.ovr-a.ovr);
+  const linhas=saindo.map(p=>{
+    const novo=Math.round(valorSalarial(p)*(1.05+(p.moral<50?0.22:0))/1e5)*1e5;
+    return `<div class="fc-row" id="fcRow${p.id}">
+      <div class="fc-info">${bd(p.pos)} <b>${esc(p.nome)}</b> <span class="muted">${p.idade}a · ovr ${p.ovr}</span></div>
+      <div class="fc-act">
+        <span class="fc-val">${$(novo)}/ano</span>
+        <button class="btn mini" onclick="renovarNaSaida(${p.id})">Renovar 3 anos</button>
+      </div></div>`;
+  }).join('');
+  abrirModal('📄 Fim de contrato', `
+    <p class="hint">Estes jogadores têm contrato terminando. Se você não renovar, eles viram <b>agentes livres</b> quando a temporada encerrar. Renove quem quiser segurar:</p>
+    <div class="fc-list">${linhas}</div>
+    <div class="row" style="justify-content:space-between;margin-top:14px">
+      <button class="btn ghost" onclick="closeModal()">Voltar</button>
+      <button class="btn" onclick="closeModal();encerrarTemporadaConfirmado()">Encerrar temporada ▸</button>
+    </div>`);
+}
+// chamada pelo botão "Renovar" dentro da tela de fim de contrato
+function renovarNaSaida(id){
+  const t=S.times[S.meuTime], p=t.elenco.find(x=>x.id===id);
+  if(!p)return;
+  const novo=Math.round(valorSalarial(p)*(1.05+(p.moral<50?0.22:0))/1e5)*1e5;
+  const folhaNova=folha(t)-p.salario+novo;
+  if(folhaNova>TETO){
+    const imposto=Math.round((folhaNova-TETO)*1.5);
+    if(!confirm(p.nome+' renovaria por '+$(novo)+'/ano, deixando a folha acima do teto. Imposto de luxo de '+$(imposto)+' agora. Confirmar?')) return;
+    t.caixa-=imposto;
+    noticia('💰 Imposto de luxo de '+$(imposto)+' pago para renovar '+p.nome+'.','x');
+  }
+  p.salario=novo; p.anos=(p.anos||0)+3; p.moral=clamp(p.moral+12,0,100);
+  noticia('📄 '+p.nome+' renovou por 3 anos ('+$(novo)+'/ano)','v');
+  const row=document.getElementById('fcRow'+id);
+  if(row) row.innerHTML=`<div class="fc-info">${bd(p.pos)} <b>${esc(p.nome)}</b> <span style="color:var(--pos)">✓ renovado por 3 anos</span></div>`;
+}
+function encerrarTemporadaConfirmado(){
   const rel=processarOffseason();
   rel.slice(0,6).forEach(r=>noticia('🎓 '+r));
   S.draftPick=0;S.avaliado=false;
