@@ -2427,13 +2427,15 @@ function _executarDraft_legado(escolhaUsuario){
   faseAgentesLivres();
   return true;
 }
+
 function faseAgentesLivres(){
   S.livres.sort((a,b)=>b.ovr-a.ovr);
-  // 1) IA contrata os melhores livres disponíveis (respeitando teto quando dá)
-  for(let volta=0;volta<4;volta++){
+  // IA garante um piso competitivo, mas SEM esvaziar o mercado — o resto ela completa ao longo
+  // dos dias de offseason (mercado vivo). O time do jogador/humanos nunca é preenchido.
+  for(let volta=0;volta<2;volta++){
     S.times.forEach(t=>{
-      if(t.id===S.meuTime) return;
-      while(t.elenco.length<13){
+      if(timeControladoPorHumano(t)) return;
+      while(t.elenco.length<12){
         const cap=TETO-folha(t);
         const alvo=S.livres.filter(p=>p.salario<=Math.max(cap,2000000));
         if(!alvo.length) break;
@@ -2443,29 +2445,89 @@ function faseAgentesLivres(){
       }
     });
   }
-  // 2) garantir mínimo de 12 em TODO time (inclusive o do jogador): gera veteranos baratos se faltar
+  // garante mínimo viável (11) nos times da IA
   S.times.forEach(t=>{
-    while(t.elenco.length<12){
+    if(timeControladoPorHumano(t)) return;
+    while(t.elenco.length<11){
       let p=S.livres.shift();
       if(!p){p=novoJogador(pick(POS),R(-14,-4),24,33);}
       p.time=t.id;p.anos=RI(1,3);p.salario=Math.min(p.salario,3500000);
       t.elenco.push(p);
     }
   });
-  // 3) manter o pool de livres enxuto (evita save inchar): guarda só os 40 melhores
+  // mantém um mercado farto pro jogador contratar na offseason (a IA consome ao longo dos dias)
   S.livres.sort((a,b)=>b.ovr-a.ovr);
-  if(S.livres.length>40) S.livres=S.livres.slice(0,40);
+  if(S.livres.length>50) S.livres=S.livres.slice(0,50);
   S.times.forEach(t=>t.elenco.sort((a,b)=>b.ovr-a.ovr));
-  S.cal=gerarCalendario();S.rodada=0;S.po=null;S.ultimoJogo=null;
+  if(typeof checarEggsDestino==='function') checarEggsDestino();
+  iniciarOffseasonMercado();
+}
+// Período de offseason com alguns dias: o jogador renova/contrata/negocia sem pressa;
+// a cada dia o mercado "vive" (IA fecha contratos, surgem rumores e ofertas de troca).
+function iniciarOffseasonMercado(){
+  S.fase='mercado';
+  S.offDia=1;
+  S.offDiasTotal=4;
+  S.propostas=S.propostas||[];
+  definirObjetivo();
+  noticia('🏝️ Offseason aberta! Você tem '+S.offDiasTotal+' dias para renovar, contratar e negociar antes da temporada '+S.temporada+'.','p');
+  gerarRumoresOffseason();
+  render();
+}
+function gerarRumoresOffseason(){
+  const meu=S.times[S.meuTime];
+  const car=carenciaPorPos(meu)[0];
+  const livresTop=(S.livres||[]).slice(0,6);
+  const frases=[];
+  if(car && livresTop.length){
+    const alvo=livresTop.find(p=>p.pos===car.pos)||livresTop[0];
+    frases.push('🗞️ Imprensa aponta '+alvo.nome+' ('+alvo.pos+', ovr '+alvo.ovr+') como alvo ideal para a carência do '+meu.nick+' em '+car.pos+'.');
+  }
+  const outro=pick(S.times.filter(t=>t.id!==S.meuTime));
+  if(outro && (outro.elenco||[]).length){
+    const astro=[...outro.elenco].sort((a,b)=>b.ovr-a.ovr)[0];
+    if(astro) frases.push('🗞️ Rumor: '+outro.cidade+' quer blindar '+astro.nome+' com uma extensão de contrato.');
+  }
+  if((S.livres||[]).length) frases.push('🗞️ '+(S.livres.length)+' agentes livres seguem no mercado nesta janela.');
+  frases.slice(0,3).forEach(f=>noticia(f,'m'));
+}
+function avancarDiaOffseason(){
+  if(S.fase!=='mercado') return;
+  // MERCADO VIVO: outros times fecham alguns contratos (some quem você demorou)
+  const iaTimes=S.times.filter(t=>!timeControladoPorHumano(t));
+  let fechados=0, maxDia=RI(2,5);
+  for(const t of iaTimes){
+    if(fechados>=maxDia) break;
+    if(t.elenco.length>=14) continue;
+    if(Math.random()>0.5) continue;
+    const car=carenciaPorPos(t)[0];
+    const cabe=p=>valorSalarial(p)<=(TETO-folha(t)>0?TETO-folha(t):3e6);
+    let pool=S.livres.filter(p=>p.pos===car.pos && cabe(p));
+    if(!pool.length) pool=S.livres.filter(cabe);
+    pool.sort((a,b)=>b.ovr-a.ovr);
+    const p=pool[0]; if(!p) continue;
+    S.livres=S.livres.filter(x=>x!==p);
+    p.time=t.id; p.anos=RI(2,4); p.salario=valorSalarial(p); t.elenco.push(p); t.elenco.sort((a,b)=>b.ovr-a.ovr);
+    noticia('✍️ '+t.cidade+' '+t.nick+' acertou com '+p.nome+' ('+p.pos+', ovr '+p.ovr+').','m');
+    fechados++;
+  }
+  if(typeof gerarPropostasIA==='function'){ try{ gerarPropostasIA(); }catch(e){} }
+  gerarRumoresOffseason();
+  S.offDia++;
+  if(S.offDia>S.offDiasTotal){ iniciarTemporada(); return; }
+  render();
+}
+function iniciarTemporada(){
+  S.cal=gerarCalendario();S.rodada=0;S.po=null;S.playin=null;S.ultimoJogo=null;
   S.times.forEach(t=>{t.minutos=autoMinutos(t);});
   S.treinos={}; S.treinosRest=TREINOS_POR_TEMP; S.scoutContrato=null; S.scoutFree=[];
-  if(typeof checarEggsDestino==='function') checarEggsDestino();
   S.fase='regular';
-  definirObjetivo();
-  if(S.times[S.meuTime].elenco.length<12)
+  if(S.times[S.meuTime].elenco.length<9)
     noticia('⚠ Seu elenco tem só '+S.times[S.meuTime].elenco.length+' jogadores. Contrate agentes livres na aba Mercado.','x');
   noticia('🏀 Temporada '+S.temporada+' começou. Objetivo da diretoria: '+S.objetivo.txt,'p');
+  render();
 }
+
 function definirObjetivo(){
   const f=forcaTime(S.times[S.meuTime]);
   const ranking=[...S.times].sort((a,b)=>forcaTime(b)-forcaTime(a)).findIndex(t=>t.id===S.meuTime)+1;
@@ -3245,7 +3307,7 @@ function hud(){
   el('hdTeam').innerHTML='<span class="brand-esc">'+escudoTime(t.ab,20)+'<span>'+t.cidade.toUpperCase()+' '+t.nick.toUpperCase()+'</span></span>';
   el('hud').innerHTML=`
     <div class="hud"><span>Temporada</span><b>${S.temporada}</b></div>
-    <div class="hud"><span>${S.fase==='regular'?'Jogos':'Fase'}</span><b>${S.fase==='regular'?(S.times[S.meuTime].v+S.times[S.meuTime].d)+'/'+JOGOS_TEMP:S.fase==='playin'?'PLAY-IN':S.fase==='playoffs'?['QUARTAS','SEMIS','FINAL C.','FINAL'][S.po.fase]:'—'}</b></div>
+    <div class="hud"><span>${S.fase==='regular'?'Jogos':'Fase'}</span><b>${S.fase==='regular'?(S.times[S.meuTime].v+S.times[S.meuTime].d)+'/'+JOGOS_TEMP:S.fase==='playin'?'PLAY-IN':S.fase==='playoffs'?['QUARTAS','SEMIS','FINAL C.','FINAL'][S.po.fase]:S.fase==='mercado'?'OFFSEASON':S.fase==='draft'?'DRAFT':'—'}</b></div>
     <div class="hud"><span>Campanha</span><b>${t.v}-${t.d}</b></div>
     <div class="hud ${cx>=0?'pos':'neg'}"><span>Caixa</span><b>${$(cx)}</b></div>`;
 }
@@ -3319,6 +3381,8 @@ function escudoTime(ab,size){
   `</svg>`;
 }
 function acaoCentral(){
+  // na offseason de mercado, o botão central avança o dia
+  if(S && S.fase==='mercado'){ if(typeof avancarDiaOffseason==='function') avancarDiaOffseason(); return; }
   // botao central: joga/avanca o proximo jogo do usuario
   try{ if(typeof jogarAoVivo==='function'){ jogarAoVivo(); return; } }catch(e){}
   if(typeof jogar==='function') jogar();
@@ -3572,6 +3636,28 @@ function vInicio(){
       <button class="btn" onclick="encerrarTemporada()">Encerrar temporada e ir ao Draft</button></div>`;
   } else if(S.fase==='draft'){
     bloco=vDraft();
+  } else if(S.fase==='mercado'){
+    const meu=S.times[S.meuTime];
+    const car=carenciaPorPos(meu).slice(0,2).map(n=>n.pos).join(' e ');
+    const nProp=(S.propostas||[]).length;
+    const restantes=S.offDiasTotal-S.offDia+1;
+    bloco=`<div class="card accent">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div><h3 class="sub" style="margin:0">🏝️ Offseason · Dia ${S.offDia} de ${S.offDiasTotal}</h3>
+        <p class="hint" style="margin:4px 0 0">Monte seu elenco para a temporada ${S.temporada}. Seu time pede reforço em <b>${car}</b>.</p></div>
+        <div style="text-align:right"><div class="big" style="font-size:26px">${meu.elenco.filter(p=>!p.egg).length}</div><div class="hint">no elenco</div></div>
+      </div>
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn" onclick="ABA='mercado';render()">🎯 Contratar (${(S.livres||[]).length})</button>
+        <button class="btn ghost" onclick="ABA='elenco';render()">👥 Meu elenco</button>
+        <button class="btn ghost" onclick="ABA='mercado';render()">🤝 Trocas${nProp?` <span class="dot"></span>`:''}</button>
+      </div>
+      <div class="row" style="justify-content:space-between;margin-top:14px;gap:8px">
+        <button class="btn ghost" onclick="if(confirm('Começar a temporada agora? Você não poderá mais contratar nesta janela.'))iniciarTemporada()">Começar temporada ▸▸</button>
+        <button class="btn" onclick="avancarDiaOffseason()">${restantes>1?'Avançar dia ▸':'Iniciar temporada ▸'}</button>
+      </div>
+      <p class="hint" style="margin-top:8px;text-align:center">A cada dia, outros times fecham contratos — o agente livre que você namora pode sumir.</p>
+    </div>`;
   }
   const cls=classificacao(t.conf), pos=cls.findIndex(x=>x.id===t.id)+1;
   return `<div class="split"><div>
@@ -4445,7 +4531,7 @@ function tierProspecto(p){
   if(teto>=75) return {t:'Rotação',c:'tier-ro'};
   return {t:'Projeto',c:'tier-pj'};
 }
-function necessidadesTime(t){
+function carenciaPorPos(t){
   const forca={PG:0,SG:0,SF:0,PF:0,C:0};
   (t.elenco||[]).filter(p=>!p.egg).forEach(p=>{ if(forca[p.pos]!=null) forca[p.pos]+=(p.ovr>=78?1.6:p.ovr>=70?1:0.45); });
   return Object.keys(forca).map(pos=>({pos,forca:forca[pos]})).sort((a,b)=>a.forca-b.forca);
@@ -4466,7 +4552,7 @@ function vDraft(){
       return `<div class="bb-row"><span class="bb-rk">${i+1}</span><span class="bb-nm clickable" onclick="fichaJogador(${p.id})">${esc(p.nome)}</span><span class="bb-pos">${p.pos}</span><span class="bb-ovr">${p.ovr}<span class="muted">▸${p.pot}</span></span><span class="tier ${tr.c}">${tr.t}</span></div>`;
     }).join('');
     // necessidade do meu time
-    const nec=necessidadesTime(S.times[S.meuTime]).slice(0,2).map(n=>n.pos).join(' e ');
+    const nec=carenciaPorPos(S.times[S.meuTime]).slice(0,2).map(n=>n.pos).join(' e ');
     return `<h2 class="sec">Loteria do Draft</h2>
       <div class="card accent"><p class="hint">As primeiras escolhas são sorteadas — os piores times têm mais chance, mas a sorte decide. ${meuNaLot?`Você tirou a <b>${meuNaLot.obtido}ª escolha</b>!`:'Seu time não caiu entre as escolhas sorteadas desta vez.'}</p></div>
       <div class="lot-board">${lot}</div>
@@ -4489,7 +4575,7 @@ function vDraft(){
     return `<h2 class="sec">Draft concluído</h2><div class="card"><p class="hint">As ${total} escolhas foram feitas. Os prospectos não escolhidos viraram agentes livres.</p></div>${boardHtml}`;
   }
   if(minhaVez){
-    const nec=necessidadesTime(S.times[S.meuTime]);
+    const nec=carenciaPorPos(S.times[S.meuTime]);
     const carentes=nec.slice(0,2).map(n=>n.pos);
     const barra=nec.map(n=>{const forte=n.forca>=3, carente=carentes.includes(n.pos);return `<span class="nec-chip ${carente?'nec-baixa':(forte?'nec-alta':'')}">${n.pos}</span>`;}).join('');
     const prosp=S.draft.slice(0,16).map(p=>{
