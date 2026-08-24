@@ -784,6 +784,8 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .olh-pos-info span{font-size:12px}
 .olh-pos-bar{grid-column:2;height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin-top:3px}
 .olh-pos-bar i{display:block;height:100%;border-radius:3px}
+
+.olh-carencia{font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -4037,7 +4039,27 @@ function vOlheiro(){
   const diagHtml=r.diag.map(d=>`<div class="olh-pos"><div class="olh-pos-tag" style="color:${corMap[d.cor]}">${d.pos}</div><div class="olh-pos-info"><b>${d.prof} jogador(es)${d.melhor?' · melhor '+d.melhor+' ovr':''}</b><span style="color:${corMap[d.cor]}">${d.status}</span></div><div class="olh-pos-bar"><i style="width:${d.nec}%;background:${corMap[d.cor]}"></i></div></div>`).join('');
   const livresHtml=r.livresUteis.length?r.livresUteis.map(p=>`<tr><td class="name clickable" onclick="fichaJogador(${p.id})">${esc(p.nome)}</td><td>${bd(p.pos)}</td><td><span class="ovr">${p.ovr}</span></td><td class="muted">${p.idade}a</td><td>${$(p.salario)}</td><td><button class="btn mini" onclick="ABA='mercado';render()">Ver mercado</button></td></tr>`).join(''):'<tr><td colspan="6" class="hint">Nenhum agente livre atende às carências agora.</td></tr>';
   const picksHtml=r.meusPicks.length?r.meusPicks.map(pk=>{const v=pk.valor;const tier=v>=70?'alto':v>=40?'médio':'baixo';return `<div class="pill">${pk.ano} · valor ${tier}</div>`;}).join(''):'<span class="hint">Sem picks de 1ª rodada.</span>';
-  return `<div class="card accent"><h3 class="sub">🔍 Diagnóstico do olheiro</h3><p class="hint">Leitura do elenco por posição — a barra mostra o tamanho da carência. Priorize o que está em vermelho.</p><div class="olh-diag">${diagHtml}</div></div><div class="card tbl-wrap" style="margin-top:12px"><h3 class="sub">🎯 Agentes livres para suas carências</h3><table><thead><tr><th>Jogador</th><th>Pos</th><th>Ovr</th><th>Idade</th><th>Salário</th><th></th></tr></thead><tbody>${livresHtml}</tbody></table></div><div class="card" style="margin-top:12px"><h3 class="sub">📊 Seus picks de 1ª rodada</h3><div class="row" style="gap:6px;flex-wrap:wrap">${picksHtml}</div><p class="hint" style="margin-top:8px">Picks valiosos podem virar moeda de troca por um reforço imediato — veja oportunidades no Mercado.</p></div>`;
+  // trocas concretas sugeridas para cada carência
+  const POSNM2={PG:'Armador',SG:'Ala-armador',SF:'Ala',PF:'Ala-pivô',C:'Pivô'};
+  const trocasHtml=(r.trocasPorCarencia&&r.trocasPorCarencia.length)? r.trocasPorCarencia.map(o=>{
+    const outro=S.times[o.outroId], alvo=o.recebo[0];
+    const picksR=o.picksRecebo&&o.picksRecebo.length?` <span class="tag">+${o.picksRecebo.length} pick</span>`:'';
+    const picksE=o.picksEntrego&&o.picksEntrego.length?` <span class="tag">−${o.picksEntrego.length} pick</span>`:'';
+    return `<div class="card" style="margin-top:8px;border-left:3px solid ${o.ganhoOvr>0?'var(--pos)':'var(--wood)'}">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <span class="olh-carencia">Para o ${POSNM2[o.pos]||o.pos}</span>
+        <span class="pill">${esc(outro.ab)}</span></div>
+      <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
+        <b style="font-size:15px">${bd(alvo.pos)} ${esc(alvo.nome)} <span class="muted">${alvo.ovr} ovr · ${alvo.idade}a · pot ${alvo.pot}</span></b>
+        ${o.ganhoOvr>0?`<span style="color:var(--pos);font-weight:700">+${o.ganhoOvr} na posição</span>`:''}</div>
+      <div class="hint" style="margin:6px 0">Você entrega: ${o.entrego.map(p=>esc(p.nome.split(' ').pop())+' ('+p.ovr+')').join(', ')||'só picks'}${picksE}${picksR} · folha ${o.salLiquido>=0?'+':''}${$(o.salLiquido)}</div>
+      <div class="row"><button class="btn mini" onclick="aceitarScout('carencia',${alvo.id})">Fechar troca</button>
+        <button class="btn ghost mini" onclick="fichaJogador(${alvo.id},${o.outroId})">Ver ficha</button></div></div>`;
+  }).join('') : '<p class="hint">Nenhuma troca viável encontrada para as carências no momento. Tente de novo mais pra frente na temporada.</p>';
+  return `<div class="card accent"><h3 class="sub">🔍 Diagnóstico do olheiro</h3><p class="hint">Leitura do elenco por posição — a barra mostra o tamanho da carência. Priorize o que está em vermelho.</p><div class="olh-diag">${diagHtml}</div></div>
+  <div class="card" style="margin-top:12px"><h3 class="sub">🤝 Trocas sugeridas para cada carência</h3><p class="hint">O olheiro montou ofertas que a diretoria adversária aceitaria — com jogadores e picks já incluídos.</p>${trocasHtml}</div>
+  <div class="card tbl-wrap" style="margin-top:12px"><h3 class="sub">🎯 Agentes livres para suas carências</h3><table><thead><tr><th>Jogador</th><th>Pos</th><th>Ovr</th><th>Idade</th><th>Salário</th><th></th></tr></thead><tbody>${livresHtml}</tbody></table></div>
+  <div class="card" style="margin-top:12px"><h3 class="sub">📊 Seus picks de 1ª rodada</h3><div class="row" style="gap:6px;flex-wrap:wrap">${picksHtml}</div><p class="hint" style="margin-top:8px">Picks valiosos podem virar moeda de troca por um reforço imediato.</p></div>`;
 }
 
 
@@ -4838,7 +4860,33 @@ function relatorioOlheiro(){
     .sort((a,b)=>a.ano-b.ano);
   // oportunidades de troca do olheiro contratado (se houver)
   const trocas=(S.scoutContrato&&S.scoutContrato.ops)?S.scoutContrato.ops.slice(0,4):[];
-  return {diag, livresUteis, meusPicks, trocas, resumo:diag[0]};
+  // TROCA CONCRETA sugerida para cada posição carente (usa o mesmo motor de ofertas viáveis)
+  const trocasPorCarencia=[];
+  const querPicks=false;
+  diag.filter(d=>d.nec>=25).slice(0,4).forEach(d=>{
+    const meuMelhorPos=meu.elenco.filter(p=>p.pos===d.pos).sort((a,b)=>b.ovr-a.ovr)[0];
+    const base=meuMelhorPos?meuMelhorPos.ovr:40;
+    let melhorOp=null;
+    S.times.forEach(outro=>{
+      if(outro.id===S.meuTime) return;
+      outro.elenco.forEach(alvo=>{
+        if(alvo.pos!==d.pos || alvo.ovr<Math.max(58, base+1) || alvo.egg) return;
+        const oferta=(typeof montarOfertaViavel==='function')?montarOfertaViavel(meu, outro, [alvo], valorMercado(alvo), querPicks):null;
+        if(!oferta) return;
+        const ganho=alvo.ovr-base;
+        const custo=oferta.jogadores.reduce((s,p)=>s+p.ovr,0);
+        const score=ganho*10 - custo*0.6 + (alvo.idade<=24?(alvo.pot-alvo.ovr):0);
+        if(!melhorOp || score>melhorOp.score){
+          melhorOp={ pos:d.pos, outroId:outro.id, recebo:[alvo], entrego:oferta.jogadores,
+            picksRecebo:oferta.picksRecebidos||[], picksEntrego:oferta.picksEnviados||[],
+            ganhoOvr:ganho, salLiquido: alvo.salario - oferta.jogadores.reduce((s,p)=>s+p.salario,0), score };
+        }
+      });
+    });
+    if(melhorOp) trocasPorCarencia.push(melhorOp);
+  });
+  S.scoutCarencia=trocasPorCarencia;   // guarda p/ o botão "Fechar troca" localizar a oferta
+  return {diag, livresUteis, meusPicks, trocas, trocasPorCarencia, resumo:diag[0]};
 }
 function necessidades(t){
   const porPos={PG:[],SG:[],SF:[],PF:[],C:[]};
@@ -5056,7 +5104,7 @@ function scoutUI(){
   return html;
 }
 function aceitarScout(fonte,alvoId){
-  const lista = fonte==='free'? S.scoutFree : (S.scoutContrato?S.scoutContrato.ops:[]);
+  const lista = fonte==='free'? S.scoutFree : fonte==='carencia'? (S.scoutCarencia||[]) : (S.scoutContrato?S.scoutContrato.ops:[]);
   const idx=lista.findIndex(o=>o.recebo[0].id===alvoId);
   if(idx<0){render();return;}
   const o=lista[idx];
