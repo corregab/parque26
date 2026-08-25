@@ -832,6 +832,15 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .olh-filtros label{display:flex;flex-direction:column;font-size:11px;color:var(--text-dim);gap:3px}
 .olh-filtros select,.olh-filtros input[type=number]{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;color:var(--text);font-size:13px;width:84px}
 .olh-chk{flex-direction:row!important;align-items:center;gap:5px!important;font-size:12.5px!important;color:var(--text)!important}
+
+/* —— Filosofia de jogo (funções + encaixe) —— */
+.fil-label{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim);margin:8px 0 4px}
+.fil-slots{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+.fil-slot{display:grid;grid-template-columns:34px 1fr 74px 44px 34px;align-items:center;gap:6px;padding:5px 4px;border-bottom:1px solid var(--hair);font-size:12.5px}
+.fil-slot.fil-head{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--line)}
+.fil-role{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 6px;color:var(--text);font-size:12px;width:100%}
+.fil-tit{font-size:12px}
+.fil-enc{font-family:'Oswald',sans-serif;font-weight:700;text-align:center}
 </style>
 </head>
 <body>
@@ -4340,23 +4349,52 @@ function olheiroFormacaoHTML(){
   const meu=S.times[S.meuTime];
   const alvo=S.olheiroFormAlvo || esquemaDe(meu);
   const diag=diagnosticoFormacao(alvo);
+  const fil=filosofiaAtual();
   const opcoes=ORDEM_ESQUEMAS.map(k=>`<button class="esq-mini ${k===alvo?'on':''}" onclick="setOlheiroForm('${k}')">${ESQUEMAS[k].emoji} ${ESQUEMAS[k].nome}</button>`).join('');
   const corpo = diag.ok
-    ? `<div class="olh-form-ok">✅ Seu elenco já está adequado para jogar <b>${diag.nome}</b>. Bom pra fechar reforços de profundidade.</div>`
-    : diag.necessidades.map(n=>`<div class="olh-form-nec ${n.gravidade==='alta'?'grave':''}">
-        <b>${POS_NOME[n.pos]||n.pos}</b>: ${esc(n.txt)}
-        <button class="btn ghost mini" onclick="buscarPara('${n.pos}')">Buscar ${n.pos}</button></div>`).join('');
-  return `<div class="card accent"><h3 class="sub">🧩 Planejar formação</h3>
-    <p class="hint">Escolha o esquema que você quer jogar na temporada. O olheiro diz o que falta no elenco para ele funcionar.</p>
-    <div class="esq-mini-row">${opcoes}</div>
-    <div class="olh-form-diag"><div class="olh-form-titulo">${diag.emoji} ${diag.nome} <span class="muted">— pede ${diag.exige && Object.entries(diag.exige).map(([p,q])=>q+'× '+p).join(', ')}</span></div>${corpo}</div></div>`;
+    ? `<div class="olh-form-ok">✅ Seu elenco já tem as posições para jogar <b>${diag.nome}</b>.</div>`
+    : diag.necessidades.map(n=>`<div class="olh-form-nec ${n.gravidade==='alta'?'grave':''}"><b>${POS_NOME[n.pos]||n.pos}</b>: ${esc(n.txt)} <button class="btn ghost mini" onclick="buscarPara('${n.pos}')">Buscar ${n.pos}</button></div>`).join('');
+  const idOpts=ORDEM_IDENTIDADES.map(k=>`<button class="esq-mini ${k===fil.identidade?'on':''}" onclick="setIdentidade('${k}')">${IDENTIDADES[k].emoji} ${IDENTIDADES[k].nome}</button>`).join('');
+  const idAtual=IDENTIDADES[fil.identidade]||IDENTIDADES.coletivo;
+  const posForm=ESQUEMAS[alvo].pos;
+  const usados={};
+  const slotsHtml=posForm.map((pos,slot)=>{
+    const role=(fil.roles[slot])||ROLE_PADRAO[pos];
+    const cands=meu.elenco.filter(p=>p.pos===pos && !p.egg && !usados[p.id]).sort((a,b)=>encaixeJogador(b,role,fil.identidade)-encaixeJogador(a,role,fil.identidade));
+    const tit=cands[0]; if(tit)usados[tit.id]=1;
+    const enc=tit?encaixeJogador(tit,role,fil.identidade):0;
+    const roleOpts=(ROLES_POR_POS[pos]||[role]).map(r=>`<option value="${r}" ${r===role?'selected':''}>${ROLES[r].nome}</option>`).join('');
+    return `<div class="fil-slot"><div class="fil-pos">${bd(pos)}</div><select class="fil-role" onchange="setRole(${slot},this.value)">${roleOpts}</select><div class="fil-tit">${tit?esc(tit.nome.split(' ').slice(-1)[0])+' ('+tit.ovr+')':'<span class="muted">vazio</span>'}</div><div class="fil-enc" style="color:${corEncaixe(enc)}">${tit?enc+'%':'—'}</div>${tit&&enc<70?`<button class="btn ghost mini" onclick="buscarRoleSlot(${slot})">🔎</button>`:'<span></span>'}</div>`;
+  }).join('');
+  return `<div class="card accent"><h3 class="sub">🧩 Filosofia de jogo</h3><p class="hint">Defina o estilo, o esquema e a função de cada posição. O olheiro mede o "encaixe" de cada titular e ajuda a buscar quem falta.</p><div class="fil-label">Identidade de jogo</div><div class="esq-mini-row">${idOpts}</div><p class="hint" style="margin:2px 0 8px">${idAtual.emoji} <b>${idAtual.nome}</b> — ${idAtual.desc}</p><div class="fil-label">Esquema tático</div><div class="esq-mini-row">${opcoes}</div><div class="fil-label" style="margin-top:8px">Funções e encaixe do elenco</div><div class="fil-slots"><div class="fil-slot fil-head"><div>Pos</div><div>Função</div><div>Titular</div><div>Encaixe</div><div></div></div>${slotsHtml}</div>${corpo?`<div class="olh-form-diag" style="margin-top:10px"><div class="fil-label">Lacunas de posição</div>${corpo}</div>`:''}</div>`;
+}
+function setIdentidade(k){
+  if(!IDENTIDADES[k])return;
+  const fil=filosofiaAtual(); fil.identidade=k;
+  const t=S.times[S.meuTime]; t.tatica=t.tatica||{};
+  if(IDENTIDADES[k].tatica){ t.tatica.ritmo=IDENTIDADES[k].tatica.ritmo; t.tatica.foco=IDENTIDADES[k].tatica.foco; }
+  render();
+}
+function setRole(slot,role){ const fil=filosofiaAtual(); fil.roles[slot]=role; render(); }
+function buscarRoleSlot(slot){
+  const meu=S.times[S.meuTime];
+  const alvo=S.olheiroFormAlvo || esquemaDe(meu);
+  const pos=ESQUEMAS[alvo].pos[slot];
+  const fil=filosofiaAtual();
+  const role=fil.roles[slot]||ROLE_PADRAO[pos];
+  S.olheiroFiltros={pos, ovrMin:72, idadeMax:99, jovem:false, role};
+  S._buscouFiltro=true;
+  buscarComFiltros(S.olheiroFiltros);
+  render();
 }
 function setOlheiroForm(k){
   if(!ESQUEMAS[k])return;
   S.olheiroFormAlvo=k;
-  const t=S.times[S.meuTime]; t.tatica=t.tatica||{}; t.tatica.esquema=k;  // passa a ser o esquema do time
+  const t=S.times[S.meuTime]; t.tatica=t.tatica||{}; t.tatica.esquema=k;
   render();
 }
+
+
 // —— seção: busca de jogadores com filtros ——
 function olheiroBuscaHTML(){
   const f=S.olheiroFiltros||{pos:'todas',ovrMin:78,idadeMax:99,jovem:false};
@@ -5216,6 +5254,53 @@ const SCOUT_NIVEIS=[
 // Relatório do olheiro: diagnóstico do elenco + oportunidades no mercado (livres, picks).
 // ===== OLHEIRO AVANÇADO (offseason): formação-alvo, busca com filtros, propostas em massa =====
 // Diagnóstico: o que o time precisa para jogar bem num esquema tático específico.
+// ===== FILOSOFIA DE JOGO: identidade + funções por posição + encaixe do elenco =====
+// Identidade ofensiva/defensiva do time — cada uma valoriza certos atributos no elenco todo.
+const IDENTIDADES={
+  chuva3:   {nome:'Chuva de 3',       emoji:'🌧️', desc:'Espaçamento e bola de 3 acima de tudo.',        at:{arr3:1.0, passe:0.5, drible:0.4}, tatica:{ritmo:0, foco:2}},
+  interior: {nome:'Ataque interior',  emoji:'🏋️', desc:'Domina o garrafão e os rebotes.',               at:{fin:1.0, reb:0.8, defI:0.6}, tatica:{ritmo:1, foco:0}},
+  correria: {nome:'Corre-corre',      emoji:'⚡', desc:'Ritmo alto, transição e atletismo.',            at:{atl:1.0, fin:0.6, res:0.6}, tatica:{ritmo:0, foco:1}},
+  muralha:  {nome:'Muralha defensiva',emoji:'🛡️', desc:'Defesa sufocante e controle do ritmo.',         at:{defP:0.9, defI:0.9, reb:0.6}, tatica:{ritmo:2, foco:1}},
+  coletivo: {nome:'Jogo coletivo',    emoji:'🎯', desc:'Bola que roda, muita assistência e QI.',         at:{passe:1.0, qi:0.7, arr3:0.5}, tatica:{ritmo:1, foco:1}},
+};
+const ORDEM_IDENTIDADES=['chuva3','interior','correria','muralha','coletivo'];
+// Funções (roles) — cada uma tem os atributos-chave que definem o papel.
+const ROLES={
+  criador:   {nome:'Criador de jogo',   at:['passe','drible','qi']},
+  pontuador: {nome:'Pontuador',         at:['arr2','arr3','fin']},
+  atirador:  {nome:'Arremessador (3&D)',at:['arr3','defP']},
+  defensor:  {nome:'Defensor perímetro',at:['defP','atl','drible']},
+  alaVersatil:{nome:'Ala versátil',     at:['arr3','defP','drible']},
+  garrafao:  {nome:'Jogo de garrafão',  at:['fin','reb','defI']},
+  protetor:  {nome:'Protetor de aro',   at:['defI','reb','atl']},
+  reboteiro: {nome:'Reboteiro',         at:['reb','fin','atl']},
+};
+// roles sugeridos por posição (quando o jogador ainda não escolheu)
+const ROLE_PADRAO={PG:'criador', SG:'pontuador', SF:'alaVersatil', PF:'garrafao', C:'protetor'};
+const ROLES_POR_POS={
+  PG:['criador','pontuador','defensor'],
+  SG:['pontuador','atirador','defensor'],
+  SF:['alaVersatil','atirador','pontuador','defensor'],
+  PF:['garrafao','reboteiro','atirador','protetor'],
+  C:['protetor','garrafao','reboteiro'],
+};
+function filosofiaAtual(){
+  S.filosofia=S.filosofia||{identidade:'coletivo', roles:{}};
+  if(!S.filosofia.roles)S.filosofia.roles={};
+  return S.filosofia;
+}
+// nota de encaixe (0-100) de um jogador num role, ponderada pela identidade do time
+function encaixeJogador(p, role, identidade){
+  if(!p||!p.at) return 0;
+  const R=ROLES[role]||ROLES[ROLE_PADRAO[p.pos]]||ROLES.pontuador;
+  const idAt=(IDENTIDADES[identidade]||{}).at||{};
+  let soma=0, peso=0;
+  R.at.forEach(k=>{ const w=1+(idAt[k]||0); soma+=(p.at[k]||40)*w; peso+=w; });
+  // atributos que a identidade valoriza também contam um pouco
+  Object.keys(idAt).forEach(k=>{ if(!R.at.includes(k)){ soma+=(p.at[k]||40)*idAt[k]*0.4; peso+=idAt[k]*0.4; } });
+  return Math.round(soma/Math.max(1,peso));
+}
+function corEncaixe(n){ return n>=80?'var(--pos)':n>=68?'var(--amber)':'var(--neg)'; }
 function diagnosticoFormacao(esquema){
   const esq=ESQUEMAS[esquema]||ESQUEMAS.padrao;
   const meu=S.times[S.meuTime];
@@ -5267,8 +5352,14 @@ function buscarComFiltros(filtros){
         salLiquido: alvo.salario - oferta.jogadores.reduce((s,p)=>s+p.salario,0) });
     });
   });
-  // ordena: trocas que melhoram o time primeiro, depois pelo overall do alvo
-  res.sort((a,b)=> ((b.liquido>0)-(a.liquido>0)) || (b.liquido-a.liquido) || (b.alvo.ovr-a.alvo.ovr) );
+  // ordena: se veio de um slot com role, prioriza encaixe no role+estilo; senão, trocas boas primeiro
+  const fil=filosofiaAtual();
+  if(filtros.role){
+    res.forEach(o=>o.encaixe=encaixeJogador(o.alvo, filtros.role, fil.identidade));
+    res.sort((a,b)=> ((b.liquido>0)-(a.liquido>0)) || (b.encaixe-a.encaixe) || (b.alvo.ovr-a.alvo.ovr) );
+  } else {
+    res.sort((a,b)=> ((b.liquido>0)-(a.liquido>0)) || (b.liquido-a.liquido) || (b.alvo.ovr-a.alvo.ovr) );
+  }
   S.scoutFiltro=res.slice(0,12);
   return S.scoutFiltro;
 }
