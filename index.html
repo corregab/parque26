@@ -818,6 +818,20 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .prem-tit{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim)}
 .prem-jog{font-size:15px;margin:2px 0}
 .prem-stats{font-size:12px;color:var(--text-dim);font-family:var(--mono)}
+
+/* —— Olheiro avançado (formação + busca) —— */
+.esq-mini-row{display:flex;gap:6px;overflow-x:auto;padding:6px 0}
+.esq-mini{flex:0 0 auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:7px 11px;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer;white-space:nowrap}
+.esq-mini.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.olh-form-diag{margin-top:10px}
+.olh-form-titulo{font-family:'Oswald',sans-serif;font-size:15px;margin-bottom:6px}
+.olh-form-nec{background:var(--surface);border-left:3px solid var(--amber);border-radius:6px;padding:8px 10px;margin:5px 0;font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between}
+.olh-form-nec.grave{border-left-color:var(--neg)}
+.olh-form-ok{background:var(--accent-soft);border-radius:8px;padding:10px;font-size:13.5px}
+.olh-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:8px}
+.olh-filtros label{display:flex;flex-direction:column;font-size:11px;color:var(--text-dim);gap:3px}
+.olh-filtros select,.olh-filtros input[type=number]{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;color:var(--text);font-size:13px;width:84px}
+.olh-chk{flex-direction:row!important;align-items:center;gap:5px!important;font-size:12.5px!important;color:var(--text)!important}
 </style>
 </head>
 <body>
@@ -2739,6 +2753,7 @@ function iniciarOffseasonMercado(){
   S.propostas=S.propostas||[];
   definirObjetivo();
   noticia('🏝️ Offseason aberta! Você tem '+S.offDiasTotal+' dias para renovar, contratar e negociar antes da temporada '+S.temporada+'.','p');
+  if(typeof gerarPropostasOffseason==='function'){ try{ gerarPropostasOffseason(); gerarPropostasOffseason(); }catch(e){} }
   gerarRumoresOffseason();
   render();
 }
@@ -2779,7 +2794,7 @@ function avancarDiaOffseason(){
     noticia('✍️ '+t.cidade+' '+t.nick+' acertou com '+p.nome+' ('+p.pos+', ovr '+p.ovr+').','m');
     fechados++;
   }
-  if(typeof gerarPropostasIA==='function'){ try{ gerarPropostasIA(); }catch(e){} }
+  if(typeof gerarPropostasOffseason==='function'){ try{ gerarPropostasOffseason(); }catch(e){} }
   gerarRumoresOffseason();
   S.offDia++;
   if(S.offDia>S.offDiasTotal){ iniciarTemporada(); return; }
@@ -4291,6 +4306,8 @@ function vDesenvolvimento(){
 }
 function vOlheiro(){
   const r=relatorioOlheiro();
+  const secFormacao=olheiroFormacaoHTML();
+  const secBusca=olheiroBuscaHTML();
   const corMap={neg:'var(--neg)',warn:'var(--amber)',pos:'var(--pos)',mut:'var(--text-dim)'};
   const diagHtml=r.diag.map(d=>`<div class="olh-pos"><div class="olh-pos-tag" style="color:${corMap[d.cor]}">${d.pos}</div><div class="olh-pos-info"><b>${d.prof} jogador(es)${d.melhor?' · melhor '+d.melhor+' ovr':''}</b><span style="color:${corMap[d.cor]}">${d.status}</span></div><div class="olh-pos-bar"><i style="width:${d.nec}%;background:${corMap[d.cor]}"></i></div></div>`).join('');
   const livresHtml=r.livresUteis.length?r.livresUteis.map(p=>`<tr><td class="name clickable" onclick="fichaJogador(${p.id})">${esc(p.nome)}</td><td>${bd(p.pos)}</td><td><span class="ovr">${p.ovr}</span></td><td class="muted">${p.idade}a</td><td>${$(p.salario)}</td><td><button class="btn mini" onclick="ABA='mercado';render()">Ver mercado</button></td></tr>`).join(''):'<tr><td colspan="6" class="hint">Nenhum agente livre atende às carências agora.</td></tr>';
@@ -4312,10 +4329,72 @@ function vOlheiro(){
       <div class="row"><button class="btn mini" onclick="aceitarScout('carencia',${alvo.id})">Fechar troca</button>
         <button class="btn ghost mini" onclick="fichaJogador(${alvo.id},${o.outroId})">Ver ficha</button></div></div>`;
   }).join('') : '<p class="hint">Nenhuma troca viável encontrada para as carências no momento. Tente de novo mais pra frente na temporada.</p>';
-  return `<div class="card accent"><h3 class="sub">🔍 Diagnóstico do olheiro</h3><p class="hint">Leitura do elenco por posição — a barra mostra o tamanho da carência. Priorize o que está em vermelho.</p><div class="olh-diag">${diagHtml}</div></div>
+  return secFormacao + secBusca +
+  `<div class="card accent" style="margin-top:12px"><h3 class="sub">🔍 Diagnóstico do olheiro</h3><p class="hint">Leitura do elenco por posição — a barra mostra o tamanho da carência. Priorize o que está em vermelho.</p><div class="olh-diag">${diagHtml}</div></div>
   <div class="card" style="margin-top:12px"><h3 class="sub">🤝 Trocas sugeridas para cada carência</h3><p class="hint">O olheiro montou ofertas que a diretoria adversária aceitaria — com jogadores e picks já incluídos.</p>${trocasHtml}</div>
   <div class="card tbl-wrap" style="margin-top:12px"><h3 class="sub">🎯 Agentes livres para suas carências</h3><table><thead><tr><th>Jogador</th><th>Pos</th><th>Ovr</th><th>Idade</th><th>Salário</th><th></th></tr></thead><tbody>${livresHtml}</tbody></table></div>
   <div class="card" style="margin-top:12px"><h3 class="sub">📊 Seus picks de 1ª rodada</h3><div class="row" style="gap:6px;flex-wrap:wrap">${picksHtml}</div><p class="hint" style="margin-top:8px">Picks valiosos podem virar moeda de troca por um reforço imediato.</p></div>`;
+}
+// —— seção: planejar a formação-alvo e diagnóstico de adequação ——
+function olheiroFormacaoHTML(){
+  const meu=S.times[S.meuTime];
+  const alvo=S.olheiroFormAlvo || esquemaDe(meu);
+  const diag=diagnosticoFormacao(alvo);
+  const opcoes=ORDEM_ESQUEMAS.map(k=>`<button class="esq-mini ${k===alvo?'on':''}" onclick="setOlheiroForm('${k}')">${ESQUEMAS[k].emoji} ${ESQUEMAS[k].nome}</button>`).join('');
+  const corpo = diag.ok
+    ? `<div class="olh-form-ok">✅ Seu elenco já está adequado para jogar <b>${diag.nome}</b>. Bom pra fechar reforços de profundidade.</div>`
+    : diag.necessidades.map(n=>`<div class="olh-form-nec ${n.gravidade==='alta'?'grave':''}">
+        <b>${POS_NOME[n.pos]||n.pos}</b>: ${esc(n.txt)}
+        <button class="btn ghost mini" onclick="buscarPara('${n.pos}')">Buscar ${n.pos}</button></div>`).join('');
+  return `<div class="card accent"><h3 class="sub">🧩 Planejar formação</h3>
+    <p class="hint">Escolha o esquema que você quer jogar na temporada. O olheiro diz o que falta no elenco para ele funcionar.</p>
+    <div class="esq-mini-row">${opcoes}</div>
+    <div class="olh-form-diag"><div class="olh-form-titulo">${diag.emoji} ${diag.nome} <span class="muted">— pede ${diag.exige && Object.entries(diag.exige).map(([p,q])=>q+'× '+p).join(', ')}</span></div>${corpo}</div></div>`;
+}
+function setOlheiroForm(k){
+  if(!ESQUEMAS[k])return;
+  S.olheiroFormAlvo=k;
+  const t=S.times[S.meuTime]; t.tatica=t.tatica||{}; t.tatica.esquema=k;  // passa a ser o esquema do time
+  render();
+}
+// —— seção: busca de jogadores com filtros ——
+function olheiroBuscaHTML(){
+  const f=S.olheiroFiltros||{pos:'todas',ovrMin:78,idadeMax:99,jovem:false};
+  S.olheiroFiltros=f;
+  const posOpts=['todas','PG','SG','SF','PF','C'].map(p=>`<option value="${p}" ${f.pos===p?'selected':''}>${p==='todas'?'Todas':p}</option>`).join('');
+  const res=S.scoutFiltro||[];
+  const resHtml = res.length? res.map(o=>{
+    const picksR=o.picksRecebo&&o.picksRecebo.length?` <span class="tag">+${o.picksRecebo.length} pick</span>`:'';
+    return `<div class="card" style="margin-top:8px;border-left:3px solid ${o.liquido>0?'var(--pos)':'var(--wood)'}">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <b>${bd(o.alvo.pos)} ${esc(o.alvo.nome)} <span class="muted">${o.alvo.ovr} ovr · ${o.alvo.idade}a · pot ${o.alvo.pot}</span></b>
+        <span class="pill">${esc(o.outro.ab)}</span></div>
+      <div class="hint" style="margin:6px 0">Você entrega: ${o.entrego.map(p=>esc(p.nome.split(' ').pop())+' ('+p.ovr+')').join(', ')||'só picks'}${picksR} · folha ${o.salLiquido>=0?'+':''}${$(o.salLiquido)}${o.liquido>0?` · <span style="color:var(--pos)">time +${o.liquido}</span>`:''}</div>
+      <div class="row"><button class="btn mini" onclick="aceitarBuscaFiltro(${o.alvo.id})">Fechar troca</button>
+        <button class="btn ghost mini" onclick="fichaJogador(${o.alvo.id},${o.outro.id})">Ver ficha</button></div></div>`;
+  }).join('') : (S._buscouFiltro?'<p class="hint">Nenhum jogador viável com esses filtros. Tente afrouxar (ovr menor, idade maior).</p>':'<p class="hint">Defina os filtros e toque em Buscar.</p>');
+  return `<div class="card" style="margin-top:12px"><h3 class="sub">🔎 Buscar jogador no mercado</h3>
+    <div class="olh-filtros">
+      <label>Posição<select id="fPos" onchange="setFiltro('pos',this.value)">${posOpts}</select></label>
+      <label>Ovr mín<input id="fOvr" type="number" min="40" max="99" value="${f.ovrMin}" onchange="setFiltro('ovrMin',+this.value)"></label>
+      <label>Idade máx<input id="fIdade" type="number" min="18" max="45" value="${f.idadeMax}" onchange="setFiltro('idadeMax',+this.value)"></label>
+      <label class="olh-chk"><input type="checkbox" ${f.jovem?'checked':''} onchange="setFiltro('jovem',this.checked)"> Só jovens promessas</label>
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn" onclick="rodarBuscaFiltro()">🔎 Buscar jogadores</button></div>
+    ${resHtml}</div>`;
+}
+function setFiltro(k,v){ S.olheiroFiltros=S.olheiroFiltros||{}; S.olheiroFiltros[k]=v; }
+function rodarBuscaFiltro(){ S._buscouFiltro=true; buscarComFiltros(S.olheiroFiltros||{}); render(); }
+function buscarPara(pos){ S.olheiroFiltros=Object.assign({pos:'todas',ovrMin:74,idadeMax:99,jovem:false}, S.olheiroFiltros||{}, {pos}); S._buscouFiltro=true; buscarComFiltros(S.olheiroFiltros); SUBP='olheiro'; render(); }
+function aceitarBuscaFiltro(alvoId){
+  if(typeof tradeDeadlinePassou==='function' && tradeDeadlinePassou()){ alert('A janela de trocas fechou no Trade Deadline.'); return; }
+  const o=(S.scoutFiltro||[]).find(x=>x.alvo.id===alvoId);
+  if(!o){ render(); return; }
+  // reaproveita o executor de trocas do scout guardando no formato esperado
+  S.scoutCarencia=S.scoutCarencia||[];
+  S.scoutCarencia.push({pos:o.alvo.pos, outroId:o.outro.id, recebo:[o.alvo], entrego:o.entrego,
+    picksRecebo:o.picksRecebo, picksEntrego:o.picksEntrego});
+  aceitarScout('carencia', alvoId);
 }
 
 
@@ -5135,6 +5214,94 @@ const SCOUT_NIVEIS=[
 ];
 
 // Relatório do olheiro: diagnóstico do elenco + oportunidades no mercado (livres, picks).
+// ===== OLHEIRO AVANÇADO (offseason): formação-alvo, busca com filtros, propostas em massa =====
+// Diagnóstico: o que o time precisa para jogar bem num esquema tático específico.
+function diagnosticoFormacao(esquema){
+  const esq=ESQUEMAS[esquema]||ESQUEMAS.padrao;
+  const meu=S.times[S.meuTime];
+  // quantos titulares cada posição o esquema exige
+  const exige={};
+  esq.pos.forEach(p=>exige[p]=(exige[p]||0)+1);
+  // quantos jogadores de nível (ovr>=72) o time tem por posição
+  const bons={PG:[],SG:[],SF:[],PF:[],C:[]};
+  meu.elenco.filter(p=>!p.egg).forEach(p=>{ if(bons[p.pos]) bons[p.pos].push(p); });
+  Object.keys(bons).forEach(k=>bons[k].sort((a,b)=>b.ovr-a.ovr));
+  const necessidades=[];
+  Object.keys(exige).forEach(pos=>{
+    const precisa=exige[pos];
+    const temBons=bons[pos].filter(p=>p.ovr>=72).length;
+    const temQualquer=bons[pos].length;
+    if(temBons<precisa){
+      necessidades.push({pos, precisa, temBons, temQualquer,
+        gravidade: temQualquer<precisa?'alta':'media',
+        txt: temQualquer<precisa
+          ? `Faltam ${precisa-temQualquer} jogador(es) de ${POS_NOME[pos]||pos} — o esquema pede ${precisa}, você tem ${temQualquer}.`
+          : `Você tem ${temQualquer} ${POS_NOME[pos]||pos}(s), mas só ${temBons} em nível de titular (o esquema quer ${precisa} fortes).`});
+    }
+  });
+  return {esquema, nome:esq.nome, emoji:esq.emoji, exige, necessidades, ok:necessidades.length===0};
+}
+// Busca jogadores de outros times pelos filtros e monta uma troca viável por cada um.
+function buscarComFiltros(filtros){
+  const meu=S.times[S.meuTime];
+  const pos=filtros.pos||'todas';
+  const ovrMin=filtros.ovrMin||0;
+  const idadeMax=filtros.idadeMax||99;
+  const jovem=filtros.jovem||false;
+  const res=[];
+  S.times.forEach(outro=>{
+    if(outro.id===S.meuTime) return;
+    outro.elenco.forEach(alvo=>{
+      if(alvo.egg) return;
+      if(pos!=='todas' && alvo.pos!==pos) return;
+      if(alvo.ovr<ovrMin) return;
+      if(alvo.idade>idadeMax) return;
+      if(jovem && (alvo.idade>24 || (alvo.pot-alvo.ovr)<3)) return;
+      const oferta=(typeof montarOfertaViavel==='function')?montarOfertaViavel(meu, outro, [alvo], valorMercado(alvo), false):null;
+      if(!oferta) return;
+      const melhorEntregue=oferta.jogadores.length?Math.max(...oferta.jogadores.map(p=>p.ovr)):0;
+      const imp=(typeof impactoLiquidoTroca==='function')?impactoLiquidoTroca(meu,[alvo],oferta.jogadores):{liquido:0};
+      res.push({ alvo, outro, entrego:oferta.jogadores,
+        picksRecebo:oferta.picksRecebidos||[], picksEntrego:oferta.picksEnviados||[],
+        melhorEntregue, liquido:Math.round(imp.liquido*10)/10,
+        salLiquido: alvo.salario - oferta.jogadores.reduce((s,p)=>s+p.salario,0) });
+    });
+  });
+  // ordena: trocas que melhoram o time primeiro, depois pelo overall do alvo
+  res.sort((a,b)=> ((b.liquido>0)-(a.liquido>0)) || (b.liquido-a.liquido) || (b.alvo.ovr-a.alvo.ovr) );
+  S.scoutFiltro=res.slice(0,12);
+  return S.scoutFiltro;
+}
+// OFFSEASON: enxurrada de propostas de troca chegando (bem mais que na temporada).
+function gerarPropostasOffseason(){
+  if(!S.propostas)S.propostas=[];
+  const meu=S.times[S.meuTime];
+  const LIMITE=12;
+  let tentativas=0, geradas=0;
+  const querJogaveis=meu.elenco.filter(p=>!p.egg && p.ovr>=66);
+  while(S.propostas.length<LIMITE && tentativas++<40 && geradas<RI(2,4)){
+    const desejado=pick(querJogaveis);
+    if(!desejado) break;
+    if(S.propostas.some(pr=>pr.querem.includes(desejado.id))) continue;
+    // um time que precisa dessa posição
+    const candidatosTime=S.times.filter(t=>t.id!==S.meuTime);
+    const outro=pick(candidatosTime);
+    if(!outro) continue;
+    const oferta=(typeof montarOfertaIA==='function')?montarOfertaIA(outro, meu, desejado, valorMercado(desejado)):null;
+    if(!oferta) continue;
+    S.propostas.push({
+      id:'PROP'+(S.propId=(S.propId||0)+1),
+      outroId:outro.id, outroAb:outro.ab, outroNome:outro.cidade+' '+outro.nick,
+      querem:[desejado.id],
+      oferecem:oferta.jogadores.map(p=>p.id),
+      oferecemPicks:(oferta.picks||[]).map(pk=>pk.id),
+      rodadaExpira:S.rodada+99   // na offseason não expiram por rodada
+    });
+    noticia('📨 '+outro.ab+' quer negociar por '+desejado.nome.split(' ').pop()+'!','p');
+    geradas++;
+  }
+  return geradas;
+}
 function relatorioOlheiro(){
   const meu=S.times[S.meuTime];
   const nec=necessidades(meu);
@@ -8921,16 +9088,16 @@ function mostrarSetup(){ mostrarHub(); }
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
 const NOVIDADES = {
-  versao: '2026.08c',
+  versao: '2026.08d',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
-    {emoji:'🗓️', t:'Temporada em calendário', d:'A temporada agora corre por datas reais (de outubro a abril), com uma agenda mostrando os próximos dias: jogos, eventos e folgas. Avance dia a dia ou pule direto pro próximo jogo — do jeito que preferir.'},
-    {emoji:'⭐', t:'All-Star Weekend', d:'No meio da temporada, os melhores da liga são convocados para o Jogo das Estrelas. Se seus jogadores forem selecionados, ganham moral e reconhecimento!'},
-    {emoji:'🔄', t:'Trade Deadline', d:'Agora existe um prazo final para trocas. Depois dele, seu elenco fica fechado para a corrida aos playoffs — planeje suas negociações com antecedência.'},
-    {emoji:'🎤', t:'Coletivas de imprensa', d:'A mídia vai te fazer perguntas ao longo da temporada. Suas respostas mexem com a moral do elenco — escolha bem o que falar.'},
-    {emoji:'🏆', t:'Prêmios da temporada', d:'Ao fim de cada temporada, são eleitos o MVP, o Melhor Defensor, o Novato do Ano e o time All-NBA. Será que alguém do seu elenco leva?'},
-    {emoji:'🧑‍🏫', t:'Comissão técnica completa', d:'Contrate um preparador que evolui o ponto fraco de cada jogador, e um olheiro que aponta carências, agentes livres e trocas que realmente melhoram o time.'},
+    {emoji:'🧩', t:'Olheiro: planejar formação', d:'Escolha o esquema que quer jogar na temporada e o olheiro faz um diagnóstico do que falta no elenco para ele funcionar — e já te leva a buscar os reforços certos.'},
+    {emoji:'🔎', t:'Busca de jogadores com filtros', d:'Defina posição, overall mínimo, idade e até "só jovens promessas". O olheiro varre a liga e monta trocas viáveis, priorizando as que melhoram seu time.'},
+    {emoji:'📨', t:'Offseason fervendo', d:'Agora chove proposta de troca na offseason! Os outros times disputam seus jogadores de verdade nessa janela.'},
+    {emoji:'🗓️', t:'Temporada em calendário', d:'A temporada corre por datas reais, com agenda dos próximos dias — jogos, eventos e folgas. Avance dia a dia ou pule pro próximo jogo. E a carreira agora começa direto na offseason.'},
+    {emoji:'⭐', t:'Eventos da temporada', d:'All-Star Weekend, Trade Deadline, coletivas de imprensa que mexem na moral e premiações de fim de ano (MVP, Novato, All-NBA).'},
+    {emoji:'🧑‍🏫', t:'Preparador de desenvolvimento', d:'Contrate um preparador que evolui o ponto fraco de cada jogador aos poucos. (O treino manual saiu — agora é tudo pela comissão técnica.)'},
   ]
 };
 function mostrarNovidades(forcar){
