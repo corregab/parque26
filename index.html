@@ -786,6 +786,12 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .olh-pos-bar i{display:block;height:100%;border-radius:3px}
 
 .olh-carencia{font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--accent)}
+
+/* —— Calendário —— */
+.cal-datebar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--hair)}
+.cal-date{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;letter-spacing:.3px}
+.cal-prog{font-size:11px;color:var(--text-dim)}
+.cal-folga{margin-top:8px;padding:8px 11px;background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);font-size:13px;color:var(--text-dim)}
 </style>
 </head>
 <body>
@@ -1882,6 +1888,38 @@ function avEncerrar(){
    LIGA — calendário, temporada, finanças, playoffs, offseason
    ============================================================ */
 const JOGOS_TEMP = 82;
+// ===== CALENDÁRIO POR DIAS (camada sobre as rodadas) =====
+// Cada jogo do seu time avança ~PASSO_RODADA dias no calendário (de ~22/out a ~abril),
+// deixando dias livres entre os jogos (treino, descanso, mercado).
+const PASSO_RODADA = 2;
+const MESES_PT=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const MESES_ABR=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function jogosJogadosMeu(){ const t=S.times&&S.meuTime!=null?S.times[S.meuTime]:null; return t?(t.v+t.d):0; }
+function diaDoProximoJogo(){ return jogosJogadosMeu()*PASSO_RODADA; }
+function diaDaRodada(r){ return r*PASSO_RODADA; }  // usado em telas antigas
+// converte "dia da temporada" (0-based, começando em 22/out) numa data
+function dataDoDia(dia){
+  const base=new Date(2001,9,22);
+  base.setDate(base.getDate()+Math.max(0,dia));
+  return {d:base.getDate(), mes:base.getMonth(), diaSemana:base.getDay()};
+}
+function dataLegivel(dia,curta){
+  const dt=dataDoDia(dia);
+  return curta? (dt.d+' '+MESES_ABR[dt.mes]) : (dt.d+' de '+MESES_PT[dt.mes]);
+}
+function diaTempAtual(){ return (S.diaTemp!=null)? S.diaTemp : diaDoProximoJogo(); }
+function totalDiasTemp(){ return JOGOS_TEMP*PASSO_RODADA; }
+// mantém a data do calendário nunca atrás do último jogo disputado (chamado no render)
+function sincronizarCalendario(){
+  if(S.fase!=='regular') return;
+  const minDia=Math.max(0,(jogosJogadosMeu()-1)*PASSO_RODADA);
+  if(S.diaTemp==null || S.diaTemp<minDia) S.diaTemp=minDia;
+}
+function meuJogoNaRodadaAtual(){
+  const rod=S.cal&&S.cal[S.rodada];
+  return rod && rod.some(j=>j.c===S.meuTime||j.f===S.meuTime);
+}
+
 /* Calendário estilo NBA: 82 jogos por time.
    Mais confrontos dentro da conferência, menos entre conferências. */
 function gerarCalendario(times){
@@ -2540,6 +2578,7 @@ function avancarDiaOffseason(){
 }
 function iniciarTemporada(){
   S.cal=gerarCalendario();S.rodada=0;S.po=null;S.playin=null;S.ultimoJogo=null;
+  S.diaTemp=0;   // reinicia o calendário em 22/out
   S.times.forEach(t=>{t.minutos=autoMinutos(t);});
   S.treinos={}; S.treinosRest=TREINOS_POR_TEMP; S.scoutContrato=null; S.scoutFree=[];
   S.fase='regular';
@@ -3328,7 +3367,7 @@ function hud(){
   el('hdTeam').innerHTML='<span class="brand-esc">'+escudoTime(t.ab,20)+'<span>'+t.cidade.toUpperCase()+' '+t.nick.toUpperCase()+'</span></span>';
   el('hud').innerHTML=`
     <div class="hud"><span>Temporada</span><b>${S.temporada}</b></div>
-    <div class="hud"><span>${S.fase==='regular'?'Jogos':'Fase'}</span><b>${S.fase==='regular'?(S.times[S.meuTime].v+S.times[S.meuTime].d)+'/'+JOGOS_TEMP:S.fase==='playin'?'PLAY-IN':S.fase==='playoffs'?['QUARTAS','SEMIS','FINAL C.','FINAL'][S.po.fase]:S.fase==='mercado'?'OFFSEASON':S.fase==='draft'?'DRAFT':'—'}</b></div>
+    <div class="hud"><span>${S.fase==='regular'?'📅 Data':'Fase'}</span><b>${S.fase==='regular'?dataLegivel(diaTempAtual(),true):S.fase==='playin'?'PLAY-IN':S.fase==='playoffs'?['QUARTAS','SEMIS','FINAL C.','FINAL'][S.po.fase]:S.fase==='mercado'?'OFFSEASON':S.fase==='draft'?'DRAFT':'—'}</b></div>
     <div class="hud"><span>Campanha</span><b>${t.v}-${t.d}</b></div>
     <div class="hud ${cx>=0?'pos':'neg'}"><span>Caixa</span><b>${$(cx)}</b></div>`;
 }
@@ -3438,6 +3477,7 @@ function render(){
     clearInterval(AVUI.timer); AVUI.timer=null;
   }
   if(S && S.online && ABA==='editor') ABA='inicio';   // editor não existe no modo online
+  if(S && typeof sincronizarCalendario==='function') sincronizarCalendario();
   // destrava o draft: se todas as escolhas ja foram feitas mas a fase nao avancou, conclui agora
   if(S && S.fase==='draft' && S.ordemDraft && S.draftPick>=S.ordemDraft.length && typeof finalizarDraft==='function'){ finalizarDraft(); }
   if(S && S.times && S.times[S.meuTime]) aplicarCoresTime(S.times[S.meuTime].ab);
@@ -3621,16 +3661,22 @@ function vInicio(){
     const px=proximoJogo();
     if(px){
       const casa=px.j.c===S.meuTime, adv=S.times[casa?px.j.f:px.j.c];
+      const diaJogo=diaDaRodada(px.rodada);
+      const folgaAtual=!meuJogoNaRodadaAtual();
       bloco=`<div class="card accent">
-        <h3 class="sub">Próximo jogo · rodada ${px.rodada+1}</h3>
+        <div class="cal-datebar"><span class="cal-date">📅 ${dataLegivel(diaTempAtual())}</span><span class="cal-prog">Rodada ${S.rodada+1} · ${dataLegivel(totalDiasTemp(),true)} encerra a temporada</span></div>
+        ${folgaAtual?`<div class="cal-folga">🛌 Dia de folga do ${esc(t.nick)} — sem jogo hoje. Bom momento para treinar, negociar ou usar o olheiro.</div>`:''}
+        <h3 class="sub" style="margin-top:8px">${folgaAtual?'Próximo compromisso':'Jogo de hoje'} · ${dataLegivel(diaJogo,true)}</h3>
         ${S.online
           ? htmlBotoesJogar()
           : `<div class="row" style="justify-content:space-between;align-items:flex-end">
           <div><div class="big">${casa?'vs':'@'} ${esc(adv.nick)}</div>
           <div class="hint">${esc(adv.cidade)} · ${adv.v}-${adv.d} · força ${forcaTime(adv)} · ${casa?'Em casa':'Fora de casa'}</div>
           <div class="prev-tat" style="margin-top:5px">📋 Provável do rival: ${resumoTaticaCurto(taticaIA(adv))}</div></div>
-          <div><div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular rápido</button></div>
-          <div class="row" style="margin-top:6px"><button class="btn ghost mini" onclick="jogarVarias(5)">Simular 5 rodadas</button></div></div>
+          <div><div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular</button></div>
+          <div class="row" style="margin-top:6px;gap:6px">
+            <button class="btn ghost mini" onclick="avancarUmDia()">📆 Avançar 1 dia</button>
+            <button class="btn ghost mini" onclick="avancarAteProximoJogo()">⏭️ Até o próximo jogo</button></div></div>
         </div>`}</div>`;
     } else {
       // seu time já jogou os 82 jogos, mas a temporada ainda não fechou no calendário
@@ -4141,18 +4187,18 @@ function autoRot(){S.times[S.meuTime].minutos=autoMinutos(S.times[S.meuTime]);re
 function vCal(){
   const meus=[];
   S.cal.forEach((rod,i)=>rod.forEach(j=>{if(j.c===S.meuTime||j.f===S.meuTime)meus.push({i,j});}));
-  const rows=meus.map(({i,j})=>{
+  const rows=meus.map(({i,j},idx)=>{
     const casa=j.c===S.meuTime,adv=S.times[casa?j.f:j.c];
     let r='—',cls='';
     if(j.res){const eu=casa?j.res[0]:j.res[1],ele=casa?j.res[1]:j.res[0];
       r=(eu>ele?'V':'D')+' '+eu+'-'+ele;cls=eu>ele?'w':'l';}
     const clk=(S.online&&j.res)?`onclick="verBoxscore(${i},${j.c})"`:'';
-    return `<tr class="${i===S.rodada?'me':''}${(S.online&&j.res)?' clickable':''}" ${clk}><td>${i+1}</td><td class="name">${casa?'vs':'@'} ${esc(adv.cidade)} ${esc(adv.nick)}</td>
+    return `<tr class="${i===S.rodada?'me':''}${(S.online&&j.res)?' clickable':''}" ${clk}><td>${dataLegivel(diaDaRodada(idx),true)}</td><td class="name">${casa?'vs':'@'} ${esc(adv.cidade)} ${esc(adv.nick)}</td>
       <td>${adv.v}-${adv.d}</td><td>${forcaTime(adv)}</td><td>${j.res?`<span class="pill ${cls}">${r}</span>`:'<span class="muted">a jogar</span>'}</td></tr>`;
   }).join('');
   return `<h2 class="sec">Calendário</h2>
-  ${S.online?'<p class="hint" style="margin:-4px 0 12px">📊 Toque em um jogo já disputado para ver o boxscore completo.</p>':''}
-  <div class="split"><div class="card tbl-wrap"><table><thead><tr><th>#</th><th>Adversário</th><th>Camp.</th><th>Força</th><th>Resultado</th></tr></thead><tbody>${rows}</tbody></table></div>
+  ${S.online?'<p class="hint" style="margin:-4px 0 12px">📊 Toque em um jogo já disputado para ver o boxscore completo.</p>':`<p class="hint" style="margin:-4px 0 12px">📅 Temporada ${S.temporada} · hoje é ${dataLegivel(diaTempAtual())}.</p>`}
+  <div class="split"><div class="card tbl-wrap"><table><thead><tr><th>Data</th><th>Adversário</th><th>Camp.</th><th>Força</th><th>Resultado</th></tr></thead><tbody>${rows}</tbody></table></div>
   <div><div class="card"><h3 class="sub">Resultados da rodada ${Math.max(1,S.rodada)}</h3>
     ${(()=>{const rr=Math.max(0,S.rodada-1);return (S.cal[rr]||[]).map(j=>{
       const A=S.times[j.c],B=S.times[j.f];
@@ -4564,6 +4610,27 @@ function jogarVarias(n){
   if(S.fase==='offseason'&&!S.avaliado){avaliarEmprego();S.avaliado=true;}
   render();
 }
+
+// Avança UM dia no calendário. Nos dias livres (entre um jogo e o próximo), só passa o dia
+// — bom pra treinar, negociar, usar o olheiro. Ao chegar no dia do jogo, você joga ao vivo.
+function avancarUmDia(){
+  if(S.fase!=='regular'){ if(typeof acaoCentral==='function')acaoCentral(); return; }
+  const prox=diaDoProximoJogo();
+  if(diaTempAtual()<prox){
+    S.diaTemp=diaTempAtual()+1;   // dia livre
+    render();
+  } else {
+    if(typeof jogarAoVivo==='function') jogarAoVivo(); else jogar();
+  }
+}
+// Pula os dias livres e vai direto pro dia do próximo jogo (joga ao vivo).
+function avancarAteProximoJogo(){
+  if(S.fase!=='regular'){ if(typeof acaoCentral==='function')acaoCentral(); return; }
+  S.diaTemp=diaDoProximoJogo();
+  if(typeof jogarAoVivo==='function') jogarAoVivo(); else jogar();
+}
+
+
 function verJogo(){
   const j=S.ultimoJogo;if(!j)return;
   const bx=(lado,ttl)=>{
@@ -5481,7 +5548,7 @@ function assumirTime(timeId){
   // reinicia a temporada regular com o novo time
   S.times.forEach(t=>{t.v=0;t.d=0;t.pf=0;t.pc=0;t.seq=[];});
   S.times.forEach(t=>t.elenco.forEach(p=>{p.stats=zeroStats();p.lesao=0;p.lesaoTxt='';p.forma=RI(90,100);}));
-  S.cal=gerarCalendario();S.rodada=0;S.po=null;S.playin=null;S.ultimoJogo=null;S.fase='regular';
+  S.cal=gerarCalendario();S.rodada=0;S.po=null;S.playin=null;S.ultimoJogo=null;S.fase="regular";S.diaTemp=0;
   S.treinos={};S.treinosRest=TREINOS_POR_TEMP;S.scoutContrato=null;S.scoutFree=[];S.propostas=[];
   S.temporada++;
   S.avaliado=false;
@@ -8475,7 +8542,7 @@ function iniciarCarreira(){
     noticias:[], po:null, ultimoJogo:null, objetivo:{txt:'',nivel:1}, avisos:0, demitido:false
   };
   // pool inicial de agentes livres (veteranos disponíveis no mercado)
-  S.cal=gerarCalendario(S.times);
+  S.cal=gerarCalendario(S.times);S.diaTemp=0;
   inicializarPicks();
   gerarAgentesLivresIniciais();
   S.treinosRest = TREINOS_POR_TEMP;
@@ -8614,15 +8681,16 @@ function mostrarSetup(){ mostrarHub(); }
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
 const NOVIDADES = {
-  versao: '2026.08',
+  versao: '2026.08b',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
-    {emoji:'🏀', t:'Elencos 2026-27 atualizados', d:'Todos os 30 times com as movimentações mais recentes da liga — incluindo as trocas do meio da temporada. Trae Young e Anthony Davis no Washington, Harden no Cleveland, Zubac no Indiana, Kuminga no Atlanta e muito mais. Vale para carreiras novas.'},
-    {emoji:'📊', t:'Estatísticas mais realistas', d:'O motor de simulação foi recalibrado: acabou o jogador fazendo 60 pontos por jogo. Agora os cestinhas ficam na casa dos 30, com assistências e rebotes coerentes — tanto no modo carreira quanto nas ligas online.'},
-    {emoji:'🔄', t:'Mercado entre os times', d:'Os times comandados pela máquina agora negociam entre si ao longo da temporada, deixando a liga mais viva.'},
-    {emoji:'🎽', t:'Comissão técnica visual', d:'Monte sua formação numa quadra de parquet, ajuste táticas, rotação e treinos — tudo num lugar só.'},
-    {emoji:'📰', t:'Feed de notícias e boxscores', d:'Acompanhe a temporada por um feed estilo ESPN e veja o boxscore detalhado de cada jogo.'},
+    {emoji:'🏝️', t:'Offseason com dias', d:'Depois do draft, agora você tem uma janela de offseason para renovar, contratar agentes livres e negociar sem pressa. A cada dia o mercado vive: outros times fecham contratos (o reforço que você namora pode sumir!), surgem rumores e ofertas de troca.'},
+    {emoji:'🧑‍🏫', t:'Preparador de desenvolvimento', d:'Contrate um preparador na Comissão Técnica e ele lapida, aos poucos, o ponto fraco de cada jogador do seu elenco a cada rodada. Jovens evoluem mais rápido, veteranos bem devagar — do jeito realista.'},
+    {emoji:'🔍', t:'Olheiro que pensa como GM', d:'O olheiro faz um diagnóstico do elenco por posição, aponta agentes livres para suas carências e sugere trocas concretas — só as que MELHORAM o time como um todo, sem te fazer entregar um craque pra tapar buraco em outra posição.'},
+    {emoji:'📄', t:'Fim de contrato sob controle', d:'Antes de encerrar a temporada, você vê quem vai virar agente livre e pode renovar quem quiser segurar. E seu time nunca mais recebe jogador automático — as contratações são só suas.'},
+    {emoji:'🧠', t:'IA mais inteligente', d:'Os times da máquina agora contratam por necessidade real e de acordo com as finanças: times ricos brigam por titulares, os endividados seguram as pontas.'},
+    {emoji:'💰', t:'Economia reequilibrada', d:'Corrigimos um desequilíbrio que deixava todos os times no vermelho. Agora a gestão financeira faz sentido, e cada temporada guarda seu balanço no histórico da carreira.'},
   ]
 };
 function mostrarNovidades(forcar){
