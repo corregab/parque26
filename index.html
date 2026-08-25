@@ -4051,7 +4051,7 @@ function vOlheiro(){
         <span class="pill">${esc(outro.ab)}</span></div>
       <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
         <b style="font-size:15px">${bd(alvo.pos)} ${esc(alvo.nome)} <span class="muted">${alvo.ovr} ovr · ${alvo.idade}a · pot ${alvo.pot}</span></b>
-        ${o.ganhoOvr>0?`<span style="color:var(--pos);font-weight:700">+${o.ganhoOvr} na posição</span>`:''}</div>
+        ${o.liquido>0?`<span style="color:var(--pos);font-weight:700" title="melhora do time somando todas as posições afetadas">time +${o.liquido}</span>`:''}</div>
       <div class="hint" style="margin:6px 0">Você entrega: ${o.entrego.map(p=>esc(p.nome.split(' ').pop())+' ('+p.ovr+')').join(', ')||'só picks'}${picksE}${picksR} · folha ${o.salLiquido>=0?'+':''}${$(o.salLiquido)}</div>
       <div class="row"><button class="btn mini" onclick="aceitarScout('carencia',${alvo.id})">Fechar troca</button>
         <button class="btn ghost mini" onclick="fichaJogador(${alvo.id},${o.outroId})">Ver ficha</button></div></div>`;
@@ -4860,9 +4860,10 @@ function relatorioOlheiro(){
     .sort((a,b)=>a.ano-b.ano);
   // oportunidades de troca do olheiro contratado (se houver)
   const trocas=(S.scoutContrato&&S.scoutContrato.ops)?S.scoutContrato.ops.slice(0,4):[];
-  // TROCA CONCRETA sugerida para cada posição carente (usa o mesmo motor de ofertas viáveis)
+  // TROCA CONCRETA sugerida para cada posição carente — só sugere se MELHORA o time como um todo
+  // (nunca entrega peça melhor do que a que chega, nunca abre um buraco pior, respeita a folha).
   const trocasPorCarencia=[];
-  const querPicks=false;
+  const folhaAtual=folha(meu);
   diag.filter(d=>d.nec>=25).slice(0,4).forEach(d=>{
     const meuMelhorPos=meu.elenco.filter(p=>p.pos===d.pos).sort((a,b)=>b.ovr-a.ovr)[0];
     const base=meuMelhorPos?meuMelhorPos.ovr:40;
@@ -4871,15 +4872,26 @@ function relatorioOlheiro(){
       if(outro.id===S.meuTime) return;
       outro.elenco.forEach(alvo=>{
         if(alvo.pos!==d.pos || alvo.ovr<Math.max(58, base+1) || alvo.egg) return;
-        const oferta=(typeof montarOfertaViavel==='function')?montarOfertaViavel(meu, outro, [alvo], valorMercado(alvo), querPicks):null;
+        const oferta=(typeof montarOfertaViavel==='function')?montarOfertaViavel(meu, outro, [alvo], valorMercado(alvo), false):null;
         if(!oferta) return;
-        const ganho=alvo.ovr-base;
-        const custo=oferta.jogadores.reduce((s,p)=>s+p.ovr,0);
-        const score=ganho*10 - custo*0.6 + (alvo.idade<=24?(alvo.pot-alvo.ovr):0);
+        // REGRA 1: nunca entregar um jogador melhor (ou quase) do que o que chega
+        const melhorEntregue=Math.max(...oferta.jogadores.map(p=>p.ovr));
+        if(melhorEntregue >= alvo.ovr-1) return;
+        // REGRA 2: o time tem que melhorar no conjunto, e nenhuma posição pode ficar pior que a carência que tapamos
+        const imp=impactoLiquidoTroca(meu, [alvo], oferta.jogadores);
+        if(imp.liquido<=0) return;                 // não melhora o time como um todo
+        if(imp.piorBuraco < -8) return;            // abriu um buraco grande em outra posição
+        // REGRA 3: respeitar a folha — não estourar demais o teto
+        const folhaNova=folhaAtual - oferta.jogadores.reduce((s,p)=>s+p.salario,0) + alvo.salario;
+        if(folhaNova > TETO+12e6) return;          // trocas que explodem a folha não passam
+        // score: prioriza melhora líquida real e folga salarial
+        const score=imp.liquido*6 + (alvo.idade<=24?(alvo.pot-alvo.ovr):0) - Math.max(0,folhaNova-TETO)/4e6;
         if(!melhorOp || score>melhorOp.score){
           melhorOp={ pos:d.pos, outroId:outro.id, recebo:[alvo], entrego:oferta.jogadores,
             picksRecebo:oferta.picksRecebidos||[], picksEntrego:oferta.picksEnviados||[],
-            ganhoOvr:ganho, salLiquido: alvo.salario - oferta.jogadores.reduce((s,p)=>s+p.salario,0), score };
+            ganhoOvr:alvo.ovr-base, liquido:Math.round(imp.liquido*10)/10,
+            salLiquido: alvo.salario - oferta.jogadores.reduce((s,p)=>s+p.salario,0),
+            folhaNova, score };
         }
       });
     });
@@ -4995,6 +5007,28 @@ function montarOfertaViavel(meu, outro, recebo, valAlvo, querPicks){
     if(nMeu<9||nMeu>15||nOutro<9||nOutro>15) return null;
   }
   return melhor;
+}
+// Mede a "força" de uma posição no elenco: titular pesa cheio, 2º pesa metade.
+// Serve pra avaliar o impacto REAL de uma troca por posição (não só na que chega).
+function forcaPosicao(elenco, pos){
+  const naPos=elenco.filter(p=>p.pos===pos).sort((a,b)=>b.ovr-a.ovr);
+  const t=naPos[0]?naPos[0].ovr:35;   // titular
+  const r=naPos[1]?naPos[1].ovr:35;   // reserva
+  return t + r*0.5;
+}
+// Impacto LÍQUIDO de uma troca no time todo: soma o ganho/perda em cada posição afetada.
+// Positivo = o time melhora no conjunto; negativo = abre buraco pior do que tapa.
+function impactoLiquidoTroca(meu, recebo, entrego){
+  const antes=meu.elenco;
+  const depois=meu.elenco.filter(p=>!entrego.includes(p)).concat(recebo);
+  const posAfetadas=new Set([...recebo,...entrego].map(p=>p.pos));
+  let liquido=0, piorBuraco=0;
+  posAfetadas.forEach(pos=>{
+    const d=forcaPosicao(depois,pos)-forcaPosicao(antes,pos);
+    liquido+=d;
+    if(d<piorBuraco) piorBuraco=d;   // a posição mais prejudicada
+  });
+  return {liquido, piorBuraco};
 }
 function melhorCombo(cands, n, alvoValor){
   const ordenado=[...cands].sort((a,b)=>b.val-a.val);
