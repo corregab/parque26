@@ -4267,12 +4267,12 @@ function subFormacao(){
   </div>`;
 }
 
+
 function vComissao(){
-  const subs=[['formacao','⛹️ Formação'],['tatica','🎯 Tática & Rotação'],['treino','🏋️ Treino'],['desenv','🧑‍🏫 Desenvolvimento'],['olheiro','🔍 Olheiro']];
+  const subs=[['formacao','⛹️ Formação'],['tatica','🎯 Tática & Rotação'],['desenv','🧑‍🏫 Desenvolvimento'],['olheiro','🔍 Olheiro']];
   const nav=`<div class="subnav">${subs.map(([k,n])=>`<button class="subtab ${SUBP===k?'on':''}" onclick="setSubP('${k}')">${n}</button>`).join('')}</div>`;
   let corpo;
   if(SUBP==='tatica') corpo=vTaticas();
-  else if(SUBP==='treino') corpo=vTreino();
   else if(SUBP==='desenv') corpo=vDesenvolvimento();
   else if(SUBP==='olheiro') corpo=vOlheiro();
   else corpo=subFormacao();
