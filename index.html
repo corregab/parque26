@@ -806,6 +806,18 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .ag-evento{border-left:3px solid var(--amber);background:var(--accent-soft)}
 .ag-evento .ag-data{color:var(--amber)}
 .ag-folga{opacity:.72}
+
+/* —— All-Star e Premiações —— */
+.as-lista{display:flex;flex-direction:column;gap:2px;margin:8px 0}
+.as-row{padding:5px 8px;border-radius:6px;font-size:13px;display:flex;align-items:center;gap:6px}
+.as-row.as-meu{background:var(--accent-soft)}
+.as-n{font-family:'Oswald',sans-serif;color:var(--text-dim);min-width:18px}
+.as-star{color:var(--accent);font-weight:700;font-size:11px}
+.prem-row{padding:10px 0;border-bottom:1px solid var(--hair)}
+.prem-row.prem-meu{background:var(--accent-soft);border-radius:8px;padding:10px;border-bottom:none;margin-bottom:4px}
+.prem-tit{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim)}
+.prem-jog{font-size:15px;margin:2px 0}
+.prem-stats{font-size:12px;color:var(--text-dim);font-family:var(--mono)}
 </style>
 </head>
 <body>
@@ -1966,6 +1978,113 @@ function eventosDaTemporada(){
 }
 function eventoNoDia(dia){
   return eventosDaTemporada().find(e=>e.dia===dia)||null;
+}
+// ===== DISPARO E EXECUÇÃO DE EVENTOS DO CALENDÁRIO =====
+// Chamado ao avançar para um dia. Se há evento novo naquele dia, executa (uma vez por temporada).
+function checarEventoDoDia(){
+  if(S.fase!=='regular') return false;
+  const ev=eventoNoDia(diaTempAtual());
+  if(!ev) return false;
+  S.eventosVistos=S.eventosVistos||[];
+  const chave=S.temporada+':'+ev.tipo;
+  if(S.eventosVistos.includes(chave)) return false;
+  S.eventosVistos.push(chave);
+  executarEvento(ev);
+  return true;
+}
+function executarEvento(ev){
+  switch(ev.tipo){
+    case 'deadline': eventoTradeDeadline(); break;
+    case 'allstar':  eventoAllStar(); break;
+    case 'midia':    eventoMidia(); break;
+    case 'especial': noticia('🎁 '+ev.desc,'p'); abrirModal('🎁 '+ev.titulo, `<p class="hint">${ev.desc}</p><div class="row" style="justify-content:center;margin-top:12px"><button class="btn" onclick="closeModal()">Bora jogar!</button></div>`); break;
+    case 'fim':      noticia('🏁 '+ev.desc,'p'); break;
+  }
+}
+// —— TRADE DEADLINE: trava as trocas após a data ——
+function tradeDeadlinePassou(){
+  const dl=eventosDaTemporada().find(e=>e.tipo==='deadline');
+  return dl && diaTempAtual()>dl.dia;
+}
+function eventoTradeDeadline(){
+  S.deadlineFechado=true;
+  noticia('🔄 Trade Deadline! A janela de trocas está fechada até o fim da temporada.','x');
+  abrirModal('🔄 Trade Deadline', `<p class="hint">A janela de trocas <b>fechou</b>. A partir de agora, você só poderá negociar de novo na próxima offseason. Seu elenco está fechado para a corrida aos playoffs!</p>
+    <div class="row" style="justify-content:center;margin-top:12px"><button class="btn" onclick="closeModal()">Entendido</button></div>`);
+}
+// —— ALL-STAR WEEKEND: seleciona as estrelas e celebra os seus jogadores ——
+function eventoAllStar(){
+  const elencoLiga=[];
+  S.times.forEach(t=>t.elenco.forEach(p=>{ if(!p.egg) elencoLiga.push({p, t}); }));
+  // seleção por uma nota que mistura overall e desempenho na temporada
+  const nota=x=>{
+    const s=x.p.stats||{}; const j=Math.max(1,s.j||1);
+    const ppg=(s.pts||0)/j, apg=(s.ast||0)/j, rpg=(s.reb||0)/j;
+    return x.p.ovr*1.2 + ppg*1.1 + apg*0.9 + rpg*0.7;
+  };
+  elencoLiga.sort((a,b)=>nota(b)-nota(a));
+  const estrelas=elencoLiga.slice(0,24);
+  const meus=estrelas.filter(x=>x.t.id===S.meuTime).map(x=>x.p);
+  // boost de moral para os selecionados
+  estrelas.forEach(x=>{ if(x.t.id===S.meuTime) x.p.moral=clamp((x.p.moral||70)+8,0,100); });
+  S.allStarSelecionados=(S.allStarSelecionados||[]);
+  meus.forEach(p=>{ if(!S.allStarSelecionados.includes(p.nome)) S.allStarSelecionados.push(p.nome); });
+  const topLista=estrelas.slice(0,12).map((x,i)=>`<div class="as-row ${x.t.id===S.meuTime?'as-meu':''}"><span class="as-n">${i+1}</span> ${bd(x.p.pos)} <b>${esc(x.p.nome)}</b> <span class="muted">${esc(x.t.ab)} · ${x.p.ovr}</span>${x.t.id===S.meuTime?' <span class="as-star">⭐ SEU</span>':''}</div>`).join('');
+  const meuTxt = meus.length
+    ? `<div class="card accent" style="margin:10px 0"><b>🎉 ${meus.length} jogador(es) do ${esc(S.times[S.meuTime].nick)} no All-Star!</b><div style="margin-top:6px">${meus.map(p=>bd(p.pos)+' '+esc(p.nome)+' ('+p.ovr+')').join('<br>')}</div><p class="hint" style="margin:6px 0 0">Eles ganham moral com a convocação.</p></div>`
+    : `<p class="hint">Nenhum jogador seu foi convocado desta vez. Desenvolva o elenco e busque a próxima!</p>`;
+  noticia('⭐ All-Star Weekend! '+(meus.length?meus.map(p=>p.nome).join(', ')+' representando o '+S.times[S.meuTime].nick+'.':'Sem convocados do '+S.times[S.meuTime].nick+' desta vez.'), meus.length?'v':'p');
+  abrirModal('⭐ All-Star Weekend', `<p class="hint">Os melhores da liga se reúnem no fim de semana das estrelas. Veja os 12 mais votados:</p>
+    <div class="as-lista">${topLista}</div>${meuTxt}
+    <div class="row" style="justify-content:center;margin-top:10px"><button class="btn" onclick="closeModal()">Voltar aos jogos</button></div>`);
+}
+// —— MÍDIA / ENTREVISTA: pergunta com escolhas que mexem na moral do elenco ——
+const PERGUNTAS_MIDIA=[
+  {q:'Repórter: "Seu time briga pelo título este ano?"', ops:[
+    {t:'"Vamos com tudo pelo troféu."', moral:+6, txt:'Você abraçou a pressão. O elenco se empolgou.'},
+    {t:'"Foco em evoluir jogo a jogo."', moral:+2, txt:'Resposta equilibrada, sem estardalhaço.'},
+    {t:'"Ainda somos um projeto."', moral:-3, txt:'Alguns veteranos não gostaram do tom cauteloso.'},
+  ]},
+  {q:'Repórter: "O que achou da atuação do time na última semana?"', ops:[
+    {t:'Elogiar publicamente o elenco', moral:+5, txt:'O grupo valorizou o reconhecimento.'},
+    {t:'Cobrar mais intensidade', moral:-2, txt:'A cobrança pegou mal com parte do elenco.'},
+    {t:'Assumir a responsabilidade você mesmo', moral:+3, txt:'Bancar o grupo caiu bem no vestiário.'},
+  ]},
+  {q:'Repórter: "Há rumores de insatisfação no vestiário. Procede?"', ops:[
+    {t:'"Estamos unidos, sem crise."', moral:+4, txt:'Você blindou o grupo publicamente.'},
+    {t:'"Todo elenco tem seus atritos."', moral:0, txt:'Resposta diplomática, sem impacto.'},
+    {t:'Ignorar a pergunta', moral:-2, txt:'O silêncio alimentou as especulações.'},
+  ]},
+];
+function eventoMidia(){
+  const pg=pick(PERGUNTAS_MIDIA);
+  const ops=pg.ops.map((o,i)=>`<button class="btn ghost" style="display:block;width:100%;text-align:left;margin:6px 0" onclick="responderMidia(${i})">${esc(o.t)}</button>`).join('');
+  S._midiaAtual=pg;
+  abrirModal('🎤 Coletiva de imprensa', `<p style="margin:0 0 4px"><b>${esc(pg.q)}</b></p><p class="hint" style="margin:0 0 8px">Sua resposta afeta a moral do elenco.</p>${ops}`);
+}
+function responderMidia(i){
+  const pg=S._midiaAtual; if(!pg)return;
+  const o=pg.ops[i]; if(!o)return;
+  const t=S.times[S.meuTime];
+  t.elenco.forEach(p=>{ if(!p.egg) p.moral=clamp((p.moral||70)+o.moral,0,100); });
+  noticia('🎤 Coletiva: '+o.txt+(o.moral?` (moral ${o.moral>0?'+':''}${o.moral})`:''), o.moral>=0?'v':'x');
+  S._midiaAtual=null;
+  closeModal();
+  render();
+}
+// —— PREMIAÇÕES DE FIM DE TEMPORADA ——
+function calcularPremiacoes(){
+  const todos=[];
+  S.times.forEach(t=>t.elenco.forEach(p=>{ if(!p.egg && p.stats && p.stats.j>=10) todos.push({p,t}); }));
+  if(!todos.length) return null;
+  const pj=(p,k)=>(p.stats[k]||0)/Math.max(1,p.stats.j);
+  const notaMVP=x=>pj(x.p,'pts')*1.0 + pj(x.p,'ast')*1.2 + pj(x.p,'reb')*0.8 + x.p.ovr*0.5 + (x.t.v*0.3);
+  const notaDef=x=>pj(x.p,'reb')*1.0 + (x.p.at?.defP||0)*0.1 + (x.p.at?.defI||0)*0.1 + x.p.ovr*0.3;
+  const mvp=[...todos].sort((a,b)=>notaMVP(b)-notaMVP(a))[0];
+  const def=[...todos].sort((a,b)=>notaDef(b)-notaDef(a))[0];
+  const novato=[...todos].filter(x=>x.p.idade<=22 && (x.p.tempLiga==null||x.p.tempLiga<=1)).sort((a,b)=>notaMVP(b)-notaMVP(a))[0] || [...todos].filter(x=>x.p.idade<=21).sort((a,b)=>notaMVP(b)-notaMVP(a))[0];
+  const allNBA=[...todos].sort((a,b)=>notaMVP(b)-notaMVP(a)).slice(0,5);
+  return {mvp,def,novato,allNBA};
 }
 // Monta a agenda dos próximos N dias a partir de hoje: cada dia com o que acontece
 // (jogo do seu time, evento especial, ou folga).
@@ -3766,7 +3885,8 @@ function vInicio(){
           <div><div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular</button></div>
           <div class="row" style="margin-top:6px;gap:6px">
             <button class="btn ghost mini" onclick="avancarUmDia()">📆 Avançar 1 dia</button>
-            <button class="btn ghost mini" onclick="avancarAteProximoJogo()">⏭️ Até o próximo jogo</button></div></div>
+            <button class="btn ghost mini" onclick="avancarAteProximoJogo()">⏭️ Até o próximo jogo</button>
+            <button class="btn ghost mini" onclick="jogarVarias(5)">⏩⏩ Simular 5 rodadas</button></div></div>
         </div>`}</div>` + agendaHTML();
     } else {
       // seu time já jogou os 82 jogos, mas a temporada ainda não fechou no calendário
@@ -4708,8 +4828,10 @@ function avancarUmDia(){
   const prox=diaDoProximoJogo();
   if(diaTempAtual()<prox){
     S.diaTemp=diaTempAtual()+1;   // dia livre
+    if(checarEventoDoDia()) return;   // caiu num dia de evento — o modal assume
     render();
   } else {
+    if(checarEventoDoDia()) return;   // evento no dia do jogo aparece antes
     if(typeof jogarAoVivo==='function') jogarAoVivo(); else jogar();
   }
 }
@@ -4868,11 +4990,33 @@ function renovarNaSaida(id){
   if(row) row.innerHTML=`<div class="fc-info">${bd(p.pos)} <b>${esc(p.nome)}</b> <span style="color:var(--pos)">✓ renovado por 3 anos</span></div>`;
 }
 function encerrarTemporadaConfirmado(){
+  // premiações da temporada (antes de zerar as stats na offseason)
+  const prem=(typeof calcularPremiacoes==='function')?calcularPremiacoes():null;
   const rel=processarOffseason();
   rel.slice(0,6).forEach(r=>noticia('🎓 '+r));
   S.draftPick=0;S.avaliado=false;
   S.draftFeitos=[]; S.draftFase='loteria';   // começa mostrando a loteria; board zerado
+  if(prem) mostrarPremiacoes(prem);
   render();
+}
+function mostrarPremiacoes(prem){
+  if(!prem||!prem.mvp) return;
+  const linha=(emoji,titulo,x)=>{
+    if(!x)return '';
+    const meu=x.t.id===S.meuTime;
+    const s=x.p.stats,j=Math.max(1,s.j||1);
+    return `<div class="prem-row ${meu?'prem-meu':''}"><div class="prem-tit">${emoji} ${titulo}</div>
+      <div class="prem-jog">${bd(x.p.pos)} <b>${esc(x.p.nome)}</b> <span class="muted">${esc(x.t.ab)}</span>${meu?' <span class="as-star">⭐</span>':''}</div>
+      <div class="prem-stats">${((s.pts||0)/j).toFixed(1)} pts · ${((s.ast||0)/j).toFixed(1)} ast · ${((s.reb||0)/j).toFixed(1)} reb</div></div>`;
+  };
+  const allNBA=prem.allNBA.map(x=>`${bd(x.p.pos)} ${esc(x.p.nome)} <span class="muted">(${esc(x.t.ab)})</span>`).join(' · ');
+  noticia('🏆 Prêmios da temporada: MVP '+prem.mvp.p.nome+' ('+prem.mvp.t.ab+')'+(prem.novato?', Novato '+prem.novato.p.nome:''),'p');
+  abrirModal('🏆 Prêmios da Temporada '+(S.temporada-1), `
+    ${linha('🏅','MVP', prem.mvp)}
+    ${linha('🛡️','Melhor Defensor', prem.def)}
+    ${linha('🌟','Novato do Ano', prem.novato)}
+    <div class="prem-row"><div class="prem-tit">⭐ All-NBA (Top 5)</div><div style="font-size:13px;line-height:1.6">${allNBA}</div></div>
+    <div class="row" style="justify-content:center;margin-top:12px"><button class="btn" onclick="closeModal()">Continuar</button></div>`);
 }
 /* ============================================================
    EDITOR DE LIGA — ajustar elencos reais / atualizar free agency
@@ -5295,6 +5439,10 @@ function scoutUI(){
   return html;
 }
 function aceitarScout(fonte,alvoId){
+  if(typeof tradeDeadlinePassou==='function' && tradeDeadlinePassou() && fonte!=='free'){
+    alert('A janela de trocas fechou no Trade Deadline. Você só poderá negociar de novo na próxima offseason. (Contratar agentes livres continua liberado.)');
+    return;
+  }
   const lista = fonte==='free'? S.scoutFree : fonte==='carencia'? (S.scoutCarencia||[]) : (S.scoutContrato?S.scoutContrato.ops:[]);
   const idx=lista.findIndex(o=>o.recebo[0].id===alvoId);
   if(idx<0){render();return;}
@@ -8771,16 +8919,16 @@ function mostrarSetup(){ mostrarHub(); }
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
 const NOVIDADES = {
-  versao: '2026.08b',
+  versao: '2026.08c',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
-    {emoji:'🏝️', t:'Offseason com dias', d:'Depois do draft, agora você tem uma janela de offseason para renovar, contratar agentes livres e negociar sem pressa. A cada dia o mercado vive: outros times fecham contratos (o reforço que você namora pode sumir!), surgem rumores e ofertas de troca.'},
-    {emoji:'🧑‍🏫', t:'Preparador de desenvolvimento', d:'Contrate um preparador na Comissão Técnica e ele lapida, aos poucos, o ponto fraco de cada jogador do seu elenco a cada rodada. Jovens evoluem mais rápido, veteranos bem devagar — do jeito realista.'},
-    {emoji:'🔍', t:'Olheiro que pensa como GM', d:'O olheiro faz um diagnóstico do elenco por posição, aponta agentes livres para suas carências e sugere trocas concretas — só as que MELHORAM o time como um todo, sem te fazer entregar um craque pra tapar buraco em outra posição.'},
-    {emoji:'📄', t:'Fim de contrato sob controle', d:'Antes de encerrar a temporada, você vê quem vai virar agente livre e pode renovar quem quiser segurar. E seu time nunca mais recebe jogador automático — as contratações são só suas.'},
-    {emoji:'🧠', t:'IA mais inteligente', d:'Os times da máquina agora contratam por necessidade real e de acordo com as finanças: times ricos brigam por titulares, os endividados seguram as pontas.'},
-    {emoji:'💰', t:'Economia reequilibrada', d:'Corrigimos um desequilíbrio que deixava todos os times no vermelho. Agora a gestão financeira faz sentido, e cada temporada guarda seu balanço no histórico da carreira.'},
+    {emoji:'🗓️', t:'Temporada em calendário', d:'A temporada agora corre por datas reais (de outubro a abril), com uma agenda mostrando os próximos dias: jogos, eventos e folgas. Avance dia a dia ou pule direto pro próximo jogo — do jeito que preferir.'},
+    {emoji:'⭐', t:'All-Star Weekend', d:'No meio da temporada, os melhores da liga são convocados para o Jogo das Estrelas. Se seus jogadores forem selecionados, ganham moral e reconhecimento!'},
+    {emoji:'🔄', t:'Trade Deadline', d:'Agora existe um prazo final para trocas. Depois dele, seu elenco fica fechado para a corrida aos playoffs — planeje suas negociações com antecedência.'},
+    {emoji:'🎤', t:'Coletivas de imprensa', d:'A mídia vai te fazer perguntas ao longo da temporada. Suas respostas mexem com a moral do elenco — escolha bem o que falar.'},
+    {emoji:'🏆', t:'Prêmios da temporada', d:'Ao fim de cada temporada, são eleitos o MVP, o Melhor Defensor, o Novato do Ano e o time All-NBA. Será que alguém do seu elenco leva?'},
+    {emoji:'🧑‍🏫', t:'Comissão técnica completa', d:'Contrate um preparador que evolui o ponto fraco de cada jogador, e um olheiro que aponta carências, agentes livres e trocas que realmente melhoram o time.'},
   ]
 };
 function mostrarNovidades(forcar){
