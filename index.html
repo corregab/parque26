@@ -841,6 +841,18 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .fil-role{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 6px;color:var(--text);font-size:12px;width:100%}
 .fil-tit{font-size:12px}
 .fil-enc{font-family:'Oswald',sans-serif;font-weight:700;text-align:center}
+
+/* —— Reforços por deficiência —— */
+.def-bloco{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+.def-cabec{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px;font-size:13px}
+.def-pos{font-family:'Oswald',sans-serif;font-weight:700}
+.def-tit{font-size:11px;color:var(--text-dim)}
+.def-vazio{font-size:11px;color:var(--neg)}
+.def-row{display:grid;grid-template-columns:1fr 70px 40px auto;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--hair);font-size:12.5px}
+.def-jog{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.def-bar{height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.def-bar i{display:block;height:100%;border-radius:3px}
+.def-pct{font-family:'Oswald',sans-serif;font-weight:700;text-align:right;font-size:13px}
 </style>
 </head>
 <body>
@@ -4316,6 +4328,7 @@ function vDesenvolvimento(){
 function vOlheiro(){
   const r=relatorioOlheiro();
   const secFormacao=olheiroFormacaoHTML();
+  const secDeficiencias=olheiroDeficienciasHTML();
   const secBusca=olheiroBuscaHTML();
   const corMap={neg:'var(--neg)',warn:'var(--amber)',pos:'var(--pos)',mut:'var(--text-dim)'};
   const diagHtml=r.diag.map(d=>`<div class="olh-pos"><div class="olh-pos-tag" style="color:${corMap[d.cor]}">${d.pos}</div><div class="olh-pos-info"><b>${d.prof} jogador(es)${d.melhor?' · melhor '+d.melhor+' ovr':''}</b><span style="color:${corMap[d.cor]}">${d.status}</span></div><div class="olh-pos-bar"><i style="width:${d.nec}%;background:${corMap[d.cor]}"></i></div></div>`).join('');
@@ -4338,7 +4351,7 @@ function vOlheiro(){
       <div class="row"><button class="btn mini" onclick="aceitarScout('carencia',${alvo.id})">Fechar troca</button>
         <button class="btn ghost mini" onclick="fichaJogador(${alvo.id},${o.outroId})">Ver ficha</button></div></div>`;
   }).join('') : '<p class="hint">Nenhuma troca viável encontrada para as carências no momento. Tente de novo mais pra frente na temporada.</p>';
-  return secFormacao + secBusca +
+  return secFormacao + secDeficiencias + secBusca +
   `<div class="card accent" style="margin-top:12px"><h3 class="sub">🔍 Diagnóstico do olheiro</h3><p class="hint">Leitura do elenco por posição — a barra mostra o tamanho da carência. Priorize o que está em vermelho.</p><div class="olh-diag">${diagHtml}</div></div>
   <div class="card" style="margin-top:12px"><h3 class="sub">🤝 Trocas sugeridas para cada carência</h3><p class="hint">O olheiro montou ofertas que a diretoria adversária aceitaria — com jogadores e picks já incluídos.</p>${trocasHtml}</div>
   <div class="card tbl-wrap" style="margin-top:12px"><h3 class="sub">🎯 Agentes livres para suas carências</h3><table><thead><tr><th>Jogador</th><th>Pos</th><th>Ovr</th><th>Idade</th><th>Salário</th><th></th></tr></thead><tbody>${livresHtml}</tbody></table></div>
@@ -4394,6 +4407,29 @@ function setOlheiroForm(k){
   render();
 }
 
+
+// —— seção: reforços por deficiência (top ~10 candidatos com % de encaixe) ——
+function olheiroDeficienciasHTML(){
+  const blocos=reforcosPorDeficiencia(10);
+  if(!blocos.length) return '';
+  const html=blocos.map(b=>{
+    const cabec=`<div class="def-cabec"><span class="def-pos">${bd(b.pos)} ${POS_NOME[b.pos]||b.pos}</span> <span class="muted">função: ${esc(b.roleNome)}</span>${b.titular?` <span class="def-tit">titular: ${esc(b.titular.nome.split(' ').slice(-1)[0])} · encaixe ${b.encTit}%</span>`:' <span class="def-vazio">sem titular</span>'}</div>`;
+    const linhas=b.candidatos.length? b.candidatos.map(c=>{
+      const cor=c.encaixe>=80?'var(--pos)':c.encaixe>=70?'var(--amber)':'var(--text-dim)';
+      const acao=c.tipo==='livre'
+        ? `<button class="btn ghost mini" onclick="ABA='mercado';render()">Contratar</button>`
+        : `<button class="btn ghost mini" onclick="buscarPara('${b.pos}')">Trocar</button>`;
+      return `<div class="def-row">
+        <div class="def-jog">${esc(c.p.nome)} <span class="muted">${c.origem} · ${c.p.ovr} ovr · ${c.p.idade}a</span></div>
+        <div class="def-bar"><i style="width:${Math.min(100,c.encaixe)}%;background:${cor}"></i></div>
+        <div class="def-pct" style="color:${cor}">${c.encaixe}%</div>
+        ${acao}</div>`;
+    }).join('') : '<p class="hint">Nenhum candidato melhor que o atual nesta posição.</p>';
+    return `<div class="def-bloco">${cabec}${linhas}</div>`;
+  }).join('');
+  return `<div class="card" style="margin-top:12px"><h3 class="sub">🎯 Reforços por deficiência</h3>
+    <p class="hint">Para cada carência do time, os melhores candidatos da liga — com o <b>% de encaixe</b> na função e no estilo que você escolheu.</p>${html}</div>`;
+}
 
 // —— seção: busca de jogadores com filtros ——
 function olheiroBuscaHTML(){
@@ -5392,6 +5428,54 @@ function gerarPropostasOffseason(){
     geradas++;
   }
   return geradas;
+}
+// Para cada deficiência do time, lista os ~10 melhores candidatos da liga com o % de encaixe.
+// Deficiência = posição carente OU posição cujo titular tem encaixe baixo na filosofia.
+function reforcosPorDeficiencia(nPorPos){
+  nPorPos=nPorPos||10;
+  const meu=S.times[S.meuTime];
+  const fil=filosofiaAtual();
+  const alvo=S.olheiroFormAlvo || esquemaDe(meu);
+  const posForm=ESQUEMAS[alvo].pos;
+  // determina as posições deficientes e o role de cada uma (pela formação/filosofia)
+  const nec=necessidades(meu);
+  const defMap={};   // pos -> role
+  posForm.forEach((pos,slot)=>{
+    const role=fil.roles[slot]||ROLE_PADRAO[pos];
+    const titular=meu.elenco.filter(p=>p.pos===pos&&!p.egg).sort((a,b)=>encaixeJogador(b,role,fil.identidade)-encaixeJogador(a,role,fil.identidade))[0];
+    const enc=titular?encaixeJogador(titular,role,fil.identidade):0;
+    // é deficiência se: carência de posição alta, ou não há titular, ou o encaixe do titular é fraco
+    if((nec[pos]||0)>=25 || !titular || enc<72){
+      if(!defMap[pos] || ROLES[role]) defMap[pos]=role;
+    }
+  });
+  // se nada apareceu (time redondo), pega as 2 posições de menor encaixe mesmo assim
+  if(!Object.keys(defMap).length){
+    const ord=posForm.map((pos,slot)=>{
+      const role=fil.roles[slot]||ROLE_PADRAO[pos];
+      const tit=meu.elenco.filter(p=>p.pos===pos&&!p.egg).sort((a,b)=>encaixeJogador(b,role,fil.identidade)-encaixeJogador(a,role,fil.identidade))[0];
+      return {pos,role,enc:tit?encaixeJogador(tit,role,fil.identidade):0};
+    }).sort((a,b)=>a.enc-b.enc).slice(0,2);
+    ord.forEach(o=>defMap[o.pos]=o.role);
+  }
+  // para cada posição deficiente, junta candidatos da liga (outros times + agentes livres)
+  const blocos=[];
+  Object.keys(defMap).forEach(pos=>{
+    const role=defMap[pos];
+    const titular=meu.elenco.filter(p=>p.pos===pos&&!p.egg).sort((a,b)=>b.ovr-a.ovr)[0];
+    const encTit=titular?encaixeJogador(titular,role,fil.identidade):0;
+    const cands=[];
+    S.times.forEach(outro=>{
+      if(outro.id===S.meuTime) return;
+      outro.elenco.forEach(p=>{ if(!p.egg && p.pos===pos) cands.push({p, origem:outro.ab, tipo:'troca', outroId:outro.id}); });
+    });
+    (S.livres||[]).forEach(p=>{ if(!p.egg && p.pos===pos) cands.push({p, origem:'Livre', tipo:'livre'}); });
+    cands.forEach(c=>{ c.encaixe=encaixeJogador(c.p, role, fil.identidade); });
+    // só quem melhora o encaixe atual, ordenado pelo melhor encaixe
+    const lista=cands.filter(c=>c.encaixe>=encTit).sort((a,b)=>b.encaixe-a.encaixe || b.p.ovr-a.p.ovr).slice(0,nPorPos);
+    blocos.push({pos, role, roleNome:ROLES[role]?ROLES[role].nome:role, titular, encTit, candidatos:lista});
+  });
+  return blocos;
 }
 function relatorioOlheiro(){
   const meu=S.times[S.meuTime];
@@ -9179,11 +9263,12 @@ function mostrarSetup(){ mostrarHub(); }
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
 const NOVIDADES = {
-  versao: '2026.08e',
+  versao: '2026.08f',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
-    {emoji:'🧩', t:'Filosofia de jogo', d:'No olheiro, monte a identidade do seu time: escolha o estilo (Chuva de 3, Muralha defensiva, Corre-corre...), o esquema tático e a função de cada posição. O olheiro mostra o "encaixe %" de cada titular e busca reforços que combinam com o seu jogo.'},
+    {emoji:'🎯', t:'Reforços por deficiência', d:'Para cada carência do time, o olheiro lista os 10 melhores candidatos da liga com o % de encaixe na função e no estilo que você escolheu — do ideal ao possível.'},
+    {emoji:'🧩', t:'Filosofia de jogo', d:'Monte a identidade do time: estilo (Chuva de 3, Muralha defensiva...), esquema tático e a função de cada posição. O olheiro mede o encaixe de cada titular.'},
     {emoji:'🔎', t:'Busca de jogadores com filtros', d:'Defina posição, overall, idade e função. O olheiro varre a liga e monta trocas viáveis, priorizando as que melhoram seu time e encaixam na sua filosofia.'},
     {emoji:'📨', t:'Offseason fervendo', d:'Chove proposta de troca na offseason! Os outros times disputam seus jogadores de verdade nessa janela.'},
     {emoji:'🗓️', t:'Temporada em calendário', d:'A temporada corre por datas reais, com agenda dos próximos dias — jogos, eventos e folgas. A carreira agora começa direto na offseason.'},
