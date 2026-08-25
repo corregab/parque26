@@ -8793,8 +8793,10 @@ function iniciarCarreira(){
   S.camisas={};
   if(typeof atualizarOlheiro==='function')atualizarOlheiro();
   if(typeof initMarketing==='function')initMarketing();
-  noticia('🏀 Bem-vindo, '+S.tecnico+'. Temporada 2026-27 começando com '+S.times[S.meuTime].cidade+' '+S.times[S.meuTime].nick+'.','p');
+  noticia('🏀 Bem-vindo, '+S.tecnico+'. Você assume o '+S.times[S.meuTime].cidade+' '+S.times[S.meuTime].nick+' na pré-temporada 2026-27.','p');
   noticia('🎯 Objetivo da diretoria: '+S.objetivo.txt,'p');
+  // começa numa janela de offseason: dá tempo de renovar, contratar e negociar antes do 1º jogo
+  if(typeof iniciarOffseasonMercado==='function') iniciarOffseasonMercado();
   S.savedAt=Date.now();
   try{ localStorage.setItem(slotKey(SLOT), JSON.stringify({...S, pid:PID})); atualizarIdx(SLOT,S); }catch(e){}
   entrarNoJogo();
