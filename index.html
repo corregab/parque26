@@ -792,6 +792,20 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .cal-date{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;letter-spacing:.3px}
 .cal-prog{font-size:11px;color:var(--text-dim)}
 .cal-folga{margin-top:8px;padding:8px 11px;background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);font-size:13px;color:var(--text-dim)}
+
+/* —— Agenda de dias —— */
+.ag-tira{display:flex;gap:7px;overflow-x:auto;padding:8px 2px 4px;scroll-snap-type:x proximity}
+.ag-dia{flex:0 0 auto;width:92px;scroll-snap-align:start;border:1px solid var(--line);border-radius:var(--r);padding:9px 8px;text-align:center;background:var(--surface);display:flex;flex-direction:column;gap:3px;align-items:center}
+.ag-data{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.4px;color:var(--text-dim);text-transform:uppercase}
+.ag-ic{font-size:22px;line-height:1}
+.ag-tit{font-size:12px;font-weight:700;line-height:1.15;min-height:28px;display:flex;align-items:center}
+.ag-sub{font-size:10.5px;color:var(--text-dim)}
+.ag-hoje{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.ag-hoje .ag-data{color:var(--accent)}
+.ag-jogo{border-left:3px solid var(--accent)}
+.ag-evento{border-left:3px solid var(--amber);background:var(--accent-soft)}
+.ag-evento .ag-data{color:var(--amber)}
+.ag-folga{opacity:.72}
 </style>
 </head>
 <body>
@@ -1918,6 +1932,82 @@ function sincronizarCalendario(){
 function meuJogoNaRodadaAtual(){
   const rod=S.cal&&S.cal[S.rodada];
   return rod && rod.some(j=>j.c===S.meuTime||j.f===S.meuTime);
+}
+// Lista ordenada dos jogos do MEU time na temporada, com o adversário e o dia no calendário.
+// O jogo de índice k acontece no dia k*PASSO_RODADA.
+function meusJogosTemporada(){
+  const lista=[];
+  (S.cal||[]).forEach(rod=>rod.forEach(j=>{
+    if(j.c===S.meuTime||j.f===S.meuTime){
+      const casa=j.c===S.meuTime;
+      lista.push({casa, adv:S.times[casa?j.f:j.c], res:j.res});
+    }
+  }));
+  return lista;
+}
+// converte uma data (mês 0-indexado, dia) no "dia da temporada" (0 = 22/out)
+function diaDaData(mes, diaMes){
+  const base=new Date(2001,9,22);
+  const alvo=new Date(2001, mes, diaMes);
+  if(mes<9) alvo.setFullYear(2002);   // meses jan–set caem no ano seguinte da temporada
+  return Math.round((alvo-base)/86400000);
+}
+// EVENTOS ESPECIAIS DA TEMPORADA (fixados em datas reais, estilo MyGM).
+function eventosDaTemporada(){
+  const tot=totalDiasTemp();
+  const evs=[
+    {dia:2,               emoji:'🎤', titulo:'Media Day', tipo:'midia', desc:'Imprensa cobre as expectativas do time para a temporada.'},
+    {dia:diaDaData(11,25),emoji:'🎁', titulo:'Jogos de Natal', tipo:'especial', desc:'Rodada especial de Natal — vitrine da liga.'},
+    {dia:diaDaData(1,6),  emoji:'🔄', titulo:'Trade Deadline', tipo:'deadline', desc:'Último dia para fazer trocas nesta temporada.'},
+    {dia:diaDaData(1,15), emoji:'⭐', titulo:'All-Star Weekend', tipo:'allstar', desc:'Fim de semana das estrelas — os melhores da liga em quadra.'},
+    {dia:tot-2,           emoji:'🏁', titulo:'Fim da temporada', tipo:'fim', desc:'Últimos jogos antes do Play-In.'},
+  ];
+  return evs.filter(e=>e.dia>=0 && e.dia<=tot);
+}
+function eventoNoDia(dia){
+  return eventosDaTemporada().find(e=>e.dia===dia)||null;
+}
+// Monta a agenda dos próximos N dias a partir de hoje: cada dia com o que acontece
+// (jogo do seu time, evento especial, ou folga).
+function agendaProximosDias(n){
+  n=n||8;
+  const hoje=diaTempAtual();
+  const jogos=meusJogosTemporada();
+  const jogados=jogosJogadosMeu();
+  const ag=[];
+  for(let off=0; off<n; off++){
+    const dia=hoje+off;
+    if(dia>totalDiasTemp()) break;
+    const ev=eventoNoDia(dia);
+    // jogo do meu time acontece quando dia = (indice do jogo)*PASSO
+    let jogo=null;
+    if(dia%PASSO_RODADA===0){
+      const idx=dia/PASSO_RODADA;
+      if(idx>=jogados && idx<jogos.length) jogo=jogos[idx];
+    }
+    ag.push({dia, data:dataLegivel(dia,true), hoje:off===0, evento:ev, jogo});
+  }
+  return ag;
+}
+// Renderiza a agenda dos próximos dias como uma tira de cards (jogo / evento / folga).
+function agendaHTML(){
+  if(S.fase!=='regular') return '';
+  const ag=agendaProximosDias(9);
+  if(!ag.length) return '';
+  const itens=ag.map(a=>{
+    let cls='ag-folga', ic='🛌', tit='Folga', sub='descanso / treino';
+    if(a.evento){ cls='ag-evento'; ic=a.evento.emoji; tit=a.evento.titulo; sub=a.evento.tipo==='deadline'?'trocas até hoje':a.evento.tipo==='allstar'?'estrelas':'evento'; }
+    else if(a.jogo){ cls='ag-jogo'; ic=a.jogo.casa?'🏠':'✈️'; tit=(a.jogo.casa?'vs ':'@ ')+a.jogo.adv.nick; sub=a.jogo.adv.v+'-'+a.jogo.adv.d; }
+    return `<div class="ag-dia ${cls} ${a.hoje?'ag-hoje':''}">
+      <div class="ag-data">${a.hoje?'HOJE':a.data}</div>
+      <div class="ag-ic">${ic}</div>
+      <div class="ag-tit">${esc(tit)}</div>
+      <div class="ag-sub">${esc(sub)}</div>
+    </div>`;
+  }).join('');
+  return `<div class="card" style="margin-top:12px"><h3 class="sub">🗓️ Agenda</h3>
+    <div class="ag-tira">${itens}</div>
+    <p class="hint" style="margin-top:6px">Toque em "Avançar 1 dia" para percorrer a agenda. Dias sem jogo são folga — aproveite pra treinar, negociar ou ver o olheiro.</p></div>`;
 }
 
 /* Calendário estilo NBA: 82 jogos por time.
@@ -3677,7 +3767,7 @@ function vInicio(){
           <div class="row" style="margin-top:6px;gap:6px">
             <button class="btn ghost mini" onclick="avancarUmDia()">📆 Avançar 1 dia</button>
             <button class="btn ghost mini" onclick="avancarAteProximoJogo()">⏭️ Até o próximo jogo</button></div></div>
-        </div>`}</div>`;
+        </div>`}</div>` + agendaHTML();
     } else {
       // seu time já jogou os 82 jogos, mas a temporada ainda não fechou no calendário
       const jogos=t.v+t.d;
