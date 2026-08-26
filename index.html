@@ -1000,6 +1000,9 @@ tr.me td{background:var(--accent-soft) !important;box-shadow:inset 3px 0 0 var(-
 /* —— Micro-animação de entrada dos cards da home —— */
 @keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 #view > .card, #view > .grid > .card{animation:cardIn .32s ease both}
+
+.build-stamp{margin:18px 4px 8px;padding-top:14px;border-top:1px solid var(--line);text-align:center;color:var(--text-dim);font-size:11.5px;font-family:var(--mono);letter-spacing:.3px}
+.build-stamp .btn{display:inline-block}
 </style>
 </head>
 <body>
@@ -3868,7 +3871,9 @@ function vMais(){
     : [['taticas','clipboard','Comissão'],['mercado','swap','Mercado'],['calendario','calendar','Calendário'],['financas','dollar','Finanças'],['marketing','megaphone','Marketing'],['stats','bars','Estatíst.'],['carreira','trophy','Carreira'],['premios','medal','Prêmios'],['editor','settings','Editar liga']];
   const dotMerc = !!(S && S.propostas && S.propostas.length);
   const cards=itens.map(([k,ic,lb])=>`<button class="mais-card" onclick="ABA='${k}';render()">${ICON(ic)}<div class="lb">${lb}</div>${(k==='mercado'&&dotMerc)?'<span class="dot"></span>':''}</button>`).join('');
-  return `<h2 class="sec">Mais</h2><div class="mais-grid">${cards}</div>`;
+  return `<h2 class="sec">Mais</h2><div class="mais-grid">${cards}</div>
+    <div class="build-stamp">PARQUÊ '26 · versão ${NOVIDADES.versao} · build ${BUILD}
+      <button class="btn ghost mini" style="margin-top:6px" onclick="forcarAtualizacao()">🔄 Buscar atualização</button></div>`;
 }
 const SECUNDARIAS_MAIS=['taticas','mercado','calendario','financas','marketing','stats','carreira','premios','editor','jogadores','transferencias'];
 function render(){
@@ -9513,6 +9518,7 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
+const BUILD = '2026.08.26-1';
 const NOVIDADES = {
   versao: '2026.08h',
   titulo: '🗞️ Novidades do PARQUÊ',
@@ -9596,12 +9602,26 @@ if('serviceWorker' in navigator){
       reg.addEventListener('updatefound',()=>{
         const nw=reg.installing;
         if(nw) nw.addEventListener('statechange',()=>{
-          // novo SW pronto e já havia um controlando → ativa e o controllerchange recarrega
-          if(nw.state==='installed' && navigator.serviceWorker.controller){ nw.postMessage&&null; }
+          // novo SW instalado e já havia um controlando → manda ativar; o controllerchange recarrega
+          if(nw.state==='installed' && navigator.serviceWorker.controller){ try{ nw.postMessage('skipWaiting'); }catch(e){} }
         });
       });
     }).catch(()=>{});
   });
+}
+
+// Botão "Buscar atualização": limpa os caches do app e recarrega já com a versão nova.
+async function forcarAtualizacao(){
+  try{ toast&&toast('🔄 Buscando atualização…'); }catch(e){}
+  try{
+    if('serviceWorker' in navigator){
+      const reg=await navigator.serviceWorker.getRegistration();
+      if(reg){ try{ await reg.update(); }catch(e){} if(reg.waiting) reg.waiting.postMessage('skipWaiting'); }
+    }
+    if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
+  }catch(e){}
+  // recarrega sem cache do navegador
+  location.reload(true);
 }
 
 /* ---------- BOXSCORE POR JOGO (online) ---------- */
