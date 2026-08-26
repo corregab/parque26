@@ -1,5 +1,5 @@
 /* Service Worker do PARQUÊ '26 — cache offline */
-const CACHE = 'parque26-v6';
+const CACHE = 'parque26-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -37,7 +37,7 @@ self.addEventListener('fetch', (e) => {
   if (isHTML) {
     // network-first: sempre tenta a versão mais nova, cai pro cache se estiver offline
     e.respondWith(
-      fetch(req).then((res) => {
+      fetch(req, { cache: 'no-store' }).then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put('./index.html', copy));
         return res;

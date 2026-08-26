@@ -880,6 +880,126 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .jogo-acoes-sec{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;margin-top:8px}
 .jogo-acoes-sec .btn{width:100%;padding:11px 8px}
 @media(max-width:380px){.jogo-acoes-sec{grid-template-columns:1fr}}
+
+/* ============================================================
+   REDESIGN v2 — "Sports Broadcast Editorial"
+   Tipografia de manchete (Anton), atmosfera de arena e micro-interações.
+   Bloco final: refina os componentes base sem tocar em HTML/JS.
+   ============================================================ */
+:root{
+  --poster:'Anton','Barlow Condensed',sans-serif;
+  --accent-hi:#FFD35C;
+  --accent-soft:rgba(253,185,39,.12);
+  --r:7px;
+  --r-lg:14px;
+  --card-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 10px 30px -18px rgba(0,0,0,.95);
+  --glow-gold:0 6px 22px -8px rgba(253,185,39,.55);
+}
+
+/* —— Atmosfera de arena: profundidade + grão sutil —— */
+body{
+  background:
+    radial-gradient(130% 62% at 50% -12%, rgba(253,185,39,.10), transparent 58%),
+    radial-gradient(100% 55% at 50% 0%, #14131a 0%, #0b0b0f 42%, #060608 100%),
+    #060608 !important;
+  background-attachment:fixed !important;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.04;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:180px 180px;mix-blend-mode:overlay;
+}
+#shell{position:relative;z-index:1}
+
+/* —— Tipografia de impacto: números e manchetes viram Anton —— */
+.brand{font-family:var(--poster);font-size:33px;letter-spacing:.4px;font-weight:400}
+.brand em{color:var(--accent)}
+.big{font-family:var(--poster) !important;letter-spacing:.4px;font-variant-numeric:tabular-nums;font-weight:400}
+.ovr{font-family:var(--poster) !important;letter-spacing:.3px}
+h2.sec{font-family:var(--poster);letter-spacing:.6px;font-size:26px}
+.sheet-head h3{font-family:var(--poster);letter-spacing:.4px}
+.nov-item b{font-family:var(--poster);letter-spacing:.5px;font-weight:400}
+.score .t .pt{font-family:var(--poster) !important;font-size:62px;letter-spacing:1px}
+
+/* —— Cards: leve profundidade e gradiente de topo —— */
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,.024), rgba(255,255,255,0) 42%), var(--surface) !important;
+  border:1px solid var(--line) !important;
+  border-radius:var(--r-lg) !important;
+  box-shadow:var(--card-shadow) !important;
+}
+.card.accent{
+  border-left:3px solid var(--accent) !important;
+  background:linear-gradient(180deg, rgba(253,185,39,.055), rgba(253,185,39,0) 46%), var(--surface) !important;
+}
+
+/* —— Botões: gradiente dourado + micro-interação —— */
+button.btn{
+  border-radius:var(--r) !important;
+  transition:transform .09s ease, filter .16s ease, box-shadow .16s ease, background .16s ease !important;
+  box-shadow:var(--glow-gold) !important;
+}
+button.btn:not(.ghost):not(:disabled){
+  background:linear-gradient(180deg, var(--accent-hi) 0%, var(--accent) 55%, var(--accent-dark) 100%) !important;
+  border-color:var(--accent) !important;
+}
+button.btn:not(.ghost):not(:disabled):hover{filter:brightness(1.06)}
+button.btn:active{transform:translateY(1px) scale(.995)}
+button.btn.ghost{box-shadow:none !important}
+button.btn.ghost:hover{border-color:var(--accent) !important;color:var(--accent) !important;background:var(--accent-soft) !important}
+button.btn:disabled{box-shadow:none !important;background:var(--surface-2) !important}
+
+/* —— Header: presença de broadcast —— */
+header.top, .top{
+  border-bottom:1px solid var(--line) !important;
+  background:linear-gradient(180deg, rgba(10,10,12,.92), rgba(10,10,12,.55)) !important;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.top:after{opacity:.7 !important;height:2px !important;
+  background:linear-gradient(90deg,var(--accent) 0 28%, var(--accent-dark) 28% 40%, transparent 40%) !important}
+
+/* —— HUD (caixa/folha): números tabulares com respiro —— */
+.hud b{font-size:16px !important}
+
+/* —— Placar com moldura de destaque —— */
+.score{
+  border-radius:var(--r-lg) !important;
+  background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 50%), var(--surface) !important;
+  border:1px solid var(--line) !important;
+}
+.score .t.win .pt{text-shadow:none;filter:drop-shadow(0 4px 16px rgba(253,185,39,.35))}
+
+/* —— Barras de atributo com brilho —— */
+.bar{border-radius:99px;background:rgba(255,255,255,.06)}
+.bar i{background:linear-gradient(90deg, var(--accent), var(--accent-hi)) !important;border-radius:99px}
+
+/* —— Badges de posição: pílulas mais nítidas —— */
+.badge{border-radius:6px;font-weight:800;padding:3px 7px}
+
+/* —— Bottombar: vidro escuro com item ativo em relevo —— */
+.bottombar{
+  background:linear-gradient(180deg, rgba(14,14,18,.82), rgba(10,10,12,.97)) !important;
+  border-top:1px solid var(--line) !important;
+}
+.bottombar .navb .lb{transition:color .15s ease}
+.bottombar .navb.on:after{content:"";position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:20px;height:3px;border-radius:99px;background:var(--accent)}
+.bottombar .fab{box-shadow:0 10px 26px -6px rgba(253,185,39,.6) !important;border-radius:20px !important}
+
+/* —— Cards do menu "Mais" —— */
+.mais-card{border-radius:var(--r-lg) !important;transition:transform .12s ease, border-color .15s ease, background .15s ease}
+.mais-card:hover{transform:translateY(-2px);border-color:var(--accent) !important}
+
+/* —— Tabelas: cabeçalho com mais respiro, linha do meu time em destaque —— */
+th{padding:8px 7px !important;color:var(--text-dim) !important}
+td{padding:8px 7px !important}
+tr.me td{background:var(--accent-soft) !important;box-shadow:inset 3px 0 0 var(--accent)}
+
+/* —— Transições suaves gerais em elementos interativos —— */
+.kv.clk, tr.clickable, .mais-card, button.btn{ -webkit-tap-highlight-color:transparent }
+
+/* —— Micro-animação de entrada dos cards da home —— */
+@keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+#view > .card, #view > .grid > .card{animation:cardIn .32s ease both}
 </style>
 </head>
 <body>
