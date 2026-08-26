@@ -866,6 +866,12 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .int-row.on{background:var(--accent-soft);border-color:var(--accent)}
 .int-tag{font-size:11px;color:var(--text-dim)}
 .int-row.on .int-tag{color:var(--accent);font-weight:700}
+
+/* —— Rotação: reserva —— */
+.fil-reserva{opacity:.82;padding-left:4px}
+.fil-reserva .fil-pos{color:var(--text-dim);font-size:14px}
+.def-vaga{font-size:10.5px;padding:1px 6px;border-radius:10px;background:var(--surface-2);color:var(--text-dim)}
+.def-vaga-tit{background:var(--accent-soft);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -4385,6 +4391,7 @@ function olheiroFormacaoHTML(){
   const alvo=S.olheiroFormAlvo || esquemaDe(meu);
   const diag=diagnosticoFormacao(alvo);
   const fil=filosofiaAtual();
+  if(!fil.rolesReserva)fil.rolesReserva={};
   const opcoes=ORDEM_ESQUEMAS.map(k=>`<button class="esq-mini ${k===alvo?'on':''}" onclick="setOlheiroForm('${k}')">${ESQUEMAS[k].emoji} ${ESQUEMAS[k].nome}</button>`).join('');
   const corpo = diag.ok
     ? `<div class="olh-form-ok">✅ Seu elenco já tem as posições para jogar <b>${diag.nome}</b>.</div>`
@@ -4393,16 +4400,26 @@ function olheiroFormacaoHTML(){
   const idAtual=IDENTIDADES[fil.identidade]||IDENTIDADES.coletivo;
   const posForm=ESQUEMAS[alvo].pos;
   const usados={};
-  const slotsHtml=posForm.map((pos,slot)=>{
-    const role=(fil.roles[slot])||ROLE_PADRAO[pos];
-    const cands=meu.elenco.filter(p=>p.pos===pos && !p.egg && !usados[p.id]).sort((a,b)=>encaixeJogador(b,role,fil.identidade)-encaixeJogador(a,role,fil.identidade));
-    const tit=cands[0]; if(tit)usados[tit.id]=1;
-    const enc=tit?encaixeJogador(tit,role,fil.identidade):0;
-    const roleOpts=(ROLES_POR_POS[pos]||[role]).map(r=>`<option value="${r}" ${r===role?'selected':''}>${ROLES[r].nome}</option>`).join('');
-    return `<div class="fil-slot"><div class="fil-pos">${bd(pos)}</div><select class="fil-role" onchange="setRole(${slot},this.value)">${roleOpts}</select><div class="fil-tit">${tit?esc(tit.nome.split(' ').slice(-1)[0])+' ('+tit.ovr+')':'<span class="muted">vazio</span>'}</div><div class="fil-enc" style="color:${corEncaixe(enc)}">${tit?enc+'%':'—'}</div>${tit&&enc<70?`<button class="btn ghost mini" onclick="buscarRoleSlot(${slot})">🔎</button>`:'<span></span>'}</div>`;
+  // para cada slot da formação: linha do TITULAR + linha do RESERVA (que herda a função por padrão)
+  const linhas=posForm.map((pos,slot)=>{
+    const roleT=(fil.roles[slot])||ROLE_PADRAO[pos];
+    const naPos=meu.elenco.filter(p=>p.pos===pos && !p.egg && !usados[p.id]).sort((a,b)=>encaixeJogador(b,roleT,fil.identidade)-encaixeJogador(a,roleT,fil.identidade));
+    const tit=naPos[0]; if(tit)usados[tit.id]=1;
+    const encT=tit?encaixeJogador(tit,roleT,fil.identidade):0;
+    const roleOptsT=(ROLES_POR_POS[pos]||[roleT]).map(r=>`<option value="${r}" ${r===roleT?'selected':''}>${ROLES[r].nome}</option>`).join('');
+    const linhaT=`<div class="fil-slot"><div class="fil-pos">${bd(pos)}</div><select class="fil-role" onchange="setRole(${slot},this.value)">${roleOptsT}</select><div class="fil-tit">${tit?esc(tit.nome.split(' ').slice(-1)[0])+' ('+tit.ovr+')':'<span class="muted">vazio</span>'}</div><div class="fil-enc" style="color:${corEncaixe(encT)}">${tit?encT+'%':'—'}</div>${tit&&encT<70?`<button class="btn ghost mini" onclick="buscarRoleSlot(${slot})">🔎</button>`:'<span></span>'}</div>`;
+    // reserva: função herda a do titular por padrão
+    const roleR=fil.rolesReserva[slot]||roleT;
+    const res=meu.elenco.filter(p=>p.pos===pos && !p.egg && !usados[p.id]).sort((a,b)=>encaixeJogador(b,roleR,fil.identidade)-encaixeJogador(a,roleR,fil.identidade))[0];
+    if(res)usados[res.id]=1;
+    const encR=res?encaixeJogador(res,roleR,fil.identidade):0;
+    const roleOptsR=(ROLES_POR_POS[pos]||[roleR]).map(r=>`<option value="${r}" ${r===roleR?'selected':''}>${ROLES[r].nome}</option>`).join('');
+    const linhaR=`<div class="fil-slot fil-reserva"><div class="fil-pos">↳</div><select class="fil-role" onchange="setRoleReserva(${slot},this.value)">${roleOptsR}</select><div class="fil-tit">${res?esc(res.nome.split(' ').slice(-1)[0])+' ('+res.ovr+')':'<span class="muted">sem reserva</span>'}</div><div class="fil-enc" style="color:${corEncaixe(encR)}">${res?encR+'%':'—'}</div>${(!res||encR<65)?`<button class="btn ghost mini" onclick="buscarRoleReserva(${slot})">🔎</button>`:'<span></span>'}</div>`;
+    return linhaT+linhaR;
   }).join('');
-  return `<div class="card accent"><h3 class="sub">🧩 Filosofia de jogo</h3><p class="hint">Defina o estilo, o esquema e a função de cada posição. O olheiro mede o "encaixe" de cada titular e ajuda a buscar quem falta.</p><div class="fil-label">Identidade de jogo</div><div class="esq-mini-row">${idOpts}</div><p class="hint" style="margin:2px 0 8px">${idAtual.emoji} <b>${idAtual.nome}</b> — ${idAtual.desc}</p><div class="fil-label">Esquema tático</div><div class="esq-mini-row">${opcoes}</div><div class="fil-label" style="margin-top:8px">Funções e encaixe do elenco</div><div class="fil-slots"><div class="fil-slot fil-head"><div>Pos</div><div>Função</div><div>Titular</div><div>Encaixe</div><div></div></div>${slotsHtml}</div>${corpo?`<div class="olh-form-diag" style="margin-top:10px"><div class="fil-label">Lacunas de posição</div>${corpo}</div>`:''}</div>`;
+  return `<div class="card accent"><h3 class="sub">🧩 Filosofia de jogo</h3><p class="hint">Defina o estilo, o esquema e a função de cada posição — titular <b>e reserva</b>. O reserva herda a função do titular pra manter a filosofia quando entra; toque pra mudar. O olheiro mede o "encaixe" de cada um.</p><div class="fil-label">Identidade de jogo</div><div class="esq-mini-row">${idOpts}</div><p class="hint" style="margin:2px 0 8px">${idAtual.emoji} <b>${idAtual.nome}</b> — ${idAtual.desc}</p><div class="fil-label">Esquema tático</div><div class="esq-mini-row">${opcoes}</div><div class="fil-label" style="margin-top:8px">Rotação: funções e encaixe (titular + reserva)</div><div class="fil-slots"><div class="fil-slot fil-head"><div>Pos</div><div>Função</div><div>Jogador</div><div>Encaixe</div><div></div></div>${linhas}</div>${corpo?`<div class="olh-form-diag" style="margin-top:10px"><div class="fil-label">Lacunas de posição</div>${corpo}</div>`:''}</div>`;
 }
+
 function setIdentidade(k){
   if(!IDENTIDADES[k])return;
   const fil=filosofiaAtual(); fil.identidade=k;
@@ -4411,6 +4428,19 @@ function setIdentidade(k){
   render();
 }
 function setRole(slot,role){ const fil=filosofiaAtual(); fil.roles[slot]=role; render(); }
+function setRoleReserva(slot,role){ const fil=filosofiaAtual(); fil.rolesReserva=fil.rolesReserva||{}; fil.rolesReserva[slot]=role; render(); }
+function buscarRoleReserva(slot){
+  const meu=S.times[S.meuTime];
+  const alvo=S.olheiroFormAlvo || esquemaDe(meu);
+  const pos=ESQUEMAS[alvo].pos[slot];
+  const fil=filosofiaAtual();
+  const role=(fil.rolesReserva&&fil.rolesReserva[slot])||fil.roles[slot]||ROLE_PADRAO[pos];
+  // reserva: overall um pouco menor, foco em quem entrega a função a baixo custo
+  S.olheiroFiltros={pos, ovrMin:66, idadeMax:99, jovem:false, role};
+  S._buscouFiltro=true;
+  buscarComFiltros(S.olheiroFiltros);
+  render();
+}
 function buscarRoleSlot(slot){
   const meu=S.times[S.meuTime];
   const alvo=S.olheiroFormAlvo || esquemaDe(meu);
@@ -4444,7 +4474,8 @@ function olheiroDeficienciasHTML(){
     <p class="hint">Só reforços que <b>cabem no seu teto</b>. Nas trocas, o olheiro monta o pacote com suas peças dispensáveis (nunca os intocáveis) e mostra o <b>% de encaixe</b> na sua filosofia.</p>`;
   if(!blocos.length) return cabecalho+`<p class="hint">Nenhuma deficiência viável no momento (ou sem espaço/moeda de troca). Marque menos intocáveis ou libere salário para abrir opções.</p></div>`;
   const html=blocos.map(b=>{
-    const cabec=`<div class="def-cabec"><span class="def-pos">${bd(b.pos)} ${POS_NOME[b.pos]||b.pos}</span> <span class="muted">função: ${esc(b.roleNome)}</span>${b.titular?` <span class="def-tit">titular: ${esc(b.titular.nome.split(' ').slice(-1)[0])} · encaixe ${b.encTit}%</span>`:' <span class="def-vazio">sem titular</span>'}</div>`;
+    const tag=b.alvo==='reserva'?'<span class="def-vaga">🔄 reserva</span>':'<span class="def-vaga def-vaga-tit">⭐ titular</span>';
+    const cabec=`<div class="def-cabec"><span class="def-pos">${bd(b.pos)} ${POS_NOME[b.pos]||b.pos}</span> ${tag} <span class="muted">função: ${esc(b.roleNome)}</span>${b.titular?` <span class="def-tit">titular atual: ${esc(b.titular.nome.split(' ').slice(-1)[0])} · ${b.encTit}%</span>`:' <span class="def-vazio">sem titular</span>'}</div>`;
     const linhas=b.candidatos.length? b.candidatos.map(c=>{
       const cor=c.encaixe>=80?'var(--pos)':c.encaixe>=70?'var(--amber)':'var(--text-dim)';
       let custoTxt, acao;
@@ -5502,13 +5533,23 @@ function reforcosPorDeficiencia(nPorPos){
   // determina as posições deficientes e o role de cada uma (pela formação/filosofia)
   const nec=necessidades(meu);
   const defMap={};   // pos -> role
+  const defAlvo={};  // pos -> 'titular' | 'reserva' (o que falta)
   posForm.forEach((pos,slot)=>{
     const role=fil.roles[slot]||ROLE_PADRAO[pos];
-    const titular=meu.elenco.filter(p=>p.pos===pos&&!p.egg).sort((a,b)=>encaixeJogador(b,role,fil.identidade)-encaixeJogador(a,role,fil.identidade))[0];
+    const roleR=(fil.rolesReserva&&fil.rolesReserva[slot])||role;
+    const naPos=meu.elenco.filter(p=>p.pos===pos&&!p.egg);
+    const titular=naPos.slice().sort((a,b)=>encaixeJogador(b,role,fil.identidade)-encaixeJogador(a,role,fil.identidade))[0];
     const enc=titular?encaixeJogador(titular,role,fil.identidade):0;
-    // é deficiência se: carência de posição alta, ou não há titular, ou o encaixe do titular é fraco
+    // reserva = 2º melhor da posição para a função de reserva
+    const reserva=naPos.filter(p=>p!==titular).sort((a,b)=>encaixeJogador(b,roleR,fil.identidade)-encaixeJogador(a,roleR,fil.identidade))[0];
+    const encR=reserva?encaixeJogador(reserva,roleR,fil.identidade):0;
+    // deficiência de TITULAR: carência alta, sem titular, ou titular não encaixa
     if((nec[pos]||0)>=25 || !titular || enc<72){
-      if(!defMap[pos] || ROLES[role]) defMap[pos]=role;
+      defMap[pos]=role; defAlvo[pos]='titular';
+    }
+    // deficiência de BANCO: sem reserva, ou reserva entrega mal a filosofia (o Gabriel quer o banco fiel ao estilo)
+    else if(!reserva || encR<65){
+      defMap[pos]=roleR; defAlvo[pos]='reserva';
     }
   });
   // se nada apareceu (time redondo), pega as 2 posições de menor encaixe mesmo assim
@@ -5554,7 +5595,7 @@ function reforcosPorDeficiencia(nPorPos){
         viaveis.push(c);
       }
     });
-    blocos.push({pos, role, roleNome:ROLES[role]?ROLES[role].nome:role, titular, encTit, candidatos:viaveis.slice(0,nPorPos)});
+    blocos.push({pos, role, roleNome:ROLES[role]?ROLES[role].nome:role, titular, encTit, alvo:defAlvo[pos]||'titular', candidatos:viaveis.slice(0,nPorPos)});
   });
   return blocos;
 }
@@ -9345,16 +9386,16 @@ function mostrarSetup(){ mostrarHub(); }
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
 const NOVIDADES = {
-  versao: '2026.08g',
+  versao: '2026.08h',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
-    {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada (seu craque!). O olheiro nunca oferece um intocável em troca — monta os pacotes só com o resto do elenco, pra você reforçar o time em volta da sua estrela.'},
-    {emoji:'💰', t:'Olheiro respeita seu teto', d:'Os reforços por deficiência agora só mostram o que cabe no seu espaço salarial, e cada troca já vem com o pacote de saída montado com suas peças dispensáveis.'},
-    {emoji:'🎯', t:'Reforços por deficiência', d:'Para cada carência, os melhores candidatos viáveis da liga com o % de encaixe na função e no estilo que você escolheu.'},
-    {emoji:'🧩', t:'Filosofia de jogo', d:'Monte a identidade do time: estilo, esquema tático e a função de cada posição. O olheiro mede o encaixe de cada titular.'},
-    {emoji:'📨', t:'Offseason fervendo', d:'Chove proposta de troca na offseason, e a carreira agora começa direto nela.'},
-    {emoji:'⭐', t:'Eventos e calendário', d:'Temporada por datas reais com All-Star, Trade Deadline, coletivas de imprensa e premiações de fim de ano.'},
+    {emoji:'🔄', t:'Molde o banco de reservas', d:'Agora você define a função dos reservas também — por padrão eles herdam a função do titular, pra entregar a mesma filosofia quando entram. O olheiro mede o encaixe de cada reserva e busca quem falta no banco.'},
+    {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca — monta os pacotes só com o resto do elenco.'},
+    {emoji:'💰', t:'Olheiro respeita seu teto', d:'Reforços por deficiência só mostram o que cabe no seu espaço salarial, com o pacote de saída já montado.'},
+    {emoji:'🧩', t:'Filosofia de jogo', d:'Monte a identidade do time: estilo, esquema tático e a função de cada posição — titular e reserva.'},
+    {emoji:'📨', t:'Offseason fervendo', d:'Chove proposta de troca na offseason, e a carreira começa direto nela.'},
+    {emoji:'⭐', t:'Eventos e calendário', d:'Temporada por datas reais com All-Star, Trade Deadline, coletivas de imprensa e premiações.'},
   ]
 };
 function mostrarNovidades(forcar){
