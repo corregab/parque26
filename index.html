@@ -872,6 +872,14 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .fil-reserva .fil-pos{color:var(--text-dim);font-size:14px}
 .def-vaga{font-size:10.5px;padding:1px 6px;border-radius:10px;background:var(--surface-2);color:var(--text-dim)}
 .def-vaga-tit{background:var(--accent-soft);color:var(--accent)}
+
+/* —— Card de jogo: layout mobile-first (empilhado, botões largura total) —— */
+.jogo-head{margin-bottom:12px}
+.jogo-acoes-main{display:flex;gap:8px}
+.jogo-acoes-main .btn{flex:1;padding:14px 10px;font-size:14px}
+.jogo-acoes-sec{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;margin-top:8px}
+.jogo-acoes-sec .btn{width:100%;padding:11px 8px}
+@media(max-width:380px){.jogo-acoes-sec{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -3942,26 +3950,26 @@ function vInicio(){
         <h3 class="sub" style="margin-top:8px">${folgaAtual?'Próximo compromisso':'Jogo de hoje'} · ${dataLegivel(diaJogo,true)}</h3>
         ${S.online
           ? htmlBotoesJogar()
-          : `<div class="row" style="justify-content:space-between;align-items:flex-end">
-          <div><div class="big">${casa?'vs':'@'} ${esc(adv.nick)}</div>
+          : `<div class="jogo-head">
+          <div class="big">${casa?'vs':'@'} ${esc(adv.nick)}</div>
           <div class="hint">${esc(adv.cidade)} · ${adv.v}-${adv.d} · força ${forcaTime(adv)} · ${casa?'Em casa':'Fora de casa'}</div>
           <div class="prev-tat" style="margin-top:5px">📋 Provável do rival: ${resumoTaticaCurto(taticaIA(adv))}</div></div>
-          <div><div class="row"><button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button><button class="btn ghost" onclick="jogar()">⏩ Simular</button></div>
-          <div class="row" style="margin-top:6px;gap:6px">
+          <div class="jogo-acoes-main">
+            <button class="btn" onclick="jogarAoVivo()">🔴 Jogar ao vivo</button>
+            <button class="btn ghost" onclick="jogar()">⏩ Simular</button></div>
+          <div class="jogo-acoes-sec">
             <button class="btn ghost mini" onclick="avancarUmDia()">📆 Avançar 1 dia</button>
-            <button class="btn ghost mini" onclick="avancarAteProximoJogo()">⏭️ Até o próximo jogo</button>
-            <button class="btn ghost mini" onclick="jogarVarias(5)">⏩⏩ Simular 5 rodadas</button></div></div>
-        </div>`}</div>` + agendaHTML();
+            <button class="btn ghost mini" onclick="avancarAteProximoJogo()">⏭️ Próximo jogo</button>
+            <button class="btn ghost mini" onclick="jogarVarias(5)">⏩⏩ Simular 5 rodadas</button></div>`}</div>` + agendaHTML();
     } else {
       // seu time já jogou os 82 jogos, mas a temporada ainda não fechou no calendário
       const jogos=t.v+t.d;
       bloco=`<div class="card accent">
         <h3 class="sub">Temporada regular encerrada</h3>
-        <div class="row" style="justify-content:space-between;align-items:flex-end">
-          <div><div class="big">${jogos} jogos · ${t.v}-${t.d}</div>
+        <div class="jogo-head">
+          <div class="big">${jogos} jogos · ${t.v}-${t.d}</div>
           <div class="hint">Seu time já cumpriu a tabela. Avance para definir o Play-In e os playoffs.</div></div>
-          <button class="btn" onclick="fecharTemporada()">Avançar para os Playoffs</button>
-        </div></div>`;
+          <button class="btn" style="width:100%" onclick="fecharTemporada()">Avançar para os Playoffs</button></div>`;
     }
   } else if(S.fase==='playin'){
     bloco=`<div class="card accent"><h3 class="sub">🎫 Play-In Tournament</h3>
