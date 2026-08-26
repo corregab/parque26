@@ -853,6 +853,19 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .def-bar{height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden}
 .def-bar i{display:block;height:100%;border-radius:3px}
 .def-pct{font-family:'Oswald',sans-serif;font-weight:700;text-align:right;font-size:13px}
+
+/* —— Reforços: espaço salarial, custo e intocáveis —— */
+.def-space{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;margin:4px 0 8px;padding:8px;background:var(--surface);border-radius:8px}
+.def-row2{padding:7px 0;border-bottom:1px solid var(--hair)}
+.def-topo{display:flex;align-items:center;gap:6px}
+.def-topo .def-jog{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.def-linha2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.def-custo{font-size:11.5px;color:var(--text-dim)}
+.int-lista{max-height:50vh;overflow-y:auto;margin:8px 0}
+.int-row{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid var(--hair);margin-bottom:4px}
+.int-row.on{background:var(--accent-soft);border-color:var(--accent)}
+.int-tag{font-size:11px;color:var(--text-dim)}
+.int-row.on .int-tag{color:var(--accent);font-weight:700}
 </style>
 </head>
 <body>
@@ -1010,6 +1023,15 @@ function forcaTime(t){
 }
 function folha(t){return t.elenco.reduce((s,p)=>s+p.salario,0);}
 const TETO = 145000000;
+// —— jogadores intocáveis (o olheiro nunca os oferece em troca) ——
+function ehIntocavel(p){ return !!(p && S.intocaveis && S.intocaveis.includes(p.id)); }
+function toggleIntocavel(id){ S.intocaveis=S.intocaveis||[]; const i=S.intocaveis.indexOf(id); if(i>=0)S.intocaveis.splice(i,1); else S.intocaveis.push(id); if(typeof render==='function')render(); }
+// —— espaço salarial disponível abaixo do teto (negativo = acima do teto) ——
+function espacoSalarial(t){ t=t||S.times[S.meuTime]; return TETO - folha(t); }
+// folha após uma troca hipotética (entrego saem, recebo entram)
+function folhaAposTroca(t, entrego, recebo){
+  return folha(t) - (entrego||[]).reduce((s,p)=>s+p.salario,0) + (recebo||[]).reduce((s,p)=>s+p.salario,0);
+}
 
 /* ===== FUNÇÕES (papéis) e JOGADAS (padrões ofensivos) ===== */
 const FUNCOES = {
@@ -4411,24 +4433,64 @@ function setOlheiroForm(k){
 // —— seção: reforços por deficiência (top ~10 candidatos com % de encaixe) ——
 function olheiroDeficienciasHTML(){
   const blocos=reforcosPorDeficiencia(10);
-  if(!blocos.length) return '';
+  const meu=S.times[S.meuTime];
+  const espaco=espacoSalarial(meu);
+  const espacoTxt = espaco>=0
+    ? `<span style="color:var(--pos)">${$(espaco)} livres abaixo do teto</span>`
+    : `<span style="color:var(--neg)">${$(-espaco)} acima do teto</span>`;
+  const nInt=(S.intocaveis||[]).length;
+  const cabecalho=`<div class="card" style="margin-top:12px"><h3 class="sub">🎯 Reforços por deficiência</h3>
+    <div class="def-space">💰 Espaço salarial: ${espacoTxt} · 🔒 ${nInt} intocável(is) <button class="btn ghost mini" onclick="abrirIntocaveis()">Gerenciar intocáveis</button></div>
+    <p class="hint">Só reforços que <b>cabem no seu teto</b>. Nas trocas, o olheiro monta o pacote com suas peças dispensáveis (nunca os intocáveis) e mostra o <b>% de encaixe</b> na sua filosofia.</p>`;
+  if(!blocos.length) return cabecalho+`<p class="hint">Nenhuma deficiência viável no momento (ou sem espaço/moeda de troca). Marque menos intocáveis ou libere salário para abrir opções.</p></div>`;
   const html=blocos.map(b=>{
     const cabec=`<div class="def-cabec"><span class="def-pos">${bd(b.pos)} ${POS_NOME[b.pos]||b.pos}</span> <span class="muted">função: ${esc(b.roleNome)}</span>${b.titular?` <span class="def-tit">titular: ${esc(b.titular.nome.split(' ').slice(-1)[0])} · encaixe ${b.encTit}%</span>`:' <span class="def-vazio">sem titular</span>'}</div>`;
     const linhas=b.candidatos.length? b.candidatos.map(c=>{
       const cor=c.encaixe>=80?'var(--pos)':c.encaixe>=70?'var(--amber)':'var(--text-dim)';
-      const acao=c.tipo==='livre'
-        ? `<button class="btn ghost mini" onclick="ABA='mercado';render()">Contratar</button>`
-        : `<button class="btn ghost mini" onclick="buscarPara('${b.pos}')">Trocar</button>`;
-      return `<div class="def-row">
-        <div class="def-jog">${esc(c.p.nome)} <span class="muted">${c.origem} · ${c.p.ovr} ovr · ${c.p.idade}a</span></div>
+      let custoTxt, acao;
+      if(c.tipo==='livre'){
+        custoTxt=`<span class="def-custo">livre · ${$(c.custa)}/ano</span>`;
+        acao=`<button class="btn ghost mini" onclick="ABA='mercado';render()">Contratar</button>`;
+      } else {
+        const envio=c.entrego.map(p=>esc(p.nome.split(' ').slice(-1)[0])+'('+p.ovr+')').join(', ')||'picks';
+        const pk=c.picksRecebo&&c.picksRecebo.length?' +pick':'';
+        custoTxt=`<span class="def-custo">${esc(c.origem)} · envia: ${envio}${pk}</span>`;
+        acao=`<button class="btn mini" onclick="fecharReforco('${b.pos}',${c.p.id},${c.outro.id})">Trocar</button>`;
+      }
+      return `<div class="def-row2">
+        <div class="def-topo"><b class="def-jog">${esc(c.p.nome)}</b> <span class="muted">${c.p.ovr} ovr · ${c.p.idade}a</span>
+          <span class="def-pct" style="color:${cor}">${c.encaixe}%</span></div>
         <div class="def-bar"><i style="width:${Math.min(100,c.encaixe)}%;background:${cor}"></i></div>
-        <div class="def-pct" style="color:${cor}">${c.encaixe}%</div>
-        ${acao}</div>`;
-    }).join('') : '<p class="hint">Nenhum candidato melhor que o atual nesta posição.</p>';
+        <div class="def-linha2">${custoTxt} ${acao}</div></div>`;
+    }).join('') : '<p class="hint">Sem candidato viável aqui (teto ou moeda de troca). Libere salário ou solte um intocável.</p>';
     return `<div class="def-bloco">${cabec}${linhas}</div>`;
   }).join('');
-  return `<div class="card" style="margin-top:12px"><h3 class="sub">🎯 Reforços por deficiência</h3>
-    <p class="hint">Para cada carência do time, os melhores candidatos da liga — com o <b>% de encaixe</b> na função e no estilo que você escolheu.</p>${html}</div>`;
+  return cabecalho+html+`</div>`;
+}
+// fecha a troca de um reforço já com o pacote de saída montado pelo olheiro
+function fecharReforco(pos, alvoId, outroId){
+  if(typeof tradeDeadlinePassou==='function' && tradeDeadlinePassou()){ alert('A janela de trocas fechou no Trade Deadline.'); return; }
+  const blocos=reforcosPorDeficiencia(10);
+  let cand=null;
+  blocos.forEach(b=>b.candidatos.forEach(c=>{ if(c.p.id===alvoId && c.tipo==='troca') cand=c; }));
+  if(!cand){ alert('Essa troca não está mais disponível (elenco mudou).'); render(); return; }
+  S.scoutCarencia=S.scoutCarencia||[];
+  S.scoutCarencia.push({pos, outroId:cand.outro.id, recebo:[cand.p], entrego:cand.entrego,
+    picksRecebo:cand.picksRecebo||[], picksEntrego:[]});
+  aceitarScout('carencia', alvoId);
+}
+// modal para marcar/desmarcar jogadores intocáveis
+function abrirIntocaveis(){
+  const meu=S.times[S.meuTime];
+  const linhas=meu.elenco.filter(p=>!p.egg).sort((a,b)=>b.ovr-a.ovr).map(p=>{
+    const on=ehIntocavel(p);
+    return `<div class="int-row ${on?'on':''}" onclick="toggleIntocavel(${p.id})">
+      <span>${on?'🔒':'🔓'} ${bd(p.pos)} ${esc(p.nome)} <span class="muted">${p.ovr} ovr</span></span>
+      <span class="int-tag">${on?'Intocável':'liberado'}</span></div>`;
+  }).join('');
+  abrirModal('🔒 Jogadores intocáveis', `<p class="hint">Toque para proteger. O olheiro nunca oferece um intocável em troca — ele monta pacotes só com o resto do elenco.</p>
+    <div class="int-lista">${linhas}</div>
+    <div class="row" style="justify-content:center;margin-top:10px"><button class="btn" onclick="closeModal();render()">Pronto</button></div>`);
 }
 
 // —— seção: busca de jogadores com filtros ——
@@ -5459,21 +5521,40 @@ function reforcosPorDeficiencia(nPorPos){
     ord.forEach(o=>defMap[o.pos]=o.role);
   }
   // para cada posição deficiente, junta candidatos da liga (outros times + agentes livres)
+  const espaco=espacoSalarial(meu);
   const blocos=[];
   Object.keys(defMap).forEach(pos=>{
     const role=defMap[pos];
     const titular=meu.elenco.filter(p=>p.pos===pos&&!p.egg).sort((a,b)=>b.ovr-a.ovr)[0];
     const encTit=titular?encaixeJogador(titular,role,fil.identidade):0;
-    const cands=[];
+    let cands=[];
     S.times.forEach(outro=>{
       if(outro.id===S.meuTime) return;
-      outro.elenco.forEach(p=>{ if(!p.egg && p.pos===pos) cands.push({p, origem:outro.ab, tipo:'troca', outroId:outro.id}); });
+      outro.elenco.forEach(p=>{ if(!p.egg && p.pos===pos) cands.push({p, origem:outro.ab, tipo:'troca', outro}); });
     });
     (S.livres||[]).forEach(p=>{ if(!p.egg && p.pos===pos) cands.push({p, origem:'Livre', tipo:'livre'}); });
     cands.forEach(c=>{ c.encaixe=encaixeJogador(c.p, role, fil.identidade); });
-    // só quem melhora o encaixe atual, ordenado pelo melhor encaixe
-    const lista=cands.filter(c=>c.encaixe>=encTit).sort((a,b)=>b.encaixe-a.encaixe || b.p.ovr-a.p.ovr).slice(0,nPorPos);
-    blocos.push({pos, role, roleNome:ROLES[role]?ROLES[role].nome:role, titular, encTit, candidatos:lista});
+    // só quem melhora o encaixe do titular; pega os de melhor encaixe pra depois testar viabilidade
+    cands=cands.filter(c=>c.encaixe>=encTit).sort((a,b)=>b.encaixe-a.encaixe || b.p.ovr-a.p.ovr).slice(0,24);
+    // testa viabilidade: livre precisa caber no espaço salarial; troca precisa de um pacote
+    // sem intocáveis que caiba no teto — e mostra as MELHORES peças dispensáveis a enviar
+    const viaveis=[];
+    cands.forEach(c=>{
+      if(c.tipo==='livre'){
+        if(c.p.salario<=espaco){ c.cabe=true; c.custa=c.p.salario; viaveis.push(c); }
+      } else {
+        const oferta=(typeof montarOfertaViavel==='function')?montarOfertaViavel(meu, c.outro, [c.p], valorMercado(c.p), false):null;
+        if(!oferta) return;   // não dá pra montar sem tocar nos intocáveis
+        const folhaNova=folhaAposTroca(meu, oferta.jogadores, [c.p]);
+        if(folhaNova>TETO) return;   // não cabe no teto
+        c.entrego=oferta.jogadores;
+        c.picksRecebo=oferta.picksRecebidos||[];
+        c.salLiquido=c.p.salario - oferta.jogadores.reduce((s,x)=>s+x.salario,0);
+        c.cabe=true;
+        viaveis.push(c);
+      }
+    });
+    blocos.push({pos, role, roleNome:ROLES[role]?ROLES[role].nome:role, titular, encTit, candidatos:viaveis.slice(0,nPorPos)});
   });
   return blocos;
 }
@@ -5526,7 +5607,7 @@ function relatorioOlheiro(){
         if(imp.piorBuraco < -8) return;            // abriu um buraco grande em outra posição
         // REGRA 3: respeitar a folha — não estourar demais o teto
         const folhaNova=folhaAtual - oferta.jogadores.reduce((s,p)=>s+p.salario,0) + alvo.salario;
-        if(folhaNova > TETO+12e6) return;          // trocas que explodem a folha não passam
+        if(folhaNova > TETO) return;          // só sugere o que cabe no teto salarial
         // score: prioriza melhora líquida real e folga salarial
         const score=imp.liquido*6 + (alvo.idade<=24?(alvo.pot-alvo.ovr):0) - Math.max(0,folhaNova-TETO)/4e6;
         if(!melhorOp || score>melhorOp.score){
@@ -5607,7 +5688,8 @@ function buscarOportunidades(objetivo, n, alcance){
 function montarOfertaViavel(meu, outro, recebo, valAlvo, querPicks){
   const exig = 1.08 + (outro.prestigio>80?0.08:0);
   let alvoValor = valAlvo*exig;
-  const candidatos=meu.elenco.filter(p=>!recebo.includes(p))
+  const soDoMeuTime = meu.id===S.meuTime;   // só protejo intocáveis do time do jogador
+  const candidatos=meu.elenco.filter(p=>!recebo.includes(p) && !(soDoMeuTime && ehIntocavel(p)))
     .map(p=>{
       const naPos=meu.elenco.filter(x=>x.pos===p.pos).sort((a,b)=>b.ovr-a.ovr);
       const rank=naPos.indexOf(p);
