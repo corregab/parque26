@@ -1459,6 +1459,7 @@ function criarLiga(){
       caixa:Math.round((26+mkt*9+(prest-70)*0.5+R(-5,8))*1e6),
       ingresso:Math.round(78+mkt*13+(prest-70)*0.6),
       capacidade:cap, patroc:Math.round((13+mkt*5.5+(prest-70)*0.32)*1e6),
+      fas:Math.round(Math.max(2,Math.min(25,(prest-42)*0.5+mkt*2.2))*10)/10,
       tv:Math.round((30+mkt*3.5)*1e6),
       tatica:{ritmo:1,foco:1,pressao:1,jogada:'balanceado',defesa:0,instr:{transicao:false,protegerBola:false,reboundCrash:false,doubleTeam:false}},minutos:{},titulares:[],hist:[],camp:0};
     (ROSTERS[ab]||[]).forEach(d=>tm.elenco.push(jogadorReal(d,i)));
@@ -1885,6 +1886,8 @@ function gravarJogo(res){
   });
   const A=res.A,B=res.B,vA=res.ptsA>res.ptsB;
   A.t.v+=vA?1:0;A.t.d+=vA?0:1;B.t.v+=vA?0:1;B.t.d+=vA?1:0;
+  A.t.fas=clamp(Math.round(((A.t.fas||10)+(vA?0.08:-0.04))*100)/100,1,40);
+  B.t.fas=clamp(Math.round(((B.t.fas||10)+(vA?-0.04:0.08))*100)/100,1,40);
   A.t.pf+=res.ptsA;A.t.pc+=res.ptsB;B.t.pf+=res.ptsB;B.t.pc+=res.ptsA;
   A.t.seq.unshift(vA?'V':'D');B.t.seq.unshift(vA?'D':'V');
   A.t.seq=A.t.seq.slice(0,8);B.t.seq=B.t.seq.slice(0,8);
@@ -2139,6 +2142,10 @@ function meuJogoNaRodadaAtual(){
   const rod=S.cal&&S.cal[S.rodada];
   return rod && rod.some(j=>j.c===S.meuTime||j.f===S.meuTime);
 }
+// hoje é folga se o dia atual da temporada ainda não chegou no dia do próximo jogo
+function hojeEhFolga(){
+  return !!(S && S.fase==='regular' && typeof diaDoProximoJogo==='function' && diaTempAtual() < diaDoProximoJogo());
+}
 // Lista ordenada dos jogos do MEU time na temporada, com o adversário e o dia no calendário.
 // O jogo de índice k acontece no dia k*PASSO_RODADA.
 function meusJogosTemporada(){
@@ -2263,6 +2270,64 @@ function responderMidia(i){
   t.elenco.forEach(p=>{ if(!p.egg) p.moral=clamp((p.moral||70)+o.moral,0,100); });
   noticia('🎤 Coletiva: '+o.txt+(o.moral?` (moral ${o.moral>0?'+':''}${o.moral})`:''), o.moral>=0?'v':'x');
   S._midiaAtual=null;
+  closeModal();
+  render();
+}
+// —— ENTREVISTAS (dias de folga): rendem FÃS e/ou MORAL, com trade-offs ——
+const PERGUNTAS_ENTREVISTA=[
+  {q:'"Como você enxerga o time nesta temporada?"', ops:[
+    {t:'Cravar que vão brigar pelo título', fas:+0.7, moral:-2, txt:'A torcida foi à loucura com a ousadia — mas parte do elenco sentiu o peso.'},
+    {t:'Exaltar a entrega dos jogadores', fas:+0.2, moral:+5, txt:'O vestiário valorizou o reconhecimento público.'},
+    {t:'Ir com cautela, jogo a jogo', fas:-0.1, moral:+1, txt:'Discurso morno — não empolgou a arquibancada.'},
+  ]},
+  {q:'"O que você diz para o torcedor que comprou ingresso hoje?"', ops:[
+    {t:'Prometer espetáculo e raça em quadra', fas:+0.8, moral:0, txt:'A galera comprou a ideia e o hype subiu.'},
+    {t:'Agradecer o apoio nos bons e maus momentos', fas:+0.4, moral:+2, txt:'Mensagem carismática, caiu bem com todos.'},
+    {t:'Dizer que resultado é o que importa', fas:-0.2, moral:+1, txt:'Objetivo demais — a torcida queria emoção.'},
+  ]},
+  {q:'"Há quem diga que seu elenco está supervalorizado. Responde?"', ops:[
+    {t:'Comprar a briga e peitar os críticos', fas:+0.9, moral:+3, txt:'Bancar o grupo publicamente empolgou torcida e vestiário!'},
+    {t:'Deixar o trabalho falar por si', fas:+0.1, moral:+2, txt:'Postura serena, bem recebida pelo elenco.'},
+    {t:'Concordar em partes com a crítica', fas:-0.3, moral:-4, txt:'Os jogadores não gostaram nada de te ver hesitar.'},
+  ]},
+  {q:'"Qual jogador é o coração deste time?"', ops:[
+    {t:'Exaltar o astro do elenco', fas:+0.5, moral:+3, txt:'O craque adorou o holofote e a torcida concordou.'},
+    {t:'"Aqui o time é mais forte que qualquer nome"', fas:+0.3, moral:+4, txt:'Discurso coletivo uniu o grupo.'},
+    {t:'Desconversar', fas:-0.1, moral:0, txt:'Resposta sem graça, passou batido.'},
+  ]},
+  {q:'"Depois da sequência recente, qual o clima no vestiário?"', ops:[
+    {t:'Vender otimismo total para a imprensa', fas:+0.6, moral:-1, txt:'A torcida embarcou, mas soou forçado pra alguns atletas.'},
+    {t:'Ser honesto e blindar o grupo', fas:+0.2, moral:+5, txt:'Sinceridade e proteção — o elenco sentiu o apoio.'},
+    {t:'Cobrar publicamente mais intensidade', fas:+0.3, moral:-5, txt:'Rendeu manchete e fãs, mas o vestiário ficou irritado.'},
+  ]},
+  {q:'"Uma palavra para a torcida que lota o ginásio?"', ops:[
+    {t:'Chamar a torcida de "o sexto homem"', fas:+0.8, moral:+1, txt:'A arquibancada amou ser protagonista.'},
+    {t:'Prometer entregar tudo por eles', fas:+0.5, moral:+2, txt:'Comprometimento público animou geral.'},
+    {t:'Um agradecimento protocolar', fas:0, moral:0, txt:'Educado, mas esquecível.'},
+  ]},
+];
+function podeDarEntrevista(){
+  return !!(hojeEhFolga() && S.entrevistaDia!==diaTempAtual());
+}
+function abrirEntrevista(){
+  if(!podeDarEntrevista()){ toast&&toast('🎤 Você já concedeu entrevista hoje.'); return; }
+  const pg=pick(PERGUNTAS_ENTREVISTA);
+  S._entrevistaAtual=pg;
+  const ops=pg.ops.map((o,i)=>`<button class="btn ghost" style="display:block;width:100%;text-align:left;margin:6px 0" onclick="responderEntrevista(${i})">${esc(o.t)}</button>`).join('');
+  abrirModal('🎤 Entrevista coletiva', `<p style="margin:0 0 4px"><b>Repórter: ${esc(pg.q)}</b></p><p class="hint" style="margin:0 0 8px">Sua resposta pode render <b>fãs</b> para a torcida ou mexer na <b>moral</b> do elenco.</p>${ops}`);
+}
+function responderEntrevista(i){
+  const pg=S._entrevistaAtual; if(!pg)return;
+  const o=pg.ops[i]; if(!o)return;
+  const t=S.times[S.meuTime];
+  if(o.moral) t.elenco.forEach(p=>{ if(!p.egg) p.moral=clamp((p.moral||70)+o.moral,0,100); });
+  if(o.fas) t.fas=Math.max(0, Math.round(((t.fas||10)+o.fas)*10)/10);
+  S.entrevistaDia=diaTempAtual();
+  S._entrevistaAtual=null;
+  const partes=[];
+  if(o.fas) partes.push(`${o.fas>0?'+':''}${o.fas}M fãs`);
+  if(o.moral) partes.push(`moral ${o.moral>0?'+':''}${o.moral}`);
+  noticia('🎤 Entrevista: '+o.txt+(partes.length?` (${partes.join(', ')})`:''), (o.fas+o.moral)>=0?'v':'x');
   closeModal();
   render();
 }
@@ -2441,7 +2506,7 @@ function noticia(txt,tipo){S.noticias.unshift({txt,tipo:tipo||'',r:S.rodada});S.
 
 /* ---------- FINANÇAS ---------- */
 function ocupacao(t){
-  return clamp(.52 + (t.prestigio-70)*.009 + (pctV(t)-.5)*.5 - (t.ingresso-95)/420, .30, 1);
+  return clamp(.52 + (t.prestigio-70)*.009 + (pctV(t)-.5)*.5 - (t.ingresso-95)/420 + clamp(((t.fas||10)-10)/90, -.06, .12), .30, 1);
 }
 function financasRodada(rod){
   S.times.forEach(t=>{
@@ -2632,7 +2697,7 @@ function jogarRodadaPO(preRes){
 function proximaFasePO(){
   const vencs=S.po.series.map(s=>S.times[s.vencedor]);
   if(S.po.fase===3){ // acabou a final
-    const camp=vencs[0];camp.camp++;camp.caixa+=30e6;
+    const camp=vencs[0];camp.camp++;camp.caixa+=30e6;camp.fas=clamp(Math.round(((camp.fas||10)+4)*10)/10,1,40);
     camp.elenco.forEach(p=>{p.camp++;p.moral=100;});
     camp.hist[camp.hist.length-1].fase='🏆 CAMPEÃO';
     S.po.campeao=camp.id;
@@ -2765,6 +2830,9 @@ function processarOffseason(){
     });
     t.elenco=t.elenco.filter(p=>!sai.includes(p));
     t.v=0;t.d=0;t.pf=0;t.pc=0;t.seq=[];
+    // fãs assentam levemente em direção à base de prestígio (evita inflar pra sempre)
+    { const baseFas=Math.max(2,Math.min(25,(t.prestigio-42)*0.5+t.mercado*2.2));
+      t.fas=Math.round(((t.fas||baseFas)*0.85+baseFas*0.15)*10)/10; }
     t.caixa += t.patroc*0.15;
     t.patroc = Math.round((12+t.mercado*5+ (t.prestigio-70)*0.35)*1e6*R(.9,1.15));
     t.tv = Math.round((90+t.mercado*3.5)*1e6*R(.98,1.06));
@@ -4068,10 +4136,11 @@ function vInicio(){
     if(px){
       const casa=px.j.c===S.meuTime, adv=S.times[casa?px.j.f:px.j.c];
       const diaJogo=diaDaRodada(px.rodada);
-      const folgaAtual=!meuJogoNaRodadaAtual();
+      const folgaAtual=hojeEhFolga();
       bloco=`<div class="card accent">
         <div class="cal-datebar"><span class="cal-date">📅 ${dataLegivel(diaTempAtual())}</span><span class="cal-prog">Rodada ${S.rodada+1} · ${dataLegivel(totalDiasTemp(),true)} encerra a temporada</span></div>
-        ${folgaAtual?`<div class="cal-folga">🛌 Dia de folga do ${esc(t.nick)} — sem jogo hoje. Bom momento para treinar, negociar ou usar o olheiro.</div>`:''}
+        ${folgaAtual?`<div class="cal-folga">🛌 Dia de folga do ${esc(t.nick)} — sem jogo hoje. Bom pra treinar, negociar ou falar com a imprensa.
+          ${podeDarEntrevista()?`<button class="btn mini" style="margin-top:8px" onclick="abrirEntrevista()">🎤 Dar entrevista</button>`:`<div class="hint" style="margin-top:6px">🎤 Entrevista de hoje já concedida.</div>`}</div>`:''}
         <h3 class="sub" style="margin-top:8px">${folgaAtual?'Próximo compromisso':'Jogo de hoje'} · ${dataLegivel(diaJogo,true)}</h3>
         ${S.online
           ? htmlBotoesJogar()
@@ -4084,7 +4153,6 @@ function vInicio(){
             <button class="btn ghost" onclick="jogar()">⏩ Simular</button></div>
           <div class="jogo-acoes-sec">
             <button class="btn ghost mini" onclick="avancarUmDia()">📆 Avançar 1 dia</button>
-            <button class="btn ghost mini" onclick="avancarAteProximoJogo()">⏭️ Próximo jogo</button>
             <button class="btn ghost mini" onclick="jogarVarias(5)">⏩⏩ Simular 5 rodadas</button></div>`}</div>` + agendaHTML();
     } else {
       // seu time já jogou os 82 jogos, mas a temporada ainda não fechou no calendário
@@ -4149,6 +4217,7 @@ function vInicio(){
       ${kpi('Aproveitamento',(pctV(t)*100).toFixed(0)+'%',t.v+'V '+t.d+'D')}
       ${kpi('Força do elenco',forcaTime(t),'média ponderada')}
       ${kpi('Folha salarial',$(folha(t)),'teto '+$(TETO))}
+      ${kpi('Torcida',(t.fas||10).toFixed(1)+'M','fãs · lota o ginásio')}
     </div>
     <div class="card" style="margin-top:14px">
       <h3 class="sub">Objetivo da diretoria</h3>
@@ -9518,18 +9587,18 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-2';
+const BUILD = '2026.08.26-3';
 const NOVIDADES = {
-  versao: '2026.08h',
+  versao: '2026.08i',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
-    {emoji:'🔄', t:'Molde o banco de reservas', d:'Agora você define a função dos reservas também — por padrão eles herdam a função do titular, pra entregar a mesma filosofia quando entram. O olheiro mede o encaixe de cada reserva e busca quem falta no banco.'},
-    {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca — monta os pacotes só com o resto do elenco.'},
-    {emoji:'💰', t:'Olheiro respeita seu teto', d:'Reforços por deficiência só mostram o que cabe no seu espaço salarial, com o pacote de saída já montado.'},
-    {emoji:'🧩', t:'Filosofia de jogo', d:'Monte a identidade do time: estilo, esquema tático e a função de cada posição — titular e reserva.'},
-    {emoji:'📨', t:'Offseason fervendo', d:'Chove proposta de troca na offseason, e a carreira começa direto nela.'},
-    {emoji:'⭐', t:'Eventos e calendário', d:'Temporada por datas reais com All-Star, Trade Deadline, coletivas de imprensa e premiações.'},
+    {emoji:'🎤', t:'Entrevistas coletivas', d:'Nos dias de folga você pode dar entrevista (uma por dia). Suas respostas rendem fãs para a torcida ou mexem na moral do elenco — com escolhas de trade-off.'},
+    {emoji:'📣', t:'Torcida e fãs', d:'Seu time agora tem uma base de fãs que cresce com vitórias, títulos e boas entrevistas. Mais fãs lotam o ginásio e aumentam sua renda nos jogos em casa.'},
+    {emoji:'🔄', t:'Molde o banco de reservas', d:'Defina a função dos reservas também — eles herdam a do titular pra entregar a mesma filosofia quando entram.'},
+    {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
+    {emoji:'💰', t:'Olheiro respeita seu teto', d:'Reforços por deficiência só mostram o que cabe no seu espaço salarial, com o pacote de saída pronto.'},
+    {emoji:'📱', t:'Mais responsivo no celular', d:'Corrigido o layout que esticava pra tamanho de desktop quando a temporada começava.'},
   ]
 };
 function mostrarNovidades(forcar){
