@@ -2273,48 +2273,109 @@ function responderMidia(i){
   closeModal();
   render();
 }
-// —— ENTREVISTAS (dias de folga): rendem FÃS e/ou MORAL, com trade-offs ——
+// —— ENTREVISTAS (dias de folga): perguntas CONTEXTUAIS que reagem à temporada ——
+// Perguntas genéricas (fallback no começo da temporada, quando ainda não há jogos)
 const PERGUNTAS_ENTREVISTA=[
-  {q:'"Como você enxerga o time nesta temporada?"', ops:[
-    {t:'Cravar que vão brigar pelo título', fas:+0.7, moral:-2, txt:'A torcida foi à loucura com a ousadia — mas parte do elenco sentiu o peso.'},
-    {t:'Exaltar a entrega dos jogadores', fas:+0.2, moral:+5, txt:'O vestiário valorizou o reconhecimento público.'},
-    {t:'Ir com cautela, jogo a jogo', fas:-0.1, moral:+1, txt:'Discurso morno — não empolgou a arquibancada.'},
+  {tag:'COLETIVA', q:'"Como você enxerga o time nesta temporada?"', ops:[
+    {t:'Cravar que vão brigar pelo título', fas:+0.7, moral:-2, txt:'O técnico abraçou o favoritismo e empolgou a torcida — mas parte do elenco sentiu o peso.'},
+    {t:'Exaltar a entrega dos jogadores', fas:+0.2, moral:+5, txt:'O comandante valorizou o grupo publicamente, e o vestiário agradeceu.'},
+    {t:'Ir com cautela, jogo a jogo', fas:-0.1, moral:+1, txt:'Discurso morno na coletiva, sem empolgar a arquibancada.'},
   ]},
-  {q:'"O que você diz para o torcedor que comprou ingresso hoje?"', ops:[
-    {t:'Prometer espetáculo e raça em quadra', fas:+0.8, moral:0, txt:'A galera comprou a ideia e o hype subiu.'},
-    {t:'Agradecer o apoio nos bons e maus momentos', fas:+0.4, moral:+2, txt:'Mensagem carismática, caiu bem com todos.'},
-    {t:'Dizer que resultado é o que importa', fas:-0.2, moral:+1, txt:'Objetivo demais — a torcida queria emoção.'},
-  ]},
-  {q:'"Há quem diga que seu elenco está supervalorizado. Responde?"', ops:[
-    {t:'Comprar a briga e peitar os críticos', fas:+0.9, moral:+3, txt:'Bancar o grupo publicamente empolgou torcida e vestiário!'},
-    {t:'Deixar o trabalho falar por si', fas:+0.1, moral:+2, txt:'Postura serena, bem recebida pelo elenco.'},
-    {t:'Concordar em partes com a crítica', fas:-0.3, moral:-4, txt:'Os jogadores não gostaram nada de te ver hesitar.'},
-  ]},
-  {q:'"Qual jogador é o coração deste time?"', ops:[
-    {t:'Exaltar o astro do elenco', fas:+0.5, moral:+3, txt:'O craque adorou o holofote e a torcida concordou.'},
-    {t:'"Aqui o time é mais forte que qualquer nome"', fas:+0.3, moral:+4, txt:'Discurso coletivo uniu o grupo.'},
-    {t:'Desconversar', fas:-0.1, moral:0, txt:'Resposta sem graça, passou batido.'},
-  ]},
-  {q:'"Depois da sequência recente, qual o clima no vestiário?"', ops:[
-    {t:'Vender otimismo total para a imprensa', fas:+0.6, moral:-1, txt:'A torcida embarcou, mas soou forçado pra alguns atletas.'},
-    {t:'Ser honesto e blindar o grupo', fas:+0.2, moral:+5, txt:'Sinceridade e proteção — o elenco sentiu o apoio.'},
-    {t:'Cobrar publicamente mais intensidade', fas:+0.3, moral:-5, txt:'Rendeu manchete e fãs, mas o vestiário ficou irritado.'},
-  ]},
-  {q:'"Uma palavra para a torcida que lota o ginásio?"', ops:[
-    {t:'Chamar a torcida de "o sexto homem"', fas:+0.8, moral:+1, txt:'A arquibancada amou ser protagonista.'},
-    {t:'Prometer entregar tudo por eles', fas:+0.5, moral:+2, txt:'Comprometimento público animou geral.'},
-    {t:'Um agradecimento protocolar', fas:0, moral:0, txt:'Educado, mas esquecível.'},
+  {tag:'COLETIVA', q:'"Uma palavra para a torcida que lota o ginásio?"', ops:[
+    {t:'Chamar a torcida de "o sexto homem"', fas:+0.8, moral:+1, txt:'O técnico exaltou a arquibancada como protagonista, e a torcida amou.'},
+    {t:'Prometer entregar tudo por eles', fas:+0.5, moral:+2, txt:'Promessa de raça animou geral na coletiva.'},
+    {t:'Um agradecimento protocolar', fas:0, moral:0, txt:'Fala educada, mas esquecível.'},
   ]},
 ];
+
+// Analisa o estado real do MEU time e monta uma pergunta personalizada (nomes, placares, sequência)
+function gerarPerguntaEntrevista(){
+  const meu=S.times[S.meuTime]; if(!meu) return pick(PERGUNTAS_ENTREVISTA);
+  const sob=n=>n?n.split(' ').slice(-1)[0]:'';
+  const cands=[];
+  // sequência atual (seq[0] = mais recente)
+  const seq=meu.seq||[]; let vseq=0,dseq=0;
+  for(const x of seq){ if(x==='V')vseq++; else break; }
+  for(const x of seq){ if(x==='D')dseq++; else break; }
+  // último jogo do meu time
+  const rj=Math.max(0,(S.rodada||0)-1);
+  const jogos=((S.cal&&S.cal[rj])||[]).filter(j=>j.res);
+  const mj=jogos.find(j=>j.c===S.meuTime||j.f===S.meuTime);
+  let ult=null;
+  if(mj){ const casa=mj.c===S.meuTime, adv=S.times[casa?mj.f:mj.c];
+    const eu=casa?mj.res[0]:mj.res[1], ele=casa?mj.res[1]:mj.res[0];
+    ult={venci:eu>ele, adv, eu, ele, dif:Math.abs(eu-ele)}; }
+  // destaque e jogador em baixa (por desempenho na temporada)
+  const cs=meu.elenco.filter(p=>!p.egg && p.stats && p.stats.j>=2);
+  let destaque=null, baixa=null;
+  if(cs.length){
+    destaque=[...cs].sort((a,b)=>(b.stats.pts/b.stats.j+b.ovr*0.15)-(a.stats.pts/a.stats.j+a.ovr*0.15))[0];
+    baixa=[...cs].filter(p=>p.ovr>=72).sort((a,b)=>((a.stats.pts/a.stats.j)-(a.ovr*0.28))-((b.stats.pts/b.stats.j)-(b.ovr*0.28)))[0];
+  }
+  // posição na conferência
+  let pos=0; if(typeof classificacao==='function'){ const cls=classificacao(meu.conf); pos=cls.findIndex(x=>x.id===meu.id)+1; }
+
+  if(ult && ult.venci) cands.push({peso:ult.dif>=18?9:7, tag:'PÓS-JOGO',
+    q:`Vitória sobre o ${ult.adv.nick} por ${ult.eu} a ${ult.ele}. O que ficou de melhor?`, ops:[
+    {t:'"Esse elenco pode brigar por tudo"', fas:+0.6, moral:-1, txt:`Após bater o ${ult.adv.nick}, o técnico do ${meu.nick} projetou voos altos e empolgou a torcida.`},
+    {t:'Creditar a vitória ao grupo', fas:+0.2, moral:+5, txt:`O comandante dividiu os louros da vitória sobre o ${ult.adv.nick} com todo o elenco.`},
+    {t:'"Uma vitória de cada vez"', fas:0, moral:+1, txt:`Discurso pé no chão do ${meu.nick} após passar pelo ${ult.adv.nick}.`},
+  ]});
+  if(ult && !ult.venci) cands.push({peso:ult.dif>=18?9:7, tag:'PÓS-JOGO',
+    q:`Derrota para o ${ult.adv.nick} por ${ult.ele} a ${ult.eu}. O que faltou?`, ops:[
+    {t:'Assumir a responsabilidade', fas:+0.2, moral:+5, txt:`O técnico do ${meu.nick} bancou o elenco e chamou pra si a derrota diante do ${ult.adv.nick}.`},
+    {t:'Cobrar publicamente o elenco', fas:+0.4, moral:-5, txt:`Após cair para o ${ult.adv.nick}, o comandante subiu o tom e cobrou os jogadores na imprensa.`},
+    {t:'"Faz parte, vamos levantar"', fas:0, moral:+1, txt:`Discurso de resiliência do ${meu.nick} após o tropeço contra o ${ult.adv.nick}.`},
+  ]});
+  if(vseq>=3) cands.push({peso:8, tag:'EMBALO',
+    q:`São ${vseq} vitórias seguidas! O ${meu.nick} briga pelo título?`, ops:[
+    {t:'Cravar que vão brigar pelo troféu', fas:+0.8, moral:-2, txt:`Na crista da onda com ${vseq} vitórias, o técnico do ${meu.nick} abraçou o favoritismo e levou a torcida à loucura.`},
+    {t:'Manter a humildade da sequência', fas:+0.2, moral:+3, txt:`Mesmo com ${vseq} triunfos seguidos, o comando do ${meu.nick} pregou os pés no chão.`},
+  ]});
+  if(dseq>=3) cands.push({peso:8, tag:'PRESSÃO',
+    q:`Após ${dseq} derrotas seguidas, a pressão aperta. Como reage?`, ops:[
+    {t:'Blindar o grupo e pedir calma', fas:+0.2, moral:+5, txt:`Na pior fase, com ${dseq} derrotas, o técnico do ${meu.nick} protegeu o elenco publicamente.`},
+    {t:'Prometer reação à torcida', fas:+0.6, moral:0, txt:`O comandante do ${meu.nick} prometeu virar o jogo e reacendeu a esperança da arquibancada.`},
+    {t:'Cobrar atitude dos jogadores', fas:+0.3, moral:-5, txt:`Irritado com ${dseq} tropeços, o técnico cobrou raça publicamente — e o vestiário do ${meu.nick} sentiu.`},
+  ]});
+  if(destaque && (destaque.stats.pts/destaque.stats.j)>=14){ const ppg=(destaque.stats.pts/destaque.stats.j).toFixed(1);
+    cands.push({peso:6, tag:'DESTAQUE',
+    q:`${sob(destaque.nome)} está voando, com ${ppg} pontos por jogo. Ele é o líder do time?`, ops:[
+    {t:`Rasgar elogios a ${sob(destaque.nome)}`, fas:+0.5, moral:+3, txt:`O técnico exaltou a fase de ${destaque.nome}, e a torcida do ${meu.nick} abraçou seu xodó.`},
+    {t:'"Aqui o time é maior que qualquer nome"', fas:+0.2, moral:+4, txt:`Discurso coletivo do ${meu.nick} valorizou o grupo acima das individualidades.`},
+  ]}); }
+  if(baixa && baixa!==destaque){
+    cands.push({peso:6, tag:'MOMENTO',
+    q:`${sob(baixa.nome)} vem abaixo do esperado. Isso preocupa?`, ops:[
+    {t:`Bancar publicamente ${sob(baixa.nome)}`, fas:+0.1, moral:+4, txt:`O técnico deu voto de confiança a ${baixa.nome} e blindou o jogador das críticas.`},
+    {t:'Admitir que precisa render mais', fas:+0.3, moral:-4, txt:`A cobrança pública a ${baixa.nome} repercutiu — e não caiu bem no vestiário do ${meu.nick}.`},
+    {t:'Desconversar sobre o assunto', fas:-0.1, moral:0, txt:`O comandante do ${meu.nick} desviou das perguntas sobre a fase de ${baixa.nome}.`},
+  ]}); }
+  if(pos===1) cands.push({peso:5, tag:'LIDERANÇA',
+    q:`O ${meu.nick} lidera a Conferência ${meu.conf==='L'?'Leste':'Oeste'}. Assume o favoritismo?`, ops:[
+    {t:'Abraçar o favoritismo', fas:+0.7, moral:-1, txt:`Na ponta da tabela, o técnico do ${meu.nick} comprou o favoritismo e a torcida vibrou.`},
+    {t:'Pregar humildade na liderança', fas:+0.2, moral:+3, txt:`Líder, mas com discurso comedido para manter o ${meu.nick} focado.`},
+  ]});
+  else if(pos>=11) cands.push({peso:5, tag:'ALERTA',
+    q:`O ${meu.nick} está fora da zona de classificação. O que dizer à torcida?`, ops:[
+    {t:'Prometer luta até o fim', fas:+0.5, moral:0, txt:`Mesmo fora do G8, o técnico do ${meu.nick} prometeu brigar por cada vaga e animou a torcida.`},
+    {t:'Pedir paciência e apoio', fas:+0.2, moral:+3, txt:`O comandante pediu paciência à arquibancada do ${meu.nick} em meio à fase ruim.`},
+  ]});
+
+  if(!cands.length) return pick(PERGUNTAS_ENTREVISTA);
+  cands.forEach(c=>c._o=c.peso+RI(0,3));
+  cands.sort((a,b)=>b._o-a._o);
+  return cands[0];
+}
 function podeDarEntrevista(){
   return !!(hojeEhFolga() && S.entrevistaDia!==diaTempAtual());
 }
 function abrirEntrevista(){
   if(!podeDarEntrevista()){ toast&&toast('🎤 Você já concedeu entrevista hoje.'); return; }
-  const pg=pick(PERGUNTAS_ENTREVISTA);
+  const pg=gerarPerguntaEntrevista();
   S._entrevistaAtual=pg;
   const ops=pg.ops.map((o,i)=>`<button class="btn ghost" style="display:block;width:100%;text-align:left;margin:6px 0" onclick="responderEntrevista(${i})">${esc(o.t)}</button>`).join('');
-  abrirModal('🎤 Entrevista coletiva', `<p style="margin:0 0 4px"><b>Repórter: ${esc(pg.q)}</b></p><p class="hint" style="margin:0 0 8px">Sua resposta pode render <b>fãs</b> para a torcida ou mexer na <b>moral</b> do elenco.</p>${ops}`);
+  abrirModal('🎤 Entrevista coletiva', `<p style="margin:0 0 4px"><b>Repórter: ${esc(pg.q)}</b></p><p class="hint" style="margin:0 0 8px">Sua resposta rende <b>fãs</b> ou mexe na <b>moral</b> — e vira manchete no PARQUÊ Sports.</p>${ops}`);
 }
 function responderEntrevista(i){
   const pg=S._entrevistaAtual; if(!pg)return;
@@ -2323,11 +2384,19 @@ function responderEntrevista(i){
   if(o.moral) t.elenco.forEach(p=>{ if(!p.egg) p.moral=clamp((p.moral||70)+o.moral,0,100); });
   if(o.fas) t.fas=Math.max(0, Math.round(((t.fas||10)+o.fas)*10)/10);
   S.entrevistaDia=diaTempAtual();
+  // manchete da coletiva para o feed PARQUÊ Sports
+  let manch;
+  if(o.fas>=0.5 && o.moral<0) manch=`Fala de efeito do técnico do ${t.nick} agita a torcida`;
+  else if(o.moral>=4) manch=`Técnico do ${t.nick} blinda o elenco em entrevista`;
+  else if(o.fas>=0.4) manch=`Técnico do ${t.nick} empolga a torcida na coletiva`;
+  else if(o.moral<0) manch=`Cobrança pública do técnico do ${t.nick} repercute`;
+  else manch=`Técnico do ${t.nick} fala à imprensa`;
+  S.ultimaEntrevista={manch, txt:o.txt, rodada:S.rodada||0};
   S._entrevistaAtual=null;
   const partes=[];
   if(o.fas) partes.push(`${o.fas>0?'+':''}${o.fas}M fãs`);
   if(o.moral) partes.push(`moral ${o.moral>0?'+':''}${o.moral}`);
-  noticia('🎤 Entrevista: '+o.txt+(partes.length?` (${partes.join(', ')})`:''), (o.fas+o.moral)>=0?'v':'x');
+  noticia('🎤 '+o.txt+(partes.length?` (${partes.join(', ')})`:''), (o.fas+o.moral)>=0?'v':'x');
   closeModal();
   render();
 }
@@ -4103,6 +4172,12 @@ function gerarNoticias(){
     const cls=classificacao(meu.conf), pos=cls.findIndex(x=>x.id===meu.id)+1;
     if(pos===1) nt.push({tag:'LIDERANÇA',cor:'#7ac77a', peso:4, manch:`${meu.nick} assumem a ponta da Conferência ${meu.conf==='L'?'Leste':'Oeste'}`, txt:`Melhor campanha da conferência. O sonho do título ganha força.`});
     else if(pos>=11) nt.push({tag:'ALERTA',cor:'#d9534f', peso:4, manch:`${meu.nick} afundam na tabela e miram o fundo do poço`, txt:`Fora da zona de classificação, a diretoria começa a perder a paciência.`});
+  }
+
+  // 10) REPERCUSSÃO DA ENTREVISTA (liga a coletiva ao feed)
+  if(meu && S.ultimaEntrevista && (Math.max(1,S.rodada||1) - (S.ultimaEntrevista.rodada||0)) <= 1){
+    const e=S.ultimaEntrevista;
+    nt.push({tag:'COLETIVA', cor:'#c084fc', peso:8, manch:e.manch, txt:e.txt});
   }
 
   // ordena por peso (com leve ruído do seed pra variar empates)
@@ -9587,17 +9662,17 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-3';
+const BUILD = '2026.08.26-4';
 const NOVIDADES = {
-  versao: '2026.08i',
+  versao: '2026.08j',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
-    {emoji:'🎤', t:'Entrevistas coletivas', d:'Nos dias de folga você pode dar entrevista (uma por dia). Suas respostas rendem fãs para a torcida ou mexem na moral do elenco — com escolhas de trade-off.'},
-    {emoji:'📣', t:'Torcida e fãs', d:'Seu time agora tem uma base de fãs que cresce com vitórias, títulos e boas entrevistas. Mais fãs lotam o ginásio e aumentam sua renda nos jogos em casa.'},
-    {emoji:'🔄', t:'Molde o banco de reservas', d:'Defina a função dos reservas também — eles herdam a do titular pra entregar a mesma filosofia quando entram.'},
+    {emoji:'🎤', t:'Entrevistas de verdade', d:'Agora o repórter pergunta sobre o que rolou: a vitória ou derrota do último jogo (com placar e adversário), a sequência do time, o craque em alta ou o jogador em baixa — tudo com os nomes do seu elenco.'},
+    {emoji:'📰', t:'Coletiva vira manchete', d:'Sua resposta na entrevista repercute no PARQUÊ Sports como uma notícia "Coletiva", ligada ao momento do time.'},
+    {emoji:'📣', t:'Torcida e fãs', d:'Sua base de fãs cresce com vitórias, títulos e boas entrevistas — e mais fãs lotam o ginásio, aumentando a renda.'},
+    {emoji:'🔄', t:'Molde o banco de reservas', d:'Defina a função dos reservas também — eles herdam a do titular pra manter a filosofia quando entram.'},
     {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
-    {emoji:'💰', t:'Olheiro respeita seu teto', d:'Reforços por deficiência só mostram o que cabe no seu espaço salarial, com o pacote de saída pronto.'},
     {emoji:'📱', t:'Mais responsivo no celular', d:'Corrigido o layout que esticava pra tamanho de desktop quando a temporada começava.'},
   ]
 };
