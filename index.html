@@ -224,8 +224,8 @@ input[type=range]{accent-color:var(--wood);width:100%}
 .news li{padding:7px 0;border-bottom:1px solid rgba(51,43,38,.6);display:flex;gap:9px}
 .news li:before{content:"▸";color:var(--wood)}
 .hint{font-size:12px;color:var(--mute);line-height:1.5}
-.split{display:grid;grid-template-columns:1fr 320px;gap:16px}
-@media(max-width:900px){.split{grid-template-columns:1fr}}
+.split{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+@media(min-width:900px){.split{grid-template-columns:minmax(0,1fr) 320px}}
 .kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(51,43,38,.5);font-size:14px}
 .kv b{font-family:var(--mono);font-weight:600}
 .center{text-align:center}
@@ -794,7 +794,7 @@ tr.meu td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .cal-folga{margin-top:8px;padding:8px 11px;background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);font-size:13px;color:var(--text-dim)}
 
 /* —— Agenda de dias —— */
-.ag-tira{display:flex;gap:7px;overflow-x:auto;padding:8px 2px 4px;scroll-snap-type:x proximity}
+.ag-tira{display:flex;gap:7px;overflow-x:auto;padding:8px 2px 4px;scroll-snap-type:x proximity;min-width:0;max-width:100%}
 .ag-dia{flex:0 0 auto;width:92px;scroll-snap-align:start;border:1px solid var(--line);border-radius:var(--r);padding:9px 8px;text-align:center;background:var(--surface);display:flex;flex-direction:column;gap:3px;align-items:center}
 .ag-data{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.4px;color:var(--text-dim);text-transform:uppercase}
 .ag-ic{font-size:22px;line-height:1}
@@ -9518,7 +9518,7 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-1';
+const BUILD = '2026.08.26-2';
 const NOVIDADES = {
   versao: '2026.08h',
   titulo: '🗞️ Novidades do PARQUÊ',
