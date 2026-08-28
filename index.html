@@ -1034,6 +1034,11 @@ tr.me td{background:var(--accent-soft) !important;box-shadow:inset 3px 0 0 var(-
 
 .hof-sec-tit{display:flex;align-items:center;gap:8px;font-family:var(--poster);font-size:16px;letter-spacing:.5px;margin:16px 0 10px;color:var(--text)}
 .hof-sec-tit span{font-family:var(--mono);font-size:12px;color:var(--text-dim);background:var(--surface-2);border-radius:99px;padding:1px 9px}
+
+/* —— Rivalidades —— */
+.riv-badge{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.4px;color:#ff8a5b;background:linear-gradient(90deg,rgba(255,90,40,.16),rgba(255,138,91,.06));border:1px solid rgba(255,120,70,.35);border-radius:99px;padding:3px 11px;margin-bottom:8px}
+.ag-riv{border-left:3px solid #ff6a3c !important;background:linear-gradient(180deg,rgba(255,90,40,.10),transparent 60%),var(--surface)}
+.ag-riv .ag-tit{color:#ff8a5b}
 </style>
 </head>
 <body>
@@ -2521,7 +2526,8 @@ function agendaHTML(){
   const itens=ag.map(a=>{
     let cls='ag-folga', ic='🛌', tit='Folga', sub='descanso / treino';
     if(a.evento){ cls='ag-evento'; ic=a.evento.emoji; tit=a.evento.titulo; sub=a.evento.tipo==='deadline'?'trocas até hoje':a.evento.tipo==='allstar'?'estrelas':'evento'; }
-    else if(a.jogo){ cls='ag-jogo'; ic=a.jogo.casa?'🏠':'✈️'; tit=(a.jogo.casa?'vs ':'@ ')+a.jogo.adv.nick; sub=a.jogo.adv.v+'-'+a.jogo.adv.d; }
+    else if(a.jogo){ cls='ag-jogo'; ic=a.jogo.casa?'🏠':'✈️'; tit=(a.jogo.casa?'vs ':'@ ')+a.jogo.adv.nick; sub=a.jogo.adv.v+'-'+a.jogo.adv.d;
+      if(rivalDoMeuJogo(a.jogo.adv)){ cls='ag-jogo ag-riv'; ic='🔥'; sub='rivalidade'; } }
     return `<div class="ag-dia ${cls} ${a.hoje?'ag-hoje':''}">
       <div class="ag-data">${a.hoje?'HOJE':a.data}</div>
       <div class="ag-ic">${ic}</div>
@@ -2724,7 +2730,20 @@ function avancarRodada(preRes){
       const meuA = meuRes.A.t.id===S.meuTime;
       const eu=meuA?meuRes.ptsA:meuRes.ptsB, ele=meuA?meuRes.ptsB:meuRes.ptsA;
       const adv=meuA?meuRes.B.t:meuRes.A.t;
-      noticia((eu>ele?'✅ Vitória':'❌ Derrota')+' '+eu+'x'+ele+' contra '+adv.cidade+' '+adv.nick,eu>ele?'v':'d');
+      const meuT=S.times[S.meuTime];
+      if(ehRival(meuT.ab, adv.ab)){
+        const nr=nomeRivalidade(meuT.ab, adv.ab)||'Clássico';
+        if(eu>ele){
+          meuT.elenco.forEach(p=>{ if(!p.egg) p.moral=clamp((p.moral||70)+4,0,100); });
+          meuT.fas=Math.max(0,Math.round(((meuT.fas||10)+0.4)*10)/10);
+          noticia('🔥 '+nr+': '+meuT.nick+' bate o rival '+adv.nick+' por '+eu+'x'+ele+'! A torcida foi à loucura. (+moral, +fãs)','p');
+        } else {
+          meuT.elenco.forEach(p=>{ if(!p.egg) p.moral=clamp((p.moral||70)-3,0,100); });
+          noticia('🔥 '+nr+': derrota dolorida para o rival '+adv.nick+' por '+ele+'x'+eu+'. (-moral)','x');
+        }
+      } else {
+        noticia((eu>ele?'✅ Vitória':'❌ Derrota')+' '+eu+'x'+ele+' contra '+adv.cidade+' '+adv.nick,eu>ele?'v':'d');
+      }
       meuRes.lesoes.filter(l=>l.time===S.times[S.meuTime].ab).forEach(l=>
         noticia('⚕ '+l.p.nome+' desfalca o time por '+l.jogos+' jogos ('+l.tipo+')','x'));
     }
@@ -2733,6 +2752,23 @@ function avancarRodada(preRes){
   }
   return meuRes;
 }
+// —— RIVALIDADES (clássicos reais do basquete) ——
+const RIVALIDADES=[
+  ['LAL','BOS','O Clássico'],['LAL','LAC','Battle of LA'],['LAL','SAC'],['LAL','DEN'],['LAL','POR'],['LAL','PHX'],
+  ['BOS','PHI'],['BOS','NYK'],['BOS','MIA'],['BOS','DET'],
+  ['CHI','DET','Bad Boys'],['CHI','NYK'],['CHI','MIL'],['CHI','MIA'],
+  ['GSW','CLE'],['GSW','HOU'],['GSW','OKC'],
+  ['SAS','DAL'],['SAS','HOU'],['SAS','PHX'],['SAS','NOP'],
+  ['UTA','HOU'],['NYK','IND'],['NYK','BKN','Battle of NY'],
+  ['DAL','MIA'],['DAL','HOU'],['DEN','MIN'],['MEM','OKC'],
+  ['ORL','ATL'],['TOR','PHI'],['WAS','CLE'],['CHA','MIA'],['ATL','MIA']
+];
+function ehRival(a,b){ return RIVALIDADES.some(p=>(p[0]===a&&p[1]===b)||(p[0]===b&&p[1]===a)); }
+function nomeRivalidade(a,b){ const p=RIVALIDADES.find(x=>(x[0]===a&&x[1]===b)||(x[0]===b&&x[1]===a)); return p&&p[2]?p[2]:null; }
+function rivaisDe(ab){ const r=[]; RIVALIDADES.forEach(p=>{ if(p[0]===ab)r.push(p[1]); else if(p[1]===ab)r.push(p[0]); }); return r; }
+// o adversário do próximo/atual jogo é rival do meu time?
+function rivalDoMeuJogo(adv){ return !!(adv && S.meuTime!=null && S.times[S.meuTime] && ehRival(S.times[S.meuTime].ab, adv.ab)); }
+
 function atualizarMoral(){
   S.times.forEach(t=>{
     const v=t.seq.filter(x=>x==='V').length, base=(v-t.seq.length/2)*3;
@@ -4424,6 +4460,7 @@ function vInicio(){
         ${S.online
           ? htmlBotoesJogar()
           : `<div class="jogo-head">
+          ${rivalDoMeuJogo(adv)?`<div class="riv-badge">🔥 ${esc(nomeRivalidade(t.ab,adv.ab)||'CLÁSSICO')} · jogo de rivalidade</div>`:''}
           <div class="big">${casa?'vs':'@'} ${esc(adv.nick)}</div>
           <div class="hint">${esc(adv.cidade)} · ${adv.v}-${adv.d} · força ${forcaTime(adv)} · ${casa?'Em casa':'Fora de casa'}</div>
           <div class="prev-tat" style="margin-top:5px">📋 Provável do rival: ${resumoTaticaCurto(taticaIA(adv))}</div></div>
@@ -9905,9 +9942,9 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-9';
+const BUILD = '2026.08.26-10';
 const NOVIDADES = {
-  versao: '2026.08o',
+  versao: '2026.08p',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
@@ -9916,7 +9953,8 @@ const NOVIDADES = {
     {emoji:'📰', t:'Coletiva vira manchete', d:'Sua resposta na entrevista repercute no PARQUÊ Sports como uma notícia "Coletiva", ligada ao momento do time.'},
     {emoji:'📣', t:'Torcida e fãs', d:'Sua base de fãs cresce com vitórias, títulos e boas entrevistas — e mais fãs lotam o ginásio, aumentando a renda.'},
     {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
-    {emoji:'🏛️', t:'Hall da Fama', d:'Agora com as lendas REAIS do basquete (Jordan, Kareem, Kobe, Bill Russell e dezenas de outras) eternizadas! E os craques que você formar entram na sua própria era ao se aposentar. Confira no menu Mais.'},
+    {emoji:'🔥', t:'Rivalidades', d:'Clássicos reais do basquete (Lakers x Celtics, Bulls x Pistons, Battle of LA...) agora são jogos marcados: badge especial no card e na agenda, e bater o rival dá moral e fãs extras — perder dói mais. Cada time tem seus rivais.'},
+    {emoji:'🏛️', t:'Hall da Fama', d:'As lendas REAIS do basquete (Jordan, Kareem, Kobe...) eternizadas, e os craques que você formar entram na sua própria era ao se aposentar.'},
     {emoji:'🤝', t:'Química / entrosamento', d:'Elenco que joga junto entrosa e rende mais; quem acaba de chegar demora a engrenar. Acompanhe a química na home e no elenco.'},
     {emoji:'💵', t:'Finanças equilibradas', d:'Corrigido um déficit crônico: manter um bom elenco não quebra mais o caixa ao longo das temporadas.'},
   ]
