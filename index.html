@@ -1136,7 +1136,7 @@ function novoJogador(posBase,nivel,idadeMin,idadeMax){
     id:PID++, nome: nomeFicticio(), pos, idade, at,
     alt: pos==='PG'?RI(180,193):pos==='SG'?RI(188,198):pos==='SF'?RI(196,204):pos==='PF'?RI(201,208):RI(206,218),
     moral:RI(55,85), forma:RI(88,100), lesao:0, lesaoTxt:'',
-    times:0, camp:0
+    times:0, camp:0, entros:30, entrosTime:null
   };
   p.arq = ({PG:'PLAY',SG:'SHOT',SF:'3D',PF:'STRE',C:'PROT'})[pos];
   p.ovr = calcOvr(p);
@@ -1452,7 +1452,7 @@ function jogadorReal(dados,timeId){
   if(idade<=21){at.qi-=6;at.res-=3;}
   const p={id:PID++,nome,pos,idade,at,arq,
     alt:pos==='PG'?RI(180,193):pos==='SG'?RI(188,198):pos==='SF'?RI(196,204):pos==='PF'?RI(201,208):RI(206,218),
-    moral:RI(60,88),forma:RI(90,100),lesao:0,lesaoTxt:'',times:0,camp:0,real:true,time:timeId};
+    moral:RI(60,88),forma:RI(90,100),lesao:0,lesaoTxt:'',times:0,camp:0,real:true,time:timeId,entros:100,entrosTime:timeId};
   chaves.forEach(k=>p.at[k]=clamp(Math.round(p.at[k]),20,99));
   // calibra os atributos até o overall bater com o valor real informado
   for(let i=0;i<14;i++){
@@ -1647,9 +1647,10 @@ function prepTime(t,casa){
   let aptos=t.elenco.filter(p=>!p.lesao);
   if(aptos.length<5) aptos=[...t.elenco].sort((a,b)=>a.lesao-b.lesao).slice(0,Math.max(5,aptos.length));
   const ps=aptos.map(p=>{
-    // moral influencia o rendimento em quadra: 70 = neutro, 100 ≈ +3%, 0 ≈ -6%
+    // moral e entrosamento influenciam o rendimento em quadra
     const fm=1+(((p.moral==null?70:p.moral)-70)/70)*0.08;
-    const at={}; for(const k in p.at) at[k]=clamp(p.at[k]*fm,20,99);
+    const fe=0.90+0.10*(((p.entros==null?100:p.entros))/100); // recém-chegado rende menos até engrenar
+    const at={}; for(const k in p.at) at[k]=clamp(p.at[k]*fm*fe,20,99);
     return {
       ref:p, id:p.id, nome:p.nome, pos:p.pos, ovr:p.ovr, at,
       alvo: alvo[p.id]||0, seg:0, fadiga:100, faltas:0, fora:false, quadra:false,
@@ -2652,8 +2653,29 @@ function financasRodada(rod){
 }
 
 /* ---------- TEMPORADA ---------- */
+// —— QUÍMICA / ENTROSAMENTO ——
+// Detecta chegada (mudança de time) e faz o entrosamento crescer a cada rodada jogada juntos.
+function atualizarEntrosamento(){
+  S.times.forEach(t=>{
+    (t.elenco||[]).forEach(p=>{
+      if(p.egg) return;
+      if(p.entrosTime!==t.id){ p.entros=30; p.entrosTime=t.id; }   // acabou de chegar neste time
+      else p.entros=Math.min(100,(p.entros==null?30:p.entros)+0.6); // joga junto → entrosa
+    });
+  });
+}
+// Química do time = entrosamento médio da rotação (ponderado pelo overall, que aproxima os minutos)
+function quimicaTime(t){
+  const el=(t.elenco||[]).filter(p=>!p.egg).sort((a,b)=>b.ovr-a.ovr).slice(0,9);
+  if(!el.length) return 100;
+  let som=0,pes=0; el.forEach(p=>{ const w=p.ovr; som+=(p.entros==null?100:p.entros)*w; pes+=w; });
+  return Math.round(som/pes);
+}
+function corQuimica(n){ return n>=80?'var(--pos)':n>=60?'var(--accent)':n>=45?'var(--amber)':'var(--neg)'; }
+
 function avancarRodada(preRes){
   if(S.fase!=='regular') return null;
+  atualizarEntrosamento();
   let meuRes=null;
   // processa rodadas até encontrar (e jogar) uma em que o SEU time joga,
   // pulando em silêncio as rodadas em que seu time folga — assim nunca "trava"
@@ -4354,6 +4376,7 @@ function vInicio(){
       ${kpi('Força do elenco',forcaTime(t),'média ponderada')}
       ${kpi('Folha salarial',$(folha(t)),'teto '+$(TETO))}
       ${kpi('Torcida',(t.fas||10).toFixed(1)+'M','fãs · lota o ginásio')}
+      ${(()=>{const q=quimicaTime(t);return `<div class="card"><h3 class="sub">Química</h3><div class="big" style="color:${corQuimica(q)}">${q}</div><div class="hint">entrosamento do elenco</div></div>`;})()}
     </div>
     <div class="card" style="margin-top:14px">
       <h3 class="sub">Objetivo da diretoria</h3>
@@ -4417,12 +4440,13 @@ function vElenco(){
       <td>${s.j?round(s.reb/j,1):'—'}</td><td>${s.j?round(s.ast/j,1):'—'}</td>
       <td>${s.fga?pct(s.fgm,s.fga):'—'}</td><td>${s.tpa?pct(s.tpm,s.tpa):'—'}</td>
       <td>${$(p.salario)}</td><td>${p.anos}a</td>
-      <td><div class="bar" style="width:46px"><i style="width:${p.moral}%"></i></div></td></tr>`;
+      <td><div class="bar" style="width:46px"><i style="width:${p.moral}%"></i></div></td>
+      <td><div class="bar" style="width:46px"><i style="width:${p.entros==null?100:p.entros}%;background:${corQuimica(p.entros==null?100:p.entros)}"></i></div>${(p.entros!=null&&p.entros<55)?' <span class="inj" title="entrosando">🆕</span>':''}</td></tr>`;
   }).join('');
   return `<h2 class="sec">Elenco · ${t.elenco.length} jogadores</h2>
   <div class="card tbl-wrap"><table><thead><tr>
     <th>Jogador</th><th>Pos</th><th>Id</th><th>Ovr</th><th>Pot</th><th>Min</th><th>Pts</th><th>Reb</th><th>Ast</th>
-    <th>FG%</th><th>3P%</th><th>Salário</th><th>Contr.</th><th>Moral</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <th>FG%</th><th>3P%</th><th>Salário</th><th>Contr.</th><th>Moral</th><th>Quím.</th></tr></thead><tbody>${rows}</tbody></table></div>
   <p class="hint" style="margin-top:10px">Clique em um jogador para ver a ficha completa, atributos e opções de contrato.</p>`;
 }
 function fichaJogador(id,tid){
@@ -9723,9 +9747,9 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-6';
+const BUILD = '2026.08.26-7';
 const NOVIDADES = {
-  versao: '2026.08l',
+  versao: '2026.08m',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
@@ -9734,7 +9758,8 @@ const NOVIDADES = {
     {emoji:'📰', t:'Coletiva vira manchete', d:'Sua resposta na entrevista repercute no PARQUÊ Sports como uma notícia "Coletiva", ligada ao momento do time.'},
     {emoji:'📣', t:'Torcida e fãs', d:'Sua base de fãs cresce com vitórias, títulos e boas entrevistas — e mais fãs lotam o ginásio, aumentando a renda.'},
     {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
-    {emoji:'💵', t:'Finanças equilibradas', d:'Corrigido um déficit crônico: manter um bom elenco não quebra mais o caixa ao longo das temporadas. A receita de TV foi ajustada pra sustentar times competitivos.'},
+    {emoji:'🤝', t:'Química / entrosamento', d:'Elenco que joga junto entrosa e rende mais; quem acaba de chegar (troca, draft, free agent) demora a engrenar. Acompanhe a química do time na home e o entrosamento de cada jogador no elenco.'},
+    {emoji:'💵', t:'Finanças equilibradas', d:'Corrigido um déficit crônico: manter um bom elenco não quebra mais o caixa ao longo das temporadas.'},
   ]
 };
 function mostrarNovidades(forcar){
