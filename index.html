@@ -1051,6 +1051,17 @@ tr.me td{background:var(--accent-soft) !important;box-shadow:inset 3px 0 0 var(-
 .tut-dot.on{background:var(--accent);width:22px}
 .tut-nav{display:flex;justify-content:space-between;gap:10px;margin-top:8px}
 .tut-nav .btn{flex:1}
+
+/* botões dentro do tutorial */
+.tut-botoes{display:flex;flex-direction:column;gap:9px;margin:4px auto 6px;max-width:430px;text-align:left}
+.tut-brow{display:flex;align-items:center;gap:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.tut-bic{flex:0 0 40px;height:40px;border-radius:10px;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--text)}
+.tut-bic svg{width:22px;height:22px}
+.tut-bic.fab{background:linear-gradient(135deg,var(--amber),var(--wood));color:#0a0a0a}
+.tut-bemoji{font-size:20px}
+.tut-binfo{display:flex;flex-direction:column;gap:1px;min-width:0}
+.tut-binfo b{font-size:14px;color:var(--text)}
+.tut-binfo span{font-size:12px;color:var(--text-dim);line-height:1.35}
 </style>
 </head>
 <body>
@@ -5532,22 +5543,40 @@ function vStats(){
 /* ---------- MODAIS / JOGO ---------- */
 // —— TUTORIAL / PRIMEIROS PASSOS ——
 const TUTORIAL_PASSOS=[
-  {emoji:'🏀', tit:'Bem-vindo ao PARQUÊ \'26!', txt:'Você é o <b>manager</b> do seu time. Sua missão: montar o elenco, vencer jogos e construir uma dinastia rumo ao <b>título</b>. Este guia rápido mostra o essencial — dá pra revê-lo quando quiser no menu <b>Mais</b>.'},
-  {emoji:'⏭️', tit:'Toque em "Avançar"', txt:'É o coração do jogo, ali no meio da barra de baixo. Em dia de jogo você pode <b>jogar ao vivo</b> ou <b>simular</b>. Nos dias de folga, <b>avance os dias</b> pra treinar, negociar ou dar entrevistas até o próximo compromisso.'},
+  {emoji:'🏀', tit:'Bem-vindo ao PARQUÊ \'26!', txt:'Você é o <b>manager</b> do seu time. Sua missão: montar o elenco, vencer jogos e construir uma dinastia rumo ao <b>título</b>. Este guia mostra o essencial — dá pra revê-lo quando quiser no menu <b>Mais</b>.'},
+  {emoji:'🧭', tit:'A barra lá embaixo', txt:'Os cinco botões da barra inferior levam a tudo:', botoes:[
+    {ic:'home', lb:'Escritório', desc:'Sua central: notícias, agenda e situação do time.'},
+    {ic:'users', lb:'Elenco', desc:'Seus jogadores, atributos e estatísticas.'},
+    {ic:'skip', lb:'Avançar', desc:'O botão dourado central — joga, simula e passa os dias.', fab:true},
+    {ic:'standings', lb:'Liga', desc:'Classificação e os outros times da liga.'},
+    {ic:'more', lb:'Mais', desc:'Mercado, comissão, finanças, olheiro, Hall da Fama...'}
+  ]},
+  {emoji:'▶️', tit:'Os botões do dia', txt:'No Escritório, no card do dia, é assim que você toca o jogo:', botoes:[
+    {emoji:'🔴', lb:'Jogar ao vivo', desc:'Comande a partida em tempo real, chamando as jogadas.'},
+    {emoji:'⏩', lb:'Simular', desc:'Resultado na hora, sem assistir ao jogo.'},
+    {emoji:'📆', lb:'Avançar 1 dia', desc:'Nos dias de folga, pula um dia rumo ao próximo jogo.'},
+    {emoji:'⏩⏩', lb:'Simular 5 rodadas', desc:'Adianta várias rodadas de uma vez.'}
+  ]},
   {emoji:'👥', tit:'Cuide do seu elenco', txt:'Na aba <b>Elenco</b> você vê overall, forma, moral e química de cada jogador. Na <b>Comissão</b> (menu Mais) você define os <b>titulares</b> e a <b>filosofia de jogo</b> — o estilo e a função de cada posição.'},
-  {emoji:'🔄', tit:'Monte o time no Mercado', txt:'No <b>Mercado</b> você faz trocas e contrata reforços. O <b>olheiro</b> é seu melhor amigo: ele encontra jogadores que encaixam na sua filosofia e <b>cabem no teto salarial</b>. Marque seus <b>intocáveis</b> pra ninguém tocar neles.'},
+  {emoji:'🔄', tit:'Monte o time no Mercado', txt:'No <b>Mercado</b> você faz trocas e contrata reforços. O <b>olheiro</b> é seu melhor amigo: acha jogadores que encaixam na sua filosofia e <b>cabem no teto salarial</b>. Marque seus <b>intocáveis</b> pra ninguém tocar neles.'},
   {emoji:'📈', tit:'Desenvolva talentos', txt:'Jogadores jovens <b>evoluem sozinhos jogando</b> — e um <b>preparador</b> (aba Desenvolvimento) acelera bastante. Aposte num prospecto no draft ou numa troca e veja ele virar craque em poucas temporadas.'},
-  {emoji:'🔥', tit:'Vestiário, torcida e rivais', txt:'<b>Moral</b> e <b>química</b> pesam no rendimento em quadra — time motivado e entrosado joga melhor. Dê <b>entrevistas</b> pra motivar o elenco e ganhar <b>fãs</b> (que lotam o ginásio e rendem grana). E prepare o sangue nos olhos nos <b>clássicos</b> contra rivais!'},
+  {emoji:'🔥', tit:'Vestiário, torcida e rivais', txt:'<b>Moral</b> e <b>química</b> pesam no rendimento em quadra. Dê <b>entrevistas</b> pra motivar o elenco e ganhar <b>fãs</b> (que lotam o ginásio e rendem grana). E prepare o sangue nos olhos nos <b>clássicos</b> contra rivais!'},
   {emoji:'🏛️', tit:'Rumo à glória eterna', txt:'Vença títulos, quebre rivais e faça história. Seus maiores craques serão <b>eternizados no Hall da Fama</b>, ao lado das lendas reais do basquete. Agora é com você, treinador. Boa sorte! 🏆'}
 ];
 function abrirTutorial(i){
   i=Math.max(0,Math.min(TUTORIAL_PASSOS.length-1, i||0));
   const p=TUTORIAL_PASSOS[i], ultimo=i===TUTORIAL_PASSOS.length-1;
   const dots=TUTORIAL_PASSOS.map((_,k)=>`<span class="tut-dot${k===i?' on':''}" onclick="abrirTutorial(${k})"></span>`).join('');
+  const botoes=p.botoes?`<div class="tut-botoes">${p.botoes.map(b=>`
+    <div class="tut-brow">
+      <div class="tut-bic${b.fab?' fab':''}">${b.ic?ICON(b.ic):`<span class="tut-bemoji">${b.emoji}</span>`}</div>
+      <div class="tut-binfo"><b>${b.lb}</b><span>${b.desc}</span></div>
+    </div>`).join('')}</div>`:'';
   const html=`<div class="tut">
     <div class="tut-emoji">${p.emoji}</div>
     <div class="tut-tit">${p.tit}</div>
     <div class="tut-txt">${p.txt}</div>
+    ${botoes}
     <div class="tut-dots">${dots}</div>
     <div class="tut-nav">
       ${i>0?`<button class="btn ghost" onclick="abrirTutorial(${i-1})">‹ Voltar</button>`:`<button class="btn ghost" onclick="fecharTutorial()">Pular</button>`}
@@ -9985,9 +10014,9 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-12';
+const BUILD = '2026.08.26-13';
 const NOVIDADES = {
-  versao: '2026.08r',
+  versao: '2026.08s',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
@@ -9996,7 +10025,7 @@ const NOVIDADES = {
     {emoji:'📰', t:'Coletiva vira manchete', d:'Sua resposta na entrevista repercute no PARQUÊ Sports como uma notícia "Coletiva", ligada ao momento do time.'},
     {emoji:'📣', t:'Torcida e fãs', d:'Sua base de fãs cresce com vitórias, títulos e boas entrevistas — e mais fãs lotam o ginásio, aumentando a renda.'},
     {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
-    {emoji:'🎓', t:'Tutorial de primeiros passos', d:'Novo por aqui? Um guia rápido aparece ao começar sua primeira carreira, explicando o essencial. Dá pra revê-lo quando quiser no menu Mais, em "Como jogar".'},
+    {emoji:'🎓', t:'Tutorial de primeiros passos', d:'Novo por aqui? Um guia aparece na primeira carreira explicando o essencial — incluindo os botões da barra e do dia de jogo, com o que cada um faz. Revê quando quiser no menu Mais, em "Como jogar".'},
     {emoji:'📈', t:'Desenvolvimento mais rápido', d:'Seus jogadores evoluem naturalmente jogando — jovens maturam em poucas temporadas. Um preparador acelera ainda mais.'},
     {emoji:'🔥', t:'Rivalidades', d:'Clássicos reais (Lakers x Celtics, Bulls x Pistons, Battle of LA...) viraram jogos marcados: badge no card e na agenda, e bater o rival dá moral e fãs extras.'},
     {emoji:'🏛️', t:'Hall da Fama', d:'As lendas REAIS do basquete (Jordan, Kareem, Kobe...) eternizadas, e os craques que você formar entram na sua própria era ao se aposentar.'},
