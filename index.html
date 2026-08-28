@@ -1031,6 +1031,9 @@ tr.me td{background:var(--accent-soft) !important;box-shadow:inset 3px 0 0 var(-
 .hof-trof span{font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:3px 9px}
 .hof-meu{font-size:10px;font-weight:800;color:var(--accent);background:var(--accent-soft);border-radius:99px;padding:2px 8px;letter-spacing:.3px}
 .hof-egg{font-size:10px;font-weight:700;color:#c084fc;background:rgba(192,132,252,.12);border-radius:99px;padding:2px 8px}
+
+.hof-sec-tit{display:flex;align-items:center;gap:8px;font-family:var(--poster);font-size:16px;letter-spacing:.5px;margin:16px 0 10px;color:var(--text)}
+.hof-sec-tit span{font-family:var(--mono);font-size:12px;color:var(--text-dim);background:var(--surface-2);border-radius:99px;padding:1px 9px}
 </style>
 </head>
 <body>
@@ -3816,7 +3819,83 @@ function aposentarCamisa(p, timeAb){
   noticia('🎽 O '+timeAb+' aposentou a camisa de '+p.nome+', uma lenda da franquia!','p');
   return true;
 }
+
+// —— LENDAS REAIS DO HALL DA FAMA (fatos históricos; o jogo já usa nomes reais) ——
+// [nome, pos, time, anoInducao, titulos, mvp, allNBA, dpoy, roy, ovrPico, ptsCarreira]
+const HOF_LENDAS_RAW=[
+["Kareem Abdul-Jabbar","C","LAL",1995,6,6,15,0,1,99,38387],
+["Michael Jordan","SG","CHI",2009,6,5,11,1,1,99,32292],
+["Bill Russell","C","BOS",1975,11,5,11,0,0,98,14522],
+["Magic Johnson","PG","LAL",2002,5,3,10,0,0,98,17707],
+["Larry Bird","SF","BOS",1998,3,3,10,0,1,97,21791],
+["Wilt Chamberlain","C","GSW",1979,2,4,10,0,1,99,31419],
+["Kobe Bryant","SG","LAL",2020,5,1,15,0,0,98,33643],
+["Shaquille O'Neal","C","LAL",2016,4,1,14,0,1,98,28596],
+["Tim Duncan","PF","SAS",2020,5,2,15,0,1,97,26496],
+["Hakeem Olajuwon","C","HOU",2008,2,1,12,2,0,97,26946],
+["Kevin Garnett","PF","MIN",2020,1,1,9,1,0,95,26071],
+["Oscar Robertson","PG","SAC",1980,1,1,11,0,1,96,26710],
+["Jerry West","SG","LAL",1980,1,0,12,0,0,95,25192],
+["Karl Malone","PF","UTA",2010,0,2,14,0,0,96,36928],
+["John Stockton","PG","UTA",2009,0,0,11,0,0,91,19711],
+["Charles Barkley","PF","PHX",2006,0,1,11,0,0,95,23757],
+["Moses Malone","C","HOU",2001,1,3,8,0,0,94,27409],
+["Julius Erving","SF","PHI",1993,1,1,7,0,0,96,30026],
+["David Robinson","C","SAS",2009,2,1,10,1,1,96,20790],
+["Scottie Pippen","SF","CHI",2010,6,0,7,0,0,93,18940],
+["Isiah Thomas","PG","DET",2000,2,0,5,0,0,92,18822],
+["Dirk Nowitzki","PF","DAL",2023,1,1,12,0,0,95,31560],
+["Dwyane Wade","SG","MIA",2023,3,0,8,0,0,95,23165],
+["Allen Iverson","PG","PHI",2016,0,1,7,0,1,93,24368],
+["Steve Nash","PG","PHX",2018,0,2,7,0,0,91,17387],
+["Gary Payton","PG","SEA",2013,1,0,9,1,0,92,21813],
+["Reggie Miller","SG","IND",2012,0,0,3,0,0,90,25279],
+["Patrick Ewing","C","NYK",2008,0,0,7,0,1,94,24815],
+["Ray Allen","SG","BOS",2018,2,0,2,0,0,91,24505],
+["Paul Pierce","SF","BOS",2021,1,0,4,0,0,92,26397],
+["Kevin McHale","PF","BOS",1999,3,0,1,0,0,91,17335],
+["Robert Parish","C","BOS",2003,4,0,2,0,0,89,23334],
+["Dennis Rodman","PF","DET",2011,5,0,0,2,0,88,6683],
+["Clyde Drexler","SG","POR",2004,1,0,5,0,0,93,22195],
+["Dominique Wilkins","SF","ATL",2006,0,0,7,0,0,93,26668],
+["James Worthy","SF","LAL",2003,3,0,2,0,0,90,16320],
+["Elgin Baylor","SF","LAL",1977,0,0,10,0,1,95,23149],
+["Bob Pettit","PF","ATL",1971,1,2,11,0,1,94,20880],
+["Rick Barry","SF","GSW",1987,1,0,6,0,1,93,25279],
+["George Gervin","SG","SAS",1996,0,0,7,0,0,93,26595],
+["Willis Reed","C","NYK",1982,2,1,5,0,1,91,12183],
+["Walt Frazier","PG","NYK",1987,2,0,6,0,0,92,15581],
+["Pete Maravich","PG","ATL",1987,0,0,4,0,0,92,15948],
+["Dave Cowens","C","BOS",1991,2,1,3,0,1,90,13516],
+["Bill Walton","C","POR",1993,2,1,2,0,0,92,6215],
+["Bob Cousy","PG","BOS",1971,6,1,12,0,0,91,16960],
+["Nate Archibald","PG","SAC",1991,1,0,5,0,0,90,16481],
+["Earl Monroe","PG","NYK",1990,1,0,1,0,1,89,17454],
+["Yao Ming","C","HOU",2016,0,0,5,0,0,91,9247],
+["Alonzo Mourning","C","MIA",2014,1,0,2,2,0,91,14311],
+["Ben Wallace","C","DET",2021,1,0,5,4,0,88,5615],
+["Chris Bosh","PF","MIA",2021,2,0,1,0,0,90,17189],
+["Pau Gasol","PF","LAL",2023,2,0,4,0,1,92,20894],
+["Tony Parker","PG","SAS",2023,4,0,4,0,0,91,19473],
+["Manu Ginobili","SG","SAS",2022,4,0,2,0,0,90,14043],
+["Jason Kidd","PG","DAL",2018,1,0,6,0,1,93,17529],
+["Grant Hill","SF","DET",2018,0,0,5,0,1,92,17137],
+["Tracy McGrady","SG","ORL",2017,0,0,7,0,0,93,18381],
+["Vince Carter","SG","TOR",2024,0,0,2,0,1,92,25728],
+["Chauncey Billups","PG","DET",2024,1,0,3,0,0,89,15802],
+["Chris Webber","PF","SAC",2021,0,0,5,0,1,92,17182],
+["Carmelo Anthony","SF","NYK",2025,0,0,6,0,0,93,28289],
+["Dikembe Mutombo","C","ATL",2015,0,0,3,4,0,89,11729]
+];
+const HOF_LENDAS=HOF_LENDAS_RAW.map(a=>({
+  nome:a[0], pos:a[1], time:a[2], temp:a[3], camp:a[4], mvp:a[5], allnba:a[6],
+  dpoy:a[7], roy:a[8], ovrPico:a[9], pts:a[10], historico:true
+}));
+
 // —— HALL DA FAMA ——
+function scoreHOFItem(o){
+  return Math.round((o.camp||0)*22 + (o.mvp||0)*40 + (o.allnba||0)*11 + (o.dpoy||0)*16 + (o.roy||0)*8 + ((o.pts||0)/1000)*3 + Math.max(0,(o.ovrPico||0)-84)*4.5);
+}
 // Score de legado a partir de títulos, prêmios individuais, pico e produção de carreira.
 function scoreLegado(p){
   const tr=p.trofeus||{};
@@ -6758,11 +6837,8 @@ function proporContrato(){
    ============================================================ */
 
 function vHallDaFama(){
-  const hof=S.hof||[];
-  const cab=`<h2 class="sec">🏛️ Hall da Fama</h2>
-    <p class="hint" style="margin-bottom:12px">Os imortais do PARQUÊ — lendas eternizadas ao encerrar a carreira, por títulos, prêmios e legado. ${hof.length} induzido${hof.length===1?'':'s'}.</p>`;
-  if(!hof.length) return cab+`<div class="card"><p class="hint">Nenhuma lenda induzida ainda. Ao longo das temporadas, os maiores craques da liga se aposentam e entram para a história aqui — fique de olho nos MVPs e campeões chegando ao fim da linha.</p></div>`;
-  const linhas=hof.map(h=>{
+  const cardHof=(h,hist)=>{
+    const sc=h.score!=null?h.score:scoreHOFItem(h);
     const trof=[];
     if(h.camp)   trof.push(`🏆 ${h.camp}× campeão`);
     if(h.mvp)    trof.push(`👑 ${h.mvp}× MVP`);
@@ -6775,13 +6851,25 @@ function vHallDaFama(){
     return `<div class="hof-card${h.doMeuTime?' on':''}">
       <div class="hof-top">
         <div class="hof-nome">${esc(h.nome)} ${meu}${egg}</div>
-        <div class="hof-score" title="índice de legado">${h.score}</div>
+        <div class="hof-score" title="índice de legado">${sc}</div>
       </div>
-      <div class="hof-sub">${bd(h.pos)} · ${esc(h.time)} · induzido em ${h.temp} · pico ${h.ovrPico} ovr · ${h.pts.toLocaleString('pt-BR')} pts na carreira</div>
+      <div class="hof-sub">${bd(h.pos)} · ${esc(h.time)} · ${hist?'lenda do basquete':'induzido em '+h.temp} · pico ${h.ovrPico} ovr · ${(h.pts||0).toLocaleString('pt-BR')} pts na carreira</div>
       ${badges}
     </div>`;
-  }).join('');
-  return cab+linhas;
+  };
+  const hof=(S.hof||[]);
+  const lendas=(typeof HOF_LENDAS!=='undefined'?HOF_LENDAS:[]).slice().sort((a,b)=>scoreHOFItem(b)-scoreHOFItem(a));
+  let out=`<h2 class="sec">🏛️ Hall da Fama</h2>
+    <p class="hint" style="margin-bottom:12px">Os imortais do basquete e as lendas que você forjar — eternizados por títulos, prêmios e legado.</p>`;
+  // Seção 1: lendas que o jogador construiu no save
+  if(hof.length){
+    out+=`<div class="hof-sec-tit">⭐ A sua era <span>${hof.length}</span></div>`;
+    out+=hof.map(h=>cardHof(h,false)).join('');
+  }
+  // Seção 2: lendas reais do basquete
+  out+=`<div class="hof-sec-tit">🏀 Lendas do basquete <span>${lendas.length}</span></div>`;
+  out+=lendas.map(h=>cardHof(h,true)).join('');
+  return out;
 }
 
 function vPremios(){
@@ -9817,9 +9905,9 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-8';
+const BUILD = '2026.08.26-9';
 const NOVIDADES = {
-  versao: '2026.08n',
+  versao: '2026.08o',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
@@ -9828,7 +9916,7 @@ const NOVIDADES = {
     {emoji:'📰', t:'Coletiva vira manchete', d:'Sua resposta na entrevista repercute no PARQUÊ Sports como uma notícia "Coletiva", ligada ao momento do time.'},
     {emoji:'📣', t:'Torcida e fãs', d:'Sua base de fãs cresce com vitórias, títulos e boas entrevistas — e mais fãs lotam o ginásio, aumentando a renda.'},
     {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
-    {emoji:'🏛️', t:'Hall da Fama', d:'As lendas do PARQUÊ agora são eternizadas! Craques com títulos, MVPs e grande legado entram no Hall da Fama ao se aposentar. Veja a galeria dos imortais no menu Mais.'},
+    {emoji:'🏛️', t:'Hall da Fama', d:'Agora com as lendas REAIS do basquete (Jordan, Kareem, Kobe, Bill Russell e dezenas de outras) eternizadas! E os craques que você formar entram na sua própria era ao se aposentar. Confira no menu Mais.'},
     {emoji:'🤝', t:'Química / entrosamento', d:'Elenco que joga junto entrosa e rende mais; quem acaba de chegar demora a engrenar. Acompanhe a química na home e no elenco.'},
     {emoji:'💵', t:'Finanças equilibradas', d:'Corrigido um déficit crônico: manter um bom elenco não quebra mais o caixa ao longo das temporadas.'},
   ]
