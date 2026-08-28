@@ -1019,6 +1019,18 @@ tr.me td{background:var(--accent-soft) !important;box-shadow:inset 3px 0 0 var(-
 .ent-delta.pos{color:#4ADE80;background:rgba(74,222,128,.13)}
 .ent-delta.neg{color:#F87171;background:rgba(248,113,113,.13)}
 .ent-delta.zero{color:var(--text-dim);background:rgba(255,255,255,.06)}
+
+/* —— Hall da Fama —— */
+.hof-card{background:linear-gradient(160deg,rgba(255,255,255,.03),transparent 55%),var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:9px}
+.hof-card.on{border-color:var(--accent);background:linear-gradient(160deg,var(--accent-soft),transparent 55%),var(--surface)}
+.hof-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hof-nome{font-family:var(--poster);font-size:19px;letter-spacing:.3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hof-score{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--accent);flex:none}
+.hof-sub{font-size:12px;color:var(--text-dim);margin-top:3px}
+.hof-trof{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.hof-trof span{font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:3px 9px}
+.hof-meu{font-size:10px;font-weight:800;color:var(--accent);background:var(--accent-soft);border-radius:99px;padding:2px 8px;letter-spacing:.3px}
+.hof-egg{font-size:10px;font-weight:700;color:#c084fc;background:rgba(192,132,252,.12);border-radius:99px;padding:2px 8px}
 </style>
 </head>
 <body>
@@ -2978,6 +2990,7 @@ function processarOffseason(){
       if(Math.random()<chApos){
         p.aposentou=true;sai.push(p);rel.push(p.nome+' ('+t.ab+') anunciou aposentadoria aos '+p.idade);
         if(typeof aposentarCamisa==='function') aposentarCamisa(p, t.ab); // lendas têm a camisa aposentada
+        if(typeof induzirHOF==='function') induzirHOF(p, t.ab); // lendas entram no Hall da Fama
       } else if(p.anos<=0){ p.salario=valorSalarial(p); sai.push(p); p.time=null; S.livres.push(p); }
     });
     t.elenco=t.elenco.filter(p=>!sai.includes(p));
@@ -3803,6 +3816,34 @@ function aposentarCamisa(p, timeAb){
   noticia('🎽 O '+timeAb+' aposentou a camisa de '+p.nome+', uma lenda da franquia!','p');
   return true;
 }
+// —— HALL DA FAMA ——
+// Score de legado a partir de títulos, prêmios individuais, pico e produção de carreira.
+function scoreLegado(p){
+  const tr=p.trofeus||{};
+  const carPts=(p.carreira&&p.carreira.pts)||0;
+  return Math.round(
+    (p.camp||0)*22 + (tr.mvp||0)*40 + (tr.allnba||0)*11 +
+    (tr.dpoy||0)*16 + (tr.roy||0)*8 + (carPts/1000)*3 +
+    Math.max(0,(p.ovrPico||p.ovr||0)-84)*4.5
+  );
+}
+// Induz o jogador no Hall da Fama da liga se o legado for grande o bastante.
+function induzirHOF(p, timeAb){
+  if(!S.hof)S.hof=[];
+  const score=scoreLegado(p);
+  if(score<58) return false;   // reservado às lendas
+  const tr=p.trofeus||{};
+  const meuAb = (S.meuTime!=null && S.times[S.meuTime]) ? S.times[S.meuTime].ab : null;
+  S.hof.unshift({
+    nome:p.nome, pos:p.pos, time:timeAb, temp:S.temporada, idade:p.idade, score,
+    camp:p.camp||0, mvp:tr.mvp||0, allnba:tr.allnba||0, dpoy:tr.dpoy||0, roy:tr.roy||0,
+    ovrPico:p.ovrPico||p.ovr||0, pts:Math.round((p.carreira&&p.carreira.pts)||0),
+    egg:!!p.egg, doMeuTime: timeAb===meuAb
+  });
+  if(S.hof.length>200)S.hof.pop();
+  noticia('🏛️ '+p.nome+' foi eternizado no Hall da Fama do PARQUÊ!','p');
+  return true;
+}
 /* ============================================================
    MARKETING — hype, patrocinadores e personalização da camisa
    ============================================================ */
@@ -3996,6 +4037,7 @@ function hud(){
     <div class="hud ${cx>=0?'pos':'neg'}"><span>Caixa</span><b>${$(cx)}</b></div>`;
 }
 const ICONS={
+  hof:'<path d="M3 9l9-5 9 5"/><path d="M4 9v1h16V9"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/><path d="M3 20h18"/>',
   home:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
   users:'<circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3 2.7-5 5.5-5s5.5 2 5.5 5"/><path d="M16 6a3 3 0 0 1 0 6"/><path d="M20.5 20c0-2.4-1.8-4.1-3.7-4.7"/>',
   skip:'<path d="M6 5l9 7-9 7z" fill="currentColor" stroke="none"/><line x1="18" y1="5" x2="18" y2="19"/>',
@@ -4087,15 +4129,15 @@ function montarBottomBar(){
 function vMais(){
   const online = !!(S && S.online);
   const itens = online
-    ? [['taticas','clipboard','Comissão'],['mercado','swap','Mercado'],['calendario','calendar','Calendário'],['financas','dollar','Finanças'],['marketing','megaphone','Marketing'],['stats','bars','Estatíst.'],['jogadores','users2','Jogadores'],['transferencias','transfer','Transfer.'],['carreira','trophy','Carreira'],['premios','medal','Prêmios']]
-    : [['taticas','clipboard','Comissão'],['mercado','swap','Mercado'],['calendario','calendar','Calendário'],['financas','dollar','Finanças'],['marketing','megaphone','Marketing'],['stats','bars','Estatíst.'],['carreira','trophy','Carreira'],['premios','medal','Prêmios'],['editor','settings','Editar liga']];
+    ? [['taticas','clipboard','Comissão'],['mercado','swap','Mercado'],['calendario','calendar','Calendário'],['financas','dollar','Finanças'],['marketing','megaphone','Marketing'],['stats','bars','Estatíst.'],['jogadores','users2','Jogadores'],['transferencias','transfer','Transfer.'],['carreira','trophy','Carreira'],['premios','medal','Prêmios'],['hof','hof','Hall da Fama']]
+    : [['taticas','clipboard','Comissão'],['mercado','swap','Mercado'],['calendario','calendar','Calendário'],['financas','dollar','Finanças'],['marketing','megaphone','Marketing'],['stats','bars','Estatíst.'],['carreira','trophy','Carreira'],['premios','medal','Prêmios'],['hof','hof','Hall da Fama'],['editor','settings','Editar liga']];
   const dotMerc = !!(S && S.propostas && S.propostas.length);
   const cards=itens.map(([k,ic,lb])=>`<button class="mais-card" onclick="ABA='${k}';render()">${ICON(ic)}<div class="lb">${lb}</div>${(k==='mercado'&&dotMerc)?'<span class="dot"></span>':''}</button>`).join('');
   return `<h2 class="sec">Mais</h2><div class="mais-grid">${cards}</div>
     <div class="build-stamp">PARQUÊ '26 · versão ${NOVIDADES.versao} · build ${BUILD}
       <button class="btn ghost mini" style="margin-top:6px" onclick="forcarAtualizacao()">🔄 Buscar atualização</button></div>`;
 }
-const SECUNDARIAS_MAIS=['taticas','mercado','calendario','financas','marketing','stats','carreira','premios','editor','jogadores','transferencias'];
+const SECUNDARIAS_MAIS=['taticas','mercado','calendario','financas','marketing','stats','carreira','premios','hof','editor','jogadores','transferencias'];
 function render(){
   // se havia um jogo ao vivo rodando e esta tela não é mais a dele, mata o timer
   // (evita o jogo continuar simulando em segundo plano e pular temporadas sozinho)
@@ -4109,7 +4151,7 @@ function render(){
   if(S && S.times && S.times[S.meuTime]) aplicarCoresTime(S.times[S.meuTime].ab);
   hud();
   const MAP={inicio:vInicio,elenco:vElenco,taticas:vComissao,calendario:vCal,tabela:vTabela,
-           mercado:vMercado,treino:vTreino,financas:vFin,marketing:vMarketing,stats:vStats,carreira:vCarreira,premios:vPremios,editor:vEditor,mais:vMais,
+           mercado:vMercado,treino:vTreino,financas:vFin,marketing:vMarketing,stats:vStats,carreira:vCarreira,premios:vPremios,hof:(typeof vHallDaFama==='function'?vHallDaFama:vStats),editor:vEditor,mais:vMais,
            jogadores:(typeof vJogadores==='function'?vJogadores:vStats),transferencias:(typeof vTransferencias==='function'?vTransferencias:vStats)};
   const f=MAP[ABA]||vInicio;
   const voltar = SECUNDARIAS_MAIS.includes(ABA) ? `<button class="voltar-mais" onclick="ABA='mais';render()">‹ Mais</button>` : '';
@@ -6714,6 +6756,34 @@ function proporContrato(){
 /* ============================================================
    UI — Prêmios, Time Ideal e Camisas Aposentadas
    ============================================================ */
+
+function vHallDaFama(){
+  const hof=S.hof||[];
+  const cab=`<h2 class="sec">🏛️ Hall da Fama</h2>
+    <p class="hint" style="margin-bottom:12px">Os imortais do PARQUÊ — lendas eternizadas ao encerrar a carreira, por títulos, prêmios e legado. ${hof.length} induzido${hof.length===1?'':'s'}.</p>`;
+  if(!hof.length) return cab+`<div class="card"><p class="hint">Nenhuma lenda induzida ainda. Ao longo das temporadas, os maiores craques da liga se aposentam e entram para a história aqui — fique de olho nos MVPs e campeões chegando ao fim da linha.</p></div>`;
+  const linhas=hof.map(h=>{
+    const trof=[];
+    if(h.camp)   trof.push(`🏆 ${h.camp}× campeão`);
+    if(h.mvp)    trof.push(`👑 ${h.mvp}× MVP`);
+    if(h.allnba) trof.push(`⭐ ${h.allnba}× Time Ideal`);
+    if(h.dpoy)   trof.push(`🛡️ ${h.dpoy}× Defensor`);
+    if(h.roy)    trof.push(`🌟 Novato`);
+    const badges=trof.length?`<div class="hof-trof">${trof.map(t=>`<span>${t}</span>`).join('')}</div>`:'';
+    const meu=h.doMeuTime?`<span class="hof-meu">seu time</span>`:'';
+    const egg=h.egg?`<span class="hof-egg">🎮 lenda da rapaziada</span>`:'';
+    return `<div class="hof-card${h.doMeuTime?' on':''}">
+      <div class="hof-top">
+        <div class="hof-nome">${esc(h.nome)} ${meu}${egg}</div>
+        <div class="hof-score" title="índice de legado">${h.score}</div>
+      </div>
+      <div class="hof-sub">${bd(h.pos)} · ${esc(h.time)} · induzido em ${h.temp} · pico ${h.ovrPico} ovr · ${h.pts.toLocaleString('pt-BR')} pts na carreira</div>
+      ${badges}
+    </div>`;
+  }).join('');
+  return cab+linhas;
+}
+
 function vPremios(){
   const sub=S.premSub||'temporada';
   const tabBtn=(k,nome)=>`<button class="btn ${sub===k?'':'ghost'} mini" onclick="S.premSub='${k}';render()">${nome}</button>`;
@@ -9747,9 +9817,9 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-7';
+const BUILD = '2026.08.26-8';
 const NOVIDADES = {
-  versao: '2026.08m',
+  versao: '2026.08n',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
@@ -9758,7 +9828,8 @@ const NOVIDADES = {
     {emoji:'📰', t:'Coletiva vira manchete', d:'Sua resposta na entrevista repercute no PARQUÊ Sports como uma notícia "Coletiva", ligada ao momento do time.'},
     {emoji:'📣', t:'Torcida e fãs', d:'Sua base de fãs cresce com vitórias, títulos e boas entrevistas — e mais fãs lotam o ginásio, aumentando a renda.'},
     {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
-    {emoji:'🤝', t:'Química / entrosamento', d:'Elenco que joga junto entrosa e rende mais; quem acaba de chegar (troca, draft, free agent) demora a engrenar. Acompanhe a química do time na home e o entrosamento de cada jogador no elenco.'},
+    {emoji:'🏛️', t:'Hall da Fama', d:'As lendas do PARQUÊ agora são eternizadas! Craques com títulos, MVPs e grande legado entram no Hall da Fama ao se aposentar. Veja a galeria dos imortais no menu Mais.'},
+    {emoji:'🤝', t:'Química / entrosamento', d:'Elenco que joga junto entrosa e rende mais; quem acaba de chegar demora a engrenar. Acompanhe a química na home e no elenco.'},
     {emoji:'💵', t:'Finanças equilibradas', d:'Corrigido um déficit crônico: manter um bom elenco não quebra mais o caixa ao longo das temporadas.'},
   ]
 };
