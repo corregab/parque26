@@ -1476,7 +1476,7 @@ function criarLiga(){
       ingresso:Math.round(78+mkt*13+(prest-70)*0.6),
       capacidade:cap, patroc:Math.round((13+mkt*5.5+(prest-70)*0.32)*1e6),
       fas:Math.round(Math.max(2,Math.min(25,(prest-42)*0.5+mkt*2.2))*10)/10,
-      tv:Math.round((30+mkt*3.5)*1e6),
+      tv:Math.round((68+mkt*4)*1e6),
       tatica:{ritmo:1,foco:1,pressao:1,jogada:'balanceado',defesa:0,instr:{transicao:false,protegerBola:false,reboundCrash:false,doubleTeam:false}},minutos:{},titulares:[],hist:[],camp:0};
     (ROSTERS[ab]||[]).forEach(d=>tm.elenco.push(jogadorReal(d,i)));
     tm.elenco.sort((a,b)=>b.ovr-a.ovr);
@@ -2965,7 +2965,7 @@ function processarOffseason(){
       t.fas=Math.round(((t.fas||baseFas)*0.85+baseFas*0.15)*10)/10; }
     t.caixa += t.patroc*0.15;
     t.patroc = Math.round((12+t.mercado*5+ (t.prestigio-70)*0.35)*1e6*R(.9,1.15));
-    t.tv = Math.round((90+t.mercado*3.5)*1e6*R(.98,1.06));
+    t.tv = Math.round((68+t.mercado*4)*1e6*R(.98,1.06));
     t.prestigio = clamp(Math.round(t.prestigio*0.82 + forcaTime(t)*0.18 + (t.camp?2:0)),40,95);
   });
   S.livres=S.livres.filter(p=>!p.aposentou);
@@ -9723,9 +9723,9 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-5';
+const BUILD = '2026.08.26-6';
 const NOVIDADES = {
-  versao: '2026.08k',
+  versao: '2026.08l',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
@@ -9734,7 +9734,7 @@ const NOVIDADES = {
     {emoji:'📰', t:'Coletiva vira manchete', d:'Sua resposta na entrevista repercute no PARQUÊ Sports como uma notícia "Coletiva", ligada ao momento do time.'},
     {emoji:'📣', t:'Torcida e fãs', d:'Sua base de fãs cresce com vitórias, títulos e boas entrevistas — e mais fãs lotam o ginásio, aumentando a renda.'},
     {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
-    {emoji:'📱', t:'Mais responsivo no celular', d:'Corrigido o layout que esticava pra tamanho de desktop quando a temporada começava.'},
+    {emoji:'💵', t:'Finanças equilibradas', d:'Corrigido um déficit crônico: manter um bom elenco não quebra mais o caixa ao longo das temporadas. A receita de TV foi ajustada pra sustentar times competitivos.'},
   ]
 };
 function mostrarNovidades(forcar){
