@@ -4871,7 +4871,7 @@ function vDesenvolvimento(){
     return `<tr><td class="name">${esc(p.nome)}</td><td>${bd(p.pos)}</td><td>${p.idade}${jovem?' <span class="muted">jovem</span>':''}</td><td><span class="ovr">${p.ovr}</span></td><td>${AT_NOMES[k]||k} <span class="muted">(${p.at[k]})</span></td></tr>`;
   }).join('');
   const log=(S.devLog||[]).slice(0,12).map(d=>`<div class="dev-log"><b>${esc(d.nome.split(' ').pop())}</b> — ${d.at} → ${d.novo}${d.dovr>0?` <span style="color:var(--pos)">(ovr +${d.dovr})</span>`:''}</div>`).join('');
-  return `<div class="card accent"><h3 class="sub">🧑‍🏫 Preparador de desenvolvimento</h3><p class="hint">O preparador lapida, aos poucos, o <b>ponto fraco de cada jogador</b> a cada rodada. Evolução realista: jovens melhoram mais rápido, veteranos bem devagar.</p><div class="staff-list">${cards}</div></div>${nivel>0?`<div class="card" style="margin-top:12px"><h3 class="sub">Evolução recente</h3>${log||'<p class="hint">Assim que a temporada rolar, os ganhos aparecem aqui.</p>'}</div>`:''}<div class="card tbl-wrap" style="margin-top:12px"><h3 class="sub">Ponto fraco de cada jogador</h3><table><thead><tr><th>Jogador</th><th>Pos</th><th>Idade</th><th>Ovr</th><th>Foco do treino</th></tr></thead><tbody>${linhas}</tbody></table></div>`;
+  return `<div class="card accent"><h3 class="sub">🧑‍🏫 Preparador de desenvolvimento</h3><p class="hint">Seus jogadores evoluem <b>naturalmente jogando</b> — jovens melhoram bem mais rápido que veteranos. Um preparador <b>acelera</b> o desenvolvimento, lapidando o ponto fraco de cada um a cada rodada.</p><div class="staff-list">${cards}</div></div>${nivel>0?`<div class="card" style="margin-top:12px"><h3 class="sub">Evolução recente</h3>${log||'<p class="hint">Assim que a temporada rolar, os ganhos aparecem aqui.</p>'}</div>`:''}<div class="card tbl-wrap" style="margin-top:12px"><h3 class="sub">Ponto fraco de cada jogador</h3><table><thead><tr><th>Jogador</th><th>Pos</th><th>Idade</th><th>Ovr</th><th>Foco do treino</th></tr></thead><tbody>${linhas}</tbody></table></div>`;
 }
 function vOlheiro(){
   const r=relatorioOlheiro();
@@ -6499,26 +6499,27 @@ function contratarTreinadorDes(nivel){
 }
 // roda a cada rodada: desenvolve devagar o ponto fraco de cada jogador
 function desenvolverAutomatico(){
-  if(!treinadorDesAtivo()) return;
-  const ritmo=STAFF_DESENV[S.treinadorDes.nivel].ritmo;
-  const t=S.times[S.meuTime];
+  const t=S.times[S.meuTime]; if(!t) return;
+  // evolução natural (sempre ativa) + bônus do preparador contratado
+  const base=1.1;
+  const bonus=treinadorDesAtivo()?(STAFF_DESENV[S.treinadorDes.nivel].ritmo||0):0;
+  const ritmo=base+bonus;
   S.devLog=S.devLog||[];
   (t.elenco||[]).forEach(p=>{
-    if(p.lesao>0) return;
+    if(p.egg || p.lesao>0) return;
     // jovens evoluem mais rápido; perto do potencial rende menos
     const fatorIdade = p.idade<=21?1.5 : p.idade<=24?1.15 : p.idade<=27?0.8 : p.idade<=30?0.5 : 0.28;
     const margem = clamp((p.pot+4 - p.ovr)/14, 0.1, 1);
-    p._devProg = (p._devProg||0) + ritmo*fatorIdade*margem*0.16; // bem devagar
-    if(p._devProg>=1){
+    p._devProg = (p._devProg||0) + ritmo*fatorIdade*margem*0.55;
+    while(p._devProg>=1){
       p._devProg-=1;
       const k=atributoMaisFraco(p);
       const teto=Math.min(99, p.pot+4);
       if(p.at[k]<teto){
         p.at[k]=clamp(p.at[k]+1,20,teto);
         const antes=p.ovr; p.ovr=calcOvr(p);
-        S.devLog.unshift({nome:p.nome, at:AT_NOMES[k]||k, novo:p.at[k], ovr:p.ovr, dovr:p.ovr-antes, r:S.rodada});
-        S.devLog=S.devLog.slice(0,30);
-      }
+        if(p.ovr>antes){ S.devLog.unshift({nome:p.nome, at:AT_NOMES[k]||k, novo:p.at[k], ovr:p.ovr, dovr:p.ovr-antes, r:S.rodada}); S.devLog=S.devLog.slice(0,30); }
+      } else break;
     }
   });
 }
@@ -9942,9 +9943,9 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-10';
+const BUILD = '2026.08.26-11';
 const NOVIDADES = {
-  versao: '2026.08p',
+  versao: '2026.08q',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
@@ -9953,7 +9954,8 @@ const NOVIDADES = {
     {emoji:'📰', t:'Coletiva vira manchete', d:'Sua resposta na entrevista repercute no PARQUÊ Sports como uma notícia "Coletiva", ligada ao momento do time.'},
     {emoji:'📣', t:'Torcida e fãs', d:'Sua base de fãs cresce com vitórias, títulos e boas entrevistas — e mais fãs lotam o ginásio, aumentando a renda.'},
     {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
-    {emoji:'🔥', t:'Rivalidades', d:'Clássicos reais do basquete (Lakers x Celtics, Bulls x Pistons, Battle of LA...) agora são jogos marcados: badge especial no card e na agenda, e bater o rival dá moral e fãs extras — perder dói mais. Cada time tem seus rivais.'},
+    {emoji:'📈', t:'Desenvolvimento mais rápido', d:'Seus jogadores agora evoluem naturalmente jogando — jovens promissores maturam em poucas temporadas, não em uma vida inteira. Um preparador acelera ainda mais. Cuidado: veteranos quase não sobem.'},
+    {emoji:'🔥', t:'Rivalidades', d:'Clássicos reais (Lakers x Celtics, Bulls x Pistons, Battle of LA...) viraram jogos marcados: badge no card e na agenda, e bater o rival dá moral e fãs extras.'},
     {emoji:'🏛️', t:'Hall da Fama', d:'As lendas REAIS do basquete (Jordan, Kareem, Kobe...) eternizadas, e os craques que você formar entram na sua própria era ao se aposentar.'},
     {emoji:'🤝', t:'Química / entrosamento', d:'Elenco que joga junto entrosa e rende mais; quem acaba de chegar demora a engrenar. Acompanhe a química na home e no elenco.'},
     {emoji:'💵', t:'Finanças equilibradas', d:'Corrigido um déficit crônico: manter um bom elenco não quebra mais o caixa ao longo das temporadas.'},
