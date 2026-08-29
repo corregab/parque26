@@ -10014,7 +10014,7 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-13';
+const BUILD = '2026.08.26-14';
 const NOVIDADES = {
   versao: '2026.08s',
   titulo: '🗞️ Novidades do PARQUÊ',
@@ -10069,14 +10069,14 @@ function talvezLembrarCadastro(){
   const INTERVALO=2*24*60*60*1000; // depois disso, cobra de novo a cada 2 dias
   if(Date.now()-ultimo<INTERVALO) return;
   try{ localStorage.setItem(key, String(Date.now())); }catch(e){}
-  abrirModal('☁️ SALVA ESSA PORRA NA NUVEM!', `
-    <p class="hint">Sério, tu tá jogando faz tempo e isso tá salvo só nesse aparelho. Limpou os dados, trocou de celular, desinstalou o app... <b>TU VAI PERDER TUDO, HEINN</b> 😤</p>
+  abrirModal('☁️ Salve sua carreira na nuvem', `
+    <p class="hint">Você já está jogando há um tempo, e sua carreira está salva <b>só neste aparelho</b>. Se limpar os dados, trocar de celular ou desinstalar o app, pode acabar perdendo tudo. Que tal proteger seu progresso?</p>
     <div class="nov-item"><span class="nov-emoji">☁️</span><div><b>Backup na nuvem</b><p>Sua carreira fica protegida e nunca some.</p></div></div>
     <div class="nov-item"><span class="nov-emoji">📱</span><div><b>Jogue de qualquer lugar</b><p>Continue no celular, no computador, onde quiser — é só entrar com sua conta.</p></div></div>
     <div class="nov-item"><span class="nov-emoji">🏀</span><div><b>Ligas online</b><p>Crie ou entre em ligas para jogar junto com os amigos.</p></div></div>
     <div class="row" style="justify-content:center;gap:8px;margin-top:14px">
       <button class="btn" onclick="closeModal();if(typeof cloudPainelLogin==='function')cloudPainelLogin('criar')">Criar conta grátis</button>
-      <button class="btn ghost" onclick="closeModal()">Continuar sem cadastro</button>
+      <button class="btn ghost" onclick="closeModal()">Agora não</button>
     </div>`);
 }
 
