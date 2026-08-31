@@ -10091,7 +10091,7 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-15';
+const BUILD = '2026.08.26-16';
 const NOVIDADES = {
   versao: '2026.08t',
   titulo: '🗞️ Novidades do PARQUÊ',
@@ -10161,6 +10161,12 @@ function talvezLembrarCadastro(){
 async function iniciarApp(){
   if(typeof cloudInit==='function') cloudInit();
   migrarLegado();
+  // atalho do app (long-press no ícone): "Nova carreira" abre direto na criação
+  if((location.search||'').indexOf('nova=1')>=0 && typeof novaCarreira==='function'){
+    mostrarHub(); try{ novaCarreira(); }catch(e){}
+    try{ history.replaceState(null,'','./index.html'); }catch(e){}
+    return;
+  }
   mostrarHub();   // primeiro acesso (e todo acesso) abre na tela de início/hub
   setTimeout(()=>{ try{ mostrarNovidades(); }catch(e){} }, 650); // aviso de novidades (1x por versão)
   setTimeout(()=>{ try{ talvezLembrarCadastro(); }catch(e){} }, 1600); // lembrete de cadastro p/ quem joga só local

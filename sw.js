@@ -1,5 +1,5 @@
 /* Service Worker do PARQUÊ '26 — cache offline */
-const CACHE = 'parque26-v22';
+const CACHE = 'parque26-v23';
 const ASSETS = [
   './',
   './index.html',

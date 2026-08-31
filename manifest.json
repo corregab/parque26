@@ -1,18 +1,32 @@
 {
   "name": "PARQUÊ '26 — Manager de Basquete",
   "short_name": "PARQUÊ '26",
-  "description": "Simulador de gerenciamento de basquete: comande uma franquia, negocie contratos e trocas, viva sua carreira de técnico.",
+  "id": "/index.html",
+  "description": "Simulador de gerenciamento de basquete: comande uma franquia, negocie contratos e trocas, desenvolva talentos, viva rivalidades e construa sua dinastia rumo ao título.",
   "lang": "pt-BR",
+  "dir": "ltr",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
   "orientation": "portrait-primary",
   "background_color": "#0c0a09",
   "theme_color": "#c8792e",
+  "categories": ["games", "sports", "entertainment"],
+  "prefer_related_applications": false,
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "screenshot-1.png", "sizes": "824x1784", "type": "image/png", "form_factor": "narrow", "label": "Comande sua franquia no escritorio do tecnico" },
+    { "src": "screenshot-2.png", "sizes": "824x1784", "type": "image/png", "form_factor": "narrow", "label": "Gerencie o elenco, atributos e quimica" },
+    { "src": "screenshot-3.png", "sizes": "824x1784", "type": "image/png", "form_factor": "narrow", "label": "Eternize suas lendas no Hall da Fama" }
+  ],
+  "shortcuts": [
+    { "name": "Continuar carreira", "short_name": "Continuar", "description": "Volte de onde parou", "url": "./index.html", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Nova carreira", "short_name": "Nova", "description": "Comece uma nova jornada", "url": "./index.html?nova=1", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
   ]
 }
