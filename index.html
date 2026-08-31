@@ -1062,6 +1062,12 @@ tr.me td{background:var(--accent-soft) !important;box-shadow:inset 3px 0 0 var(-
 .tut-binfo{display:flex;flex-direction:column;gap:1px;min-width:0}
 .tut-binfo b{font-size:14px;color:var(--text)}
 .tut-binfo span{font-size:12px;color:var(--text-dim);line-height:1.35}
+
+/* —— Coletiva pós-jogo (banner) —— */
+.coletiva-banner{background:linear-gradient(160deg,rgba(192,132,252,.14),transparent 60%),var(--surface);border:1px solid rgba(192,132,252,.35);margin-bottom:14px}
+.cb-tit{font-family:var(--poster);font-size:18px;letter-spacing:.3px;color:#c084fc}
+.cb-sub{font-size:13px;color:var(--text-dim);margin-top:3px;line-height:1.4}
+.cb-sub b{color:#c084fc}
 </style>
 </head>
 <body>
@@ -2442,6 +2448,55 @@ function abrirEntrevista(){
   const ops=pg.ops.map((o,i)=>`<button class="btn ghost" style="display:block;width:100%;text-align:left;margin:6px 0" onclick="responderEntrevista(${i})">${esc(o.t)}</button>`).join('');
   abrirModal('🎤 Entrevista coletiva', `<p style="margin:0 0 4px"><b>Repórter: ${esc(pg.q)}</b></p><p class="hint" style="margin:0 0 8px">Sua resposta rende <b>fãs</b> ou mexe na <b>moral</b> — e vira manchete no PARQUÊ Sports.</p>${ops}`);
 }
+// —— COLETIVA PÓS-JOGO: entrevista específica sobre o jogo que acabou ——
+function gerarPerguntaColetiva(){
+  const c=S.coletivaPendente; if(!c) return null;
+  const sob=n=>n?n.split(' ').slice(-1)[0]:'';
+  const cands=[];
+  if(c.td) cands.push({peso:9, tag:'PÓS-JOGO', q:`${sob(c.destaque)} fez um triple-duplo (${c.dP}pts / ${c.dR}reb / ${c.dA}ast)! O que achou da atuação?`, ops:[
+    {t:`Rasgar elogios a ${sob(c.destaque)}`, fas:+0.6, moral:+3, txt:`O técnico exaltou o triple-duplo de ${c.destaque}, e a torcida ovacionou o craque.`},
+    {t:'Valorizar o coletivo', fas:+0.2, moral:+4, txt:`Mesmo após a noite histórica de ${c.destaque}, o comando pregou o trabalho de grupo.`}
+  ]});
+  else if(c.dP>=35) cands.push({peso:8, tag:'PÓS-JOGO', q:`${sob(c.destaque)} explodiu com ${c.dP} pontos! Comente a exibição.`, ops:[
+    {t:`Coroar ${sob(c.destaque)} como craque`, fas:+0.5, moral:+3, txt:`O técnico coroou a noite de ${c.dP} pontos de ${c.destaque}.`},
+    {t:'Manter os pés no chão', fas:+0.1, moral:+2, txt:`Elogio contido à exibição de ${c.dP} pontos de ${c.destaque}.`}
+  ]});
+  if(c.rival) cands.push({peso:8, tag:'CLÁSSICO', q:c.venci?`Vitória no clássico contra o ${c.advNick} por ${c.eu} a ${c.ele}! O que essa vitória significa?`:`Derrota no clássico para o ${c.advNick} por ${c.ele} a ${c.eu}. Como avalia?`, ops: c.venci?[
+    {t:'Dedicar à torcida', fas:+0.7, moral:+2, txt:`O técnico dedicou o triunfo no clássico à torcida, que fez a festa contra o ${c.advNick}.`},
+    {t:'"Foi só mais um jogo"', fas:-0.2, moral:+1, txt:`A tentativa de esfriar a rivalidade não agradou a arquibancada.`}
+  ]:[
+    {t:'Assumir e prometer revanche', fas:+0.4, moral:+2, txt:`O técnico prometeu revanche no próximo duelo contra o rival ${c.advNick}.`},
+    {t:'Minimizar a derrota', fas:-0.3, moral:-2, txt:`Minimizar o clássico perdido irritou a torcida.`}
+  ]});
+  if(c.dif>=20) cands.push({peso:7, tag:'PÓS-JOGO', q:c.venci?`Que atropelo — ${c.eu} a ${c.ele} no ${c.advNick}! O time está voando?`:`Goleada dura: ${c.ele} a ${c.eu} para o ${c.advNick}. O que aconteceu?`, ops: c.venci?[
+    {t:'Projetar voos altos', fas:+0.6, moral:0, txt:`Após o atropelo no ${c.advNick}, o técnico projetou grandes objetivos.`},
+    {t:'Elogiar a entrega', fas:+0.2, moral:+4, txt:`O comandante creditou a goleada à entrega do grupo.`}
+  ]:[
+    {t:'Assumir a responsabilidade', fas:+0.2, moral:+4, txt:`O técnico blindou o elenco após a goleada sofrida diante do ${c.advNick}.`},
+    {t:'Cobrar reação imediata', fas:+0.3, moral:-4, txt:`A cobrança pública após a goleada pesou no vestiário.`}
+  ]});
+  else if(c.dif<=4) cands.push({peso:6, tag:'PÓS-JOGO', q:c.venci?`Vitória no sufoco por ${c.eu} a ${c.ele} sobre o ${c.advNick}. Sofreu?`:`Derrota apertada por ${c.ele} a ${c.eu} para o ${c.advNick}. Faltou o quê?`, ops: c.venci?[
+    {t:'Exaltar a raça do time', fas:+0.5, moral:+3, txt:`O técnico exaltou a garra na vitória apertada sobre o ${c.advNick}.`},
+    {t:'Admitir que deu trabalho', fas:+0.1, moral:+1, txt:`Sinceridade sobre o jogo difícil.`}
+  ]:[
+    {t:'Lamentar os detalhes', fas:0, moral:+1, txt:`O técnico lamentou os detalhes na derrota apertada.`},
+    {t:'Bancar o elenco', fas:+0.2, moral:+4, txt:`Apoio público ao grupo após a derrota no fim.`}
+  ]});
+  if(!cands.length) cands.push({peso:1, tag:'PÓS-JOGO', q:c.venci?`Vitória por ${c.eu} a ${c.ele} sobre o ${c.advNick}. Comente.`:`Derrota por ${c.ele} a ${c.eu} para o ${c.advNick}. Comente.`, ops:[
+    {t:'Valorizar o grupo', fas:+0.2, moral:+3, txt:`Discurso de valorização do elenco após o jogo.`},
+    {t:'Foco no próximo', fas:0, moral:+1, txt:`O técnico já mirou o próximo compromisso.`}
+  ]});
+  cands.forEach(c2=>c2._o=c2.peso+RI(0,2));
+  cands.sort((a,b)=>b._o-a._o);
+  const pg=cands[0]; pg._coletiva=true; return pg;
+}
+function abrirColetiva(){
+  const pg=gerarPerguntaColetiva();
+  if(!pg){ toast&&toast('Nenhuma coletiva disponível agora.'); return; }
+  S._entrevistaAtual=pg;
+  const ops=pg.ops.map((o,i)=>`<button class="btn ghost" style="display:block;width:100%;text-align:left;margin:6px 0" onclick="responderEntrevista(${i})">${esc(o.t)}</button>`).join('');
+  abrirModal('🎤 Coletiva pós-jogo', `<p style="margin:0 0 4px"><b>Repórter: ${esc(pg.q)}</b></p><p class="hint" style="margin:0 0 8px">Fala sobre o jogo que acabou — rende <b>fãs</b> ou <b>moral</b>, e vira manchete no PARQUÊ Sports.</p>${ops}`);
+}
 function moralMediaElenco(t){
   const el=(t.elenco||[]).filter(p=>!p.egg);
   return el.length? el.reduce((s,p)=>s+(p.moral==null?70:p.moral),0)/el.length : 70;
@@ -2463,6 +2518,7 @@ function responderEntrevista(i){
   else if(o.moral<0) manch=`Cobrança pública do técnico do ${t.nick} repercute`;
   else manch=`Técnico do ${t.nick} fala à imprensa`;
   S.ultimaEntrevista={manch, txt:o.txt, rodada:S.rodada||0};
+  if(pg._coletiva) S.coletivaPendente=null;
   S._entrevistaAtual=null;
   const partes=[];
   if(o.fas) partes.push(`${o.fas>0?'+':''}${o.fas}M fãs`);
@@ -2769,6 +2825,18 @@ function avancarRodada(preRes){
       }
       meuRes.lesoes.filter(l=>l.time===S.times[S.meuTime].ab).forEach(l=>
         noticia('⚕ '+l.p.nome+' desfalca o time por '+l.jogos+' jogos ('+l.tipo+')','x'));
+      // COLETIVA PÓS-JOGO: fica disponível só após jogos marcantes
+      { const dif=Math.abs(eu-ele);
+        const bx=((meuA?meuRes.A:meuRes.B).ps)||[];
+        const dest=[...bx].filter(p=>p.b).sort((a,b)=>(b.b.pts||0)-(a.b.pts||0))[0];
+        const dP=dest&&dest.b?dest.b.pts:0, dR=dest&&dest.b?dest.b.reb:0, dA=dest&&dest.b?dest.b.ast:0;
+        const td=[dP,dR,dA].filter(x=>x>=10).length>=3, riv=ehRival(meuT.ab, adv.ab);
+        S.coletivaPendente = (riv||dif>=20||dif<=4||dP>=35||td) ? {
+          venci:eu>ele, eu, ele, dif, advNick:adv.nick,
+          rival:riv, rivNome:riv?(nomeRivalidade(meuT.ab,adv.ab)||'Clássico'):null,
+          destaque:dest?dest.nome:null, dP, dR, dA, td
+        } : null;
+      }
     }
     if(S.rodada>=S.cal.length){ iniciarPlayoffs(); break; }
     if(meuJoga) break; // jogou o seu jogo desta vez: para aqui
@@ -4471,13 +4539,22 @@ function vInicio(){
   const t=S.times[S.meuTime];
   if(S.demitido) return telaDesemprego();
   let bloco='';
+  if(S.coletivaPendente){
+    const c=S.coletivaPendente;
+    const extra = c.rival?' · <b>clássico</b>' : (c.destaque&&(c.dP>=35||c.td))?' · '+esc(c.destaque)+' brilhou' : (c.dif>=20?' · goleada':c.dif<=4?' · no sufoco':'');
+    bloco += `<div class="card coletiva-banner">
+      <div class="cb-tit">🎤 Coletiva pós-jogo</div>
+      <div class="cb-sub">${c.venci?'Vitória':'Derrota'} ${c.eu}×${c.ele} ${c.venci?'sobre o':'para o'} ${esc(c.advNick)}${extra}. A imprensa quer ouvir você.</div>
+      <button class="btn mini" style="margin-top:9px" onclick="abrirColetiva()">🎤 Dar coletiva</button>
+    </div>`;
+  }
   if(S.fase==='regular'){
     const px=proximoJogo();
     if(px){
       const casa=px.j.c===S.meuTime, adv=S.times[casa?px.j.f:px.j.c];
       const diaJogo=diaDaRodada(px.rodada);
       const folgaAtual=hojeEhFolga();
-      bloco=`<div class="card accent">
+      bloco+=`<div class="card accent">
         <div class="cal-datebar"><span class="cal-date">📅 ${dataLegivel(diaTempAtual())}</span><span class="cal-prog">Rodada ${S.rodada+1} · ${dataLegivel(totalDiasTemp(),true)} encerra a temporada</span></div>
         ${folgaAtual?`<div class="cal-folga">🛌 Dia de folga do ${esc(t.nick)} — sem jogo hoje. Bom pra treinar, negociar ou falar com a imprensa.
           ${podeDarEntrevista()?`<button class="btn mini" style="margin-top:8px" onclick="abrirEntrevista()">🎤 Dar entrevista</button>`:`<div class="hint" style="margin-top:6px">🎤 Entrevista de hoje já concedida.</div>`}</div>`:''}
@@ -10014,9 +10091,9 @@ function mostrarSetup(){ mostrarHub(); }
 
 /* ---------- NOVIDADES / NOTAS DE ATUALIZAÇÃO ----------
    Para reexibir o aviso a todos, basta trocar o campo "versao" abaixo. */
-const BUILD = '2026.08.26-14';
+const BUILD = '2026.08.26-15';
 const NOVIDADES = {
-  versao: '2026.08s',
+  versao: '2026.08t',
   titulo: '🗞️ Novidades do PARQUÊ',
   data: 'Atualização de agosto/2026',
   itens: [
@@ -10025,7 +10102,8 @@ const NOVIDADES = {
     {emoji:'📰', t:'Coletiva vira manchete', d:'Sua resposta na entrevista repercute no PARQUÊ Sports como uma notícia "Coletiva", ligada ao momento do time.'},
     {emoji:'📣', t:'Torcida e fãs', d:'Sua base de fãs cresce com vitórias, títulos e boas entrevistas — e mais fãs lotam o ginásio, aumentando a renda.'},
     {emoji:'🔒', t:'Jogadores intocáveis', d:'Marque quem não sai por nada. O olheiro nunca oferece um intocável em troca.'},
-    {emoji:'🎓', t:'Tutorial de primeiros passos', d:'Novo por aqui? Um guia aparece na primeira carreira explicando o essencial — incluindo os botões da barra e do dia de jogo, com o que cada um faz. Revê quando quiser no menu Mais, em "Como jogar".'},
+    {emoji:'🎙️', t:'Coletiva pós-jogo', d:'Depois de um jogo marcante (clássico, goleada, jogo no sufoco ou um show individual), a imprensa te chama pra uma coletiva sobre aquele jogo. Suas respostas rendem moral e fãs, e viram manchete.'},
+    {emoji:'🎓', t:'Tutorial de primeiros passos', d:'Um guia aparece na primeira carreira explicando o essencial, incluindo os botões. Revê quando quiser no menu Mais, em "Como jogar".'},
     {emoji:'📈', t:'Desenvolvimento mais rápido', d:'Seus jogadores evoluem naturalmente jogando — jovens maturam em poucas temporadas. Um preparador acelera ainda mais.'},
     {emoji:'🔥', t:'Rivalidades', d:'Clássicos reais (Lakers x Celtics, Bulls x Pistons, Battle of LA...) viraram jogos marcados: badge no card e na agenda, e bater o rival dá moral e fãs extras.'},
     {emoji:'🏛️', t:'Hall da Fama', d:'As lendas REAIS do basquete (Jordan, Kareem, Kobe...) eternizadas, e os craques que você formar entram na sua própria era ao se aposentar.'},
